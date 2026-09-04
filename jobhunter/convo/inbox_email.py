@@ -1,0 +1,225 @@
+"""Цикл входящих писем: IMAP → привязка → те же автоответы и карточки.
+
+Отличие от телеграмного цикла в одном: там опрос идёт ПО ЗАЯВКАМ, здесь —
+по ящику целиком, а привязка к заявке происходит уже после. Всё остальное
+переиспользуется как есть: классификация, разбор слотов, план ответа,
+карточки владельцу, статусы, черновики от LLM. Дублировать эту логику для
+второго канала значило бы гарантировать, что однажды каналы разойдутся в
+поведении.
+
+    python -m jobhunter.convo.inbox_email --dry     # разбор без записи в БД
+"""
+from __future__ import annotations
+
+import asyncio
+import logging
+import sys
+from collections import Counter
+
+from sqlalchemy import select
+
+from ..config import get_settings
+from ..db import session_scope
+from ..models import Application, ContactKind, Job, Message, Status
+from ..textutil import clean_email_body
+from . import imapbox, mailmatch
+from .engine import LIVE, handle_message, store_incoming
+
+log = logging.getLogger("inbox_mail")
+
+# Отвечают и через три недели, когда заявка уже закрыта как «без ответа» —
+# такое письмо принять надо.
+LIVE_EMAIL = LIVE | {Status.NO_REPLY_CLOSED.value}
+# По этим статусам письмо сохраняем, но автоматику не запускаем: разговор
+# закончен, и любой ответ — дело владельца.
+TERMINAL_NOTIFY = {Status.REJECTED_BY_EMPLOYER.value, Status.WITHDRAWN.value}
+
+
+def build_context() -> mailmatch.MatchContext:
+    """Снимок БД для привязки: один запрос на проход, дальше чистые функции."""
+    ctx = mailmatch.MatchContext()
+    with session_scope() as sess:
+        rows = sess.execute(
+            select(Application, Job)
+            .join(Job, Application.job_id == Job.id)
+            .where(Job.contact_kind == ContactKind.EMAIL.value)).all()
+        live_ids = []
+        for app, job in rows:
+            addr = (job.contact_url or "").replace("mailto:", "").strip().lower()
+            if app.status in LIVE_EMAIL or app.status in TERMINAL_NOTIFY:
+                live_ids.append(app.id)
+                if app.email_peer:
+                    ctx.by_peer[app.email_peer.strip().lower()] = app.id
+                if addr:
+                    ctx.by_employer.setdefault(addr, []).append(app.id)
+                    if "@" in addr:
+                        ctx.known_domains.add(addr.split("@")[-1])
+                ctx.subjects[app.id] = job.title or job.tag or ""
+        if live_ids:
+            for msg in sess.scalars(
+                    select(Message)
+                    .where(Message.application_id.in_(live_ids),
+                           Message.email_message_id != "")).all():
+                ctx.by_msgid[msg.email_message_id] = msg.application_id
+    return ctx
+
+
+def _parse_plus(text: str) -> int:
+    from ..outreach.mailer import parse_reply_to
+    return parse_reply_to(text)
+
+
+async def process(dry: bool = False) -> dict:
+    """Один проход по ящику."""
+    s = get_settings()
+    stats = {"seen": 0, "matched": 0, "incoming": 0, "auto": 0, "escalated": 0,
+             "closed": 0, "skipped": 0, "bodies": 0, "by_rule": Counter(),
+             "ambiguous": 0}
+    if not s.imap_enabled:
+        return dict(stats, error="IMAP выключен")
+
+    try:
+        conn = imapbox.connect()
+    except imapbox.MailboxError as e:
+        return dict(stats, error=str(e))
+
+    try:
+        uids, validity, _reset = imapbox.new_uids(conn)
+        stats["seen"] = len(uids)
+        if not uids:
+            return stats
+
+        ctx = build_context()
+        matched = []                      # (app_id, uid, headers, rule)
+        for uid, headers in imapbox.fetch_headers(conn, uids):
+            cand = mailmatch.match_by_headers(headers, ctx, _parse_plus)
+            if cand.drop_reason:
+                stats["skipped"] += 1
+                continue
+            if cand.ambiguous:
+                stats["ambiguous"] += 1
+                _notify_ambiguous(headers, cand.ambiguous)
+                continue
+            if not cand.need_body:
+                # Постороннее письмо: тело не скачивается вовсе. Именно так
+                # выражается «в базу попадает только связанное с откликами».
+                stats["skipped"] += 1
+                continue
+
+            body, is_html = imapbox.fetch_body(conn, uid)
+            stats["bodies"] += 1
+            if not cand.matched:
+                # Последний шанс: plus-адрес в цитате пересланного письма.
+                cand = mailmatch.match_by_body(body, ctx, _parse_plus)
+                if not cand.matched:
+                    stats["skipped"] += 1
+                    continue
+            text = clean_email_body(body, is_html=is_html)
+            matched.append((cand.app_id, uid, headers, cand.rule, text))
+            stats["matched"] += 1
+            stats["by_rule"][cand.rule] += 1
+    finally:
+        try:
+            conn.logout()
+        except Exception:
+            pass
+
+    for app_id, uid, headers, rule, text in matched:
+        verdict = await _handle_one(app_id, uid, headers, rule, text, dry=dry)
+        log.info("   #%s uid=%s (%s): %s", app_id, uid, rule, verdict)
+        if verdict.startswith("автоответ"):
+            stats["auto"] += 1
+        elif verdict.startswith(("эскалация", "слоты")):
+            stats["escalated"] += 1
+        elif verdict.startswith("отказ"):
+            stats["closed"] += 1
+        stats["incoming"] += 1
+
+    if not dry:
+        imapbox.advance_watermark(uids, validity)
+    stats["by_rule"] = dict(stats["by_rule"])
+    return stats
+
+
+async def _handle_one(app_id: int, uid: int, headers: dict, rule: str,
+                      text: str, dry: bool = False) -> str:
+    """Сохранить письмо и, если уместно, пустить по общей логике ответов."""
+    from ..textutil import clean_email_body  # noqa: F401  (док-ссылка)
+
+    sender = mailmatch.addr_of(headers.get("from", ""))
+    extra = {"email_message_id": mailmatch.MSGID_RE.search(
+                 headers.get("message-id", "") or "").group(0)
+             if mailmatch.MSGID_RE.search(headers.get("message-id", "") or "")
+             else "",
+             "email_in_reply_to": headers.get("in-reply-to", "")[:200],
+             "email_from": sender,
+             "email_subject": (headers.get("subject", "") or "")[:300],
+             "match_rule": rule}
+
+    if dry:
+        return "dry: %s → заявка #%d" % (sender, app_id)
+
+    received = imapbox.msg_date(headers)
+    new_ids = store_incoming(app_id, [(uid, text or "(пустое письмо)",
+                                       received, extra)], channel="email")
+    if not new_ids:
+        return "уже было"
+
+    with session_scope() as sess:
+        status = sess.get(Application, app_id).status
+    if status in TERMINAL_NOTIFY:
+        return "сохранено, тред закрыт"
+    if not text:
+        # Письмо целиком из цитаты: факт ответа зафиксирован, а
+        # классифицировать нечего — пустой текст даст ложный UNKNOWN.
+        return "сохранено, нового текста нет"
+
+    # client=None: handle_message передаёт его только в send_reply, а тот для
+    # почтовой заявки уходит в SMTP и клиента не касается.
+    return await handle_message(None, app_id, text, dry=dry)
+
+
+def _notify_ambiguous(headers: dict, apps: list) -> None:
+    """Несколько заявок в одну компанию — решает владелец, а не эвристика.
+
+    Гадать нельзя: цена ошибки — подтверждение интервью не по той вакансии.
+    """
+    from .. import notify
+    notify.push("mail_ambiguous",
+                "📧 Письмо от %s не удалось привязать однозначно.\n"
+                "Тема: %s\nПодходят заявки: %s"
+                % (mailmatch.addr_of(headers.get("from", "")) or "?",
+                   (headers.get("subject", "") or "")[:120],
+                   ", ".join("#%d" % a for a in apps[:6])),
+                dedup="ambig:%s" % (headers.get("message-id", "") or "")[:120])
+
+
+async def run(dry: bool = False) -> dict:
+    return await process(dry=dry)
+
+
+def main() -> int:
+    import argparse
+
+    ap = argparse.ArgumentParser(description="Входящие письма")
+    ap.add_argument("--dry", action="store_true",
+                    help="разобрать и показать, ничего не записывая")
+    args = ap.parse_args()
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+
+    stats = asyncio.run(run(dry=args.dry))
+    if stats.get("error"):
+        print("Ошибка: %s" % stats["error"])
+        return 2
+    print("просмотрено %(seen)d, тел скачано %(bodies)d, привязано %(matched)d, "
+          "пропущено %(skipped)d, неоднозначных %(ambiguous)d" % stats)
+    if stats["by_rule"]:
+        print("правила: %s" % ", ".join("%s=%d" % kv
+                                        for kv in stats["by_rule"].items()))
+    print("входящих %(incoming)d, автоответов %(auto)d, эскалаций %(escalated)d"
+          % stats)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

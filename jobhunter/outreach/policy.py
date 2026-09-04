@@ -1,0 +1,229 @@
+"""Политика безопасности отправки: квоты, стоп-краны, реакция на флуд.
+
+Темп задан пользователем (по умолчанию 30 холодных/день, без прогрева).
+Здесь не ограничивается сам темп — здесь стоят предохранители, которые
+не дают потерять аккаунт при срабатывании анти-спама Telegram.
+"""
+from __future__ import annotations
+
+import random
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
+
+from ..config import get_settings
+from ..models import CampaignState, DailyQuota, SendLock, utcnow
+
+# Ответы в существующие диалоги — отдельный, более щедрый бакет:
+# они низкорисковые и не должны съедать холодную квоту.
+WARM_REPLY_DAILY = 80
+
+PEERFLOOD_LOCK_HOURS = 48
+FLOOD_SLEEP_MAX = 300          # выше — это уже анти-спам сигнал, не rate limit
+
+
+@dataclass
+class Verdict:
+    allowed: bool
+    reason: str = ""
+    wait_seconds: int = 0
+
+
+def _today() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+
+def get_state(sess) -> CampaignState:
+    st = sess.get(CampaignState, 1)
+    if st is None:
+        s = get_settings()
+        st = CampaignState(id=1, quota_ceiling=s.daily_cold_limit)
+        sess.add(st)
+        sess.flush()
+    return st
+
+
+def get_quota(sess, day: str | None = None) -> DailyQuota:
+    day = day or _today()
+    q = sess.get(DailyQuota, day)
+    if q is None:
+        st = get_state(sess)
+        cap = st.quota_ceiling
+        # Первый день после истёкшего пирфлуд-лока — разведка тремя
+        # сообщениями, а не сразу полный потолок: третий страйк подряд
+        # может стоить аккаунта надолго.
+        lk = sess.get(SendLock, 1)
+        if lk and lk.locked_until:
+            since = (datetime.now(timezone.utc).replace(tzinfo=None)
+                     - lk.locked_until)
+            if timedelta(0) <= since < timedelta(hours=24):
+                cap = min(3, cap)
+        q = DailyQuota(date=day, planned_cap=cap)
+        sess.add(q)
+        sess.flush()
+    return q
+
+
+def get_lock(sess) -> SendLock:
+    lk = sess.get(SendLock, 1)
+    if lk is None:
+        lk = SendLock(id=1)
+        sess.add(lk)
+        sess.flush()
+    return lk
+
+
+def kill_switch_active() -> bool:
+    """Файл-стоп-кран: проверяется ПЕРЕД каждой отправкой, не раз на партию."""
+    return get_settings().kill_switch.exists()
+
+
+def can_send_cold(sess) -> Verdict:
+    """Можно ли отправить ещё одно холодное сообщение прямо сейчас."""
+    if kill_switch_active():
+        return Verdict(False, "kill-switch: %s" % get_settings().kill_switch.name)
+
+    st = get_state(sess)
+    if st.manual_only:
+        return Verdict(False, "кампания переведена в ручной режим (2× PeerFlood)")
+
+    lk = get_lock(sess)
+    if lk.locked_until and lk.locked_until > datetime.now(timezone.utc).replace(tzinfo=None):
+        left = lk.locked_until - datetime.now(timezone.utc).replace(tzinfo=None)
+        return Verdict(False, "лок до %s (%s)" % (lk.locked_until, lk.reason),
+                       int(left.total_seconds()))
+
+    q = get_quota(sess)
+    cap = min(q.planned_cap or st.quota_ceiling, st.quota_ceiling)
+    if q.sent_count >= cap:
+        return Verdict(False, "дневная квота исчерпана (%d/%d)" % (q.sent_count, cap))
+    return Verdict(True, "%d/%d за сегодня" % (q.sent_count, cap))
+
+
+def register_sent(sess, cold: bool = True) -> None:
+    q = get_quota(sess)
+    if cold:
+        q.sent_count += 1
+
+
+def register_resolve(sess) -> None:
+    """Резолв юзернейма имеет свои лимиты — считаем отдельно."""
+    get_quota(sess).resolve_count += 1
+
+
+def on_flood_wait(sess, seconds: int) -> Verdict:
+    """FloodWaitError. Короткий — ждём. Длинный — это уже сигнал, не лимит."""
+    q = get_quota(sess)
+    q.floodwait_total_seconds += int(seconds)
+    if seconds <= FLOOD_SLEEP_MAX:
+        return Verdict(True, "flood wait %ds — ждём" % seconds, int(seconds))
+    return on_peer_flood(sess, "FloodWait %ds" % seconds)
+
+
+def on_peer_flood(sess, detail: str = "") -> Verdict:
+    """PeerFloodError — аккаунт уже в анти-спам списке. Немедленный стоп.
+
+    Это не ограничение выбранного пользователем темпа: без этой реакции
+    следующие сообщения идут в пустоту, а аккаунт уходит в постоянный бан.
+    """
+    st = get_state(sess)
+    q = get_quota(sess)
+    lk = get_lock(sess)
+
+    q.peerflood_count += 1
+    q.clean_day = False
+    st.peerflood_total += 1
+    st.consecutive_clean_days = 0
+    st.quota_ceiling = max(2, st.quota_ceiling // 2)     # навсегда для кампании
+
+    lk.locked_until = (datetime.now(timezone.utc).replace(tzinfo=None)
+                       + timedelta(hours=PEERFLOOD_LOCK_HOURS))
+    lk.scope = "cold_only"        # переписка с ответившими продолжается
+    lk.reason = "peerflood: %s" % (detail or "")
+    lk.set_at = utcnow()
+    lk.set_by = "policy"
+
+    # Уведомление ставится ТОЙ ЖЕ транзакцией, что и понижение квоты: иначе
+    # возможен коммит наказания без предупреждения владельцу или наоборот.
+    from .. import notify
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+    if st.peerflood_total >= 2:
+        st.manual_only = True
+        notify.push("error",
+                    "🛑 Второй PeerFlood — кампания в ручном режиме.\n"
+                    "Автоматическая отправка остановлена до твоего решения.\n"
+                    "Причина: %s" % (detail or "—"),
+                    dedup="manual_only", sess=sess)
+        return Verdict(False, "второй PeerFlood — постоянный ручной режим")
+
+    notify.push("peerflood",
+                "⚠️ PeerFlood: Telegram придержал отправку.\n"
+                "Стоп на %d ч, дневной потолок понижен до %d.\n"
+                "Переписка с теми, кто уже ответил, продолжается."
+                % (PEERFLOOD_LOCK_HOURS, st.quota_ceiling),
+                dedup="peerflood:%s" % today, sess=sess)
+    return Verdict(False, "PeerFlood: стоп на %dч, потолок → %d"
+                   % (PEERFLOOD_LOCK_HOURS, st.quota_ceiling))
+
+
+def close_day(sess) -> None:
+    """Итог дня: чистый день увеличивает счётчик доверия."""
+    q = get_quota(sess)
+    st = get_state(sess)
+    if q.clean_day and q.sent_count > 0:
+        st.consecutive_clean_days += 1
+        # Восстановление доверия: каждые 3 чистых дня подряд возвращают
+        # единицу потолка. Максимум 15, не исходные 30: аккаунт с двумя
+        # страйками к прежнему темпу не возвращается.
+        if st.consecutive_clean_days % 3 == 0 and st.quota_ceiling < 15:
+            st.quota_ceiling += 1
+
+
+# ── тайминг: сессиями, а не равномерным рандомом ──
+
+def session_plan(daily_cap: int, rng: random.Random | None = None) -> list:
+    """План дня: 4-6 сессий по 2-6 сообщений.
+
+    Равномерные интервалы — сами по себе машинный паттерн; люди пишут
+    пачками и потом молчат час.
+    """
+    rng = rng or random.Random()
+    sessions = rng.randint(4, 6)
+    left, plan = daily_cap, []
+    for i in range(sessions):
+        if left <= 0:
+            break
+        remaining_sessions = sessions - i
+        chunk = max(1, min(left, round(left / remaining_sessions + rng.uniform(-1, 1))))
+        plan.append(chunk)
+        left -= chunk
+    if left > 0 and plan:
+        plan[-1] += left
+    return plan
+
+
+def gap_seconds(rng: random.Random | None = None) -> float:
+    """Пауза между сообщениями внутри сессии: логнормальная, медиана ~90с."""
+    rng = rng or random.Random()
+    # Медиана поднята 90 → 120 с после двух PeerFlood: медленнее, чем
+    # хочется, но быстрее, чем разбан.
+    v = rng.lognormvariate(4.8, 0.6)     # медиана e^4.8 ≈ 120
+    return max(60.0, min(300.0, v)) + rng.uniform(0, 7)
+
+
+def session_gap_seconds(rng: random.Random | None = None) -> float:
+    rng = rng or random.Random()
+    return rng.uniform(40 * 60, 120 * 60)
+
+
+def typing_seconds(text: str, rng: random.Random | None = None) -> float:
+    """Сколько «печатать» перед отправкой — реальный MTProto-сигнал."""
+    rng = rng or random.Random()
+    return min(12.0, len(text or "") / rng.uniform(6.0, 9.0))
+
+
+# ── окно по времени ПОЛУЧАТЕЛЯ ──
+
+def within_send_window(hour_local: int) -> bool:
+    """09:00-21:00 по времени получателя. Ночной холодный DM = жалоба."""
+    return 9 <= hour_local < 21

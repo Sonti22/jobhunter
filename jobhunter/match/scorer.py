@@ -1,0 +1,180 @@
+"""Скоринг вакансия ↔ профиль.
+
+Определяет, стоит ли откликаться, и служит основой ранжирования буллетов.
+Ключевой сигнал — какие технологии из вакансии кандидат реально знает
+(и на каком уровне), и сколько из требований попадает в never_claim.
+"""
+from __future__ import annotations
+
+import re
+from dataclasses import dataclass, field
+
+from ..profile import Profile, get_profile
+from ..tailor.gate import _find_terms
+from . import workformat
+
+LEVEL_WEIGHT = {"expert": 1.0, "working": 0.7, "familiar": 0.35, "none": 0.0}
+
+# Роли, под которые Сурен реально подходит (по опыту в профиле).
+FIT_ROLES = re.compile(
+    r"(product\s*manager|product\s*owner|technical\s*pm|tech\s*lead|"
+    r"backend|back-end|python|software\s*(engineer|architect)|"
+    r"продукт|разработчик|инженер|архитектор|team\s*lead|teamlead|"
+    r"ml\s*engineer|mlops|ml\s*systems|computer\s*vision|"
+    r"integration\s*engineer|platform\s*engineer|"
+    r"devops|\bsre\b|site\s*reliability|infrastructure\s*engineer|"
+    r"solution\s*architect|системный\s*архитектор|data\s*engineer)", re.I)
+
+# Product positions remain valid for this profile, but they no longer receive
+# the same generic role bonus as an engineering vacancy.  The historical
+# queue had product roles overrepresented because the word "product" was
+# enough to make them look as strong as backend roles.
+PRODUCT_ROLES = re.compile(
+    r"(?:product\s*(?:manager|owner|lead|analyst)|technical\s*pm|"
+    r"продакт|продуктов\w*\s+менеджер)", re.I)
+
+# Роли, где он точно не кандидат (чтобы не тратить отклик).
+# Госпортал «Работа России» отдаёт много бюджетных ролей, где слово
+# «информатика» или «программист» есть, а работа — не инженерная.
+BUDGET_ROLES = re.compile(
+    r"(преподавател|учител|педагог|воспитател|методист|лаборант|"
+    r"доцент|профессор|ассистент\s+кафедр|заведующ|ректор|декан|"
+    r"научный\s+сотрудник|соискател\s+учен|аспирант|"
+    r"библиотекар|делопроизводител|секретар|диспетчер|"
+    r"электромонт|слесар|механик|монтажник|сварщик|токар|фрезеров|"
+    r"техник[- ]|оператор\s+эвм|водител|кладовщик|груз|"
+    r"инженер\s+по\s+охране|инженер[- ]констру|инженер[- ]механ|"
+    r"инженер\s+по\s+(?:наладке|эксплуатац|снабжен|мет)|"
+    r"специалист\s+по\s+кадр|бухгалтер|экономист|юрисконсульт|"
+    r"ведущий\s+специалист\s+отдела|главный\s+специалист\s+отдела|"
+    r"в\s+прочих\s+отраслях)", re.I)
+
+MISFIT_ROLES = re.compile(
+    r"\b(ios|android|swift|kotlin|frontend|front-end|react|vue|angular|"
+    r"designer|дизайнер|php|\.net|c#|java\b|golang\b|rust\b|qa\s*manual|"
+    r"unity|gamedev|3d|копирайтер|маркетолог|smm|sales|продаж)", re.I)
+
+# Теги careered — надёжная категория роли. Эти = профнепригодно независимо от
+# случайных совпадений терминов в тексте вакансии.
+MISFIT_TAGS = {
+    "ios", "android", "swift", "kotlin", "flutter", "react native",
+    "frontend", "front-end", "react", "vue", "angular", "js", "javascript",
+    "php", "c#", ".net", "java", "go", "golang", "rust", "ruby", "scala",
+    "c / c++", "c/c++", "c++", "c", "1c", "unity", "gamedev", "game",
+    "design", "designer", "ui/ux", "ux", "seo", "smm", "marketing",
+    "sales", "hr", "copywriter", "sysadmin",
+}
+
+
+# Уровень позиции. Кандидат — Senior/Lead с 7 годами: junior/intern-вакансии
+# это не «запасной вариант», а гарантированный отказ и потраченный контакт.
+# Русские слова склоняются — \b на конце не работает («начинающ|его»),
+# поэтому кириллические маркеры матчим по основе.
+JUNIOR_RE = re.compile(
+    r"(?:\b(?:junior|jun\.|intern|internship|trainee|entry[\s-]?level)\b"
+    r"|стажёр|стажер|стажиров|начинающ|младш|без\s+опыта)", re.I)
+MIDDLE_RE = re.compile(
+    r"(?:\bmiddle\b|\bmid\b|\bmid-level\b|мидл|средний\s+уровень)", re.I)
+SENIOR_RE = re.compile(
+    r"(?:\b(?:senior|sr\.|lead|principal|staff|head\s+of|architect)\b"
+    r"|ведущ|старш|главн|архитектор)", re.I)
+
+
+@dataclass
+class Score:
+    total: float                         # 0..100
+    fit_role: bool
+    misfit_role: bool
+    matched_skills: list = field(default_factory=list)   # [(term, level, weight)]
+    forbidden_demands: list = field(default_factory=list)  # требуемое из never_claim
+    jd_terms: list = field(default_factory=list)
+    reason: str = ""
+    is_junior: bool = False
+    is_middle: bool = False
+    work_format: str = workformat.UNKNOWN
+
+    @property
+    def recommend(self) -> bool:
+        return (self.total >= 45 and not self.forbidden_dominant
+                and not self.misfit_role and not self.is_junior
+                and not self.onsite_only)
+
+    @property
+    def onsite_only(self) -> bool:
+        """Офис или релокация без единого упоминания удалёнки.
+
+        Владелец рассматривает только удалённый формат. Молчание о
+        формате отказом не считается — см. match/workformat.py.
+        """
+        return self.work_format == workformat.ONSITE
+
+    @property
+    def forbidden_dominant(self) -> bool:
+        """Ключевой стек вакансии — сплошь то, чего у кандидата нет."""
+        return len(self.forbidden_demands) >= 3 and len(self.matched_skills) < 2
+
+
+def score_job(title: str, tag: str, jd_text: str, profile: Profile | None = None) -> Score:
+    p = profile or get_profile()
+    blob = " ".join([title or "", tag or "", jd_text or ""])
+    jd_terms = _find_terms(jd_text or "") | _find_terms(tag or "")
+
+    matched, forbidden = [], []
+    skill_pts = 0.0
+    for term in sorted(jd_terms):
+        sk = next((s for s in p.skills if term in s.terms), None)
+        if sk:
+            w = LEVEL_WEIGHT.get(sk.level, 0.0)
+            matched.append((term, sk.level, w))
+            skill_pts += w
+        elif term in p.forbidden_terms:
+            forbidden.append(term)
+
+    fit = bool(FIT_ROLES.search(blob))
+    tag_l = (tag or "").strip().lower()
+    misfit = (tag_l in MISFIT_TAGS or bool(MISFIT_ROLES.search(title or ""))
+              or bool(MISFIT_ROLES.search(tag or ""))
+              or bool(BUDGET_ROLES.search(title or "")))
+
+    # junior-позиция: ищем в заголовке и в первых строках описания, где обычно
+    # стоит грейд. «Senior» в тексте перебивает — бывает «Junior/Senior» вилка.
+    head = " ".join([title or "", (jd_text or "")[:400]])
+    junior = bool(JUNIOR_RE.search(head)) and not bool(SENIOR_RE.search(head))
+    # Middle-позиция: откликаемся, но резюме подаём укороченным — без
+    # «7+ лет» и Tech Lead в заголовке, иначе выглядим переквалифицированными.
+    middle = bool(MIDDLE_RE.search(head)) and not bool(SENIOR_RE.search(head))
+
+    # ── баллы ──
+    # навыки: до 60 (насыщение), роль: +25 fit / −30 misfit, штраф за forbidden
+    skill_component = min(60.0, skill_pts * 12.0)
+    product_role = bool(PRODUCT_ROLES.search(" ".join([title or "", tag or ""])))
+    # Product is a supported family, but not an engineering-role bonus.  Keep
+    # skill matches and the fixed base intact so a genuinely relevant product
+    # vacancy can still pass; only remove the generic +25 role boost.
+    role_component = (0.0 if product_role else (25.0 if fit else 0.0)) \
+        - (30.0 if misfit else 0.0)
+    forbidden_penalty = min(25.0, len(forbidden) * 8.0)
+    total = max(0.0, min(100.0, skill_component + role_component + 15.0 - forbidden_penalty))
+    fmt = workformat.detect(title, tag, jd_text)
+
+    reason_bits = []
+    if matched:
+        reason_bits.append("совпало навыков: %d (%s)" % (
+            len(matched), ", ".join(t for t, _, _ in matched[:6])))
+    if forbidden:
+        reason_bits.append("требуют вне профиля: %s" % ", ".join(forbidden[:5]))
+    if misfit:
+        reason_bits.append("роль не профильная")
+    if fit:
+        reason_bits.append("роль профильная")
+    if product_role:
+        reason_bits.append("product-роль без инженерного бонуса")
+    if junior:
+        reason_bits.append("junior-позиция при 7 годах опыта")
+    if fmt == workformat.ONSITE:
+        reason_bits.append("офис/релокация, удалёнка не упомянута")
+
+    return Score(total=round(total, 1), fit_role=fit, misfit_role=misfit,
+                 matched_skills=matched, forbidden_demands=forbidden,
+                 jd_terms=sorted(jd_terms), reason="; ".join(reason_bits),
+                 is_junior=junior, is_middle=middle, work_format=fmt)

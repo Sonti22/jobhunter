@@ -1,0 +1,337 @@
+{
+ "channels": [
+  {
+   "username": "forpython"
+  },
+  {
+   "username": "pydevjob"
+  },
+  {
+   "username": "python_djangojobs"
+  },
+  {
+   "username": "job_python"
+  },
+  {
+   "username": "job_pythonz"
+  },
+  {
+   "username": "pythonrabota"
+  },
+  {
+   "username": "rabotapython"
+  },
+  {
+   "username": "python_django_job"
+  },
+  {
+   "username": "django_jobs_board"
+  },
+  {
+   "username": "pythonpythonjobs"
+  },
+  {
+   "username": "runello_rus_backend"
+  },
+  {
+   "username": "backend_job_geeklink"
+  },
+  {
+   "username": "remoteit"
+  },
+  {
+   "username": "relocats"
+  },
+  {
+   "username": "jc_it"
+  },
+  {
+   "username": "getitrussia"
+  },
+  {
+   "username": "workayte"
+  },
+  {
+   "username": "geekjobs"
+  },
+  {
+   "username": "remotegeekjob"
+  },
+  {
+   "username": "it_vakansii_jobs"
+  },
+  {
+   "username": "evacuatejobs"
+  },
+  {
+   "username": "forchiefs"
+  },
+  {
+   "username": "habr_career"
+  },
+  {
+   "username": "myresume_ru"
+  },
+  {
+   "username": "devs_it"
+  },
+  {
+   "username": "jobfortm"
+  },
+  {
+   "username": "profunctor_jobs"
+  },
+  {
+   "username": "zizu_it_ru"
+  },
+  {
+   "username": "jobscode_infull"
+  },
+  {
+   "username": "runello_rus_python"
+  },
+  {
+   "username": "fordev"
+  },
+  {
+   "username": "remote_python_jobs"
+  },
+  {
+   "username": "remotedevjobs"
+  },
+  {
+   "username": "young_relocate"
+  },
+  {
+   "username": "opento_dev"
+  },
+  {
+   "username": "jobgeeks"
+  },
+  {
+   "username": "theyseeku_it"
+  },
+  {
+   "username": "rusukrjobs"
+  },
+  {
+   "username": "ru_pythonjobs"
+  },
+  {
+   "username": "vacancy_python"
+  },
+  {
+   "username": "remocate"
+  },
+  {
+   "username": "devaller"
+  },
+  {
+   "username": "remote_jobs_relocate"
+  },
+  {
+   "username": "relocateme"
+  },
+  {
+   "username": "serbia_jobs"
+  },
+  {
+   "username": "youritjob"
+  },
+  {
+   "username": "workitkz"
+  },
+  {
+   "username": "uzdev_jobs"
+  },
+  {
+   "username": "cyithr"
+  },
+  {
+   "username": "jobsincyprus"
+  },
+  {
+   "username": "ijobam_it"
+  },
+  {
+   "username": "remotejobss"
+  },
+  {
+   "username": "findmyremote_backend"
+  },
+  {
+   "username": "thehire"
+  },
+  {
+   "username": "remoters"
+  },
+  {
+   "username": "remote_devops_jobs"
+  },
+  {
+   "username": "itfreelancers"
+  },
+  {
+   "username": "jobspy"
+  },
+  {
+   "username": "fordevops"
+  },
+  {
+   "username": "devops_jobs_feed"
+  },
+  {
+   "username": "foranalysts"
+  },
+  {
+   "username": "de_rabota"
+  },
+  {
+   "username": "data_engineer_jobs"
+  },
+  {
+   "username": "data_science_job"
+  },
+  {
+   "username": "data_secrets_career"
+  },
+  {
+   "username": "secretbackendjobs"
+  },
+  {
+   "username": "digital_hr"
+  },
+  {
+   "username": "backend_frontend_jobs"
+  },
+  {
+   "username": "vakansii_it"
+  },
+  {
+   "username": "python_jobs"
+  },
+  {
+   "username": "itposition"
+  },
+  {
+   "username": "g_jobchannel"
+  },
+  {
+   "username": "refer_me_it"
+  },
+  {
+   "username": "hcareers_jobs"
+  },
+  {
+   "username": "teamlead_job_it"
+  },
+  {
+   "username": "devopssre_jobs"
+  },
+  {
+   "username": "phystechcareerchannel"
+  },
+  {
+   "username": "holder_job_devs"
+  },
+  {
+   "username": "jobs_abroad"
+  },
+  {
+   "username": "montenegro_it_jobs"
+  },
+  {
+   "username": "careernoborders"
+  },
+  {
+   "username": "alexstaffagency"
+  },
+  {
+   "username": "datasciencejobs"
+  },
+  {
+   "username": "datascienceml_jobs"
+  },
+  {
+   "username": "opento_data"
+  },
+  {
+   "username": "job_web3"
+  },
+  {
+   "username": "cryptojobslist"
+  },
+  {
+   "username": "runity_career"
+  },
+  {
+   "username": "senior_job_it"
+  },
+  {
+   "username": "developers_job_geeklink"
+  },
+  {
+   "username": "fullstack_job_geeklink"
+  },
+  {
+   "username": "database_administrator_job"
+  },
+  {
+   "username": "devops_job_geeklink"
+  },
+  {
+   "username": "remote_job_it_geeklink"
+  },
+  {
+   "username": "relocate_job_geeklink"
+  },
+  {
+   "username": "progjob"
+  },
+  {
+   "username": "ya_jobs"
+  },
+  {
+   "username": "choicy_work"
+  },
+  {
+   "username": "relocation_vacancies"
+  },
+  {
+   "username": "back_rabota"
+  },
+  {
+   "username": "it_rab"
+  },
+  {
+   "username": "p_rabota"
+  },
+  {
+   "username": "hiddengurus"
+  },
+  {
+   "username": "jobsfordevsandops"
+  },
+  {
+   "username": "devitjobs"
+  },
+  {
+   "username": "workewco"
+  },
+  {
+   "username": "remoteok"
+  },
+  {
+   "username": "remotelist"
+  },
+  {
+   "username": "jobskolkovo"
+  },
+  {
+   "username": "rabota_v_ii"
+  },
+  {
+   "username": "xcareers"
+  }
+ ]
+}

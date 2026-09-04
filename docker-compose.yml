@@ -1,0 +1,118 @@
+# jobhunter — четыре сервиса на одном образе.
+#
+#   docker compose up -d          запустить
+#   docker compose logs -f bot    смотреть бота
+#   docker compose down           остановить
+#
+# ВАЖНО: пока контейнеры работают, не запускать `python -m jobhunter...` с
+# хоста. Второй Telethon-клиент на том же jobhunter.session даёт
+# AuthKeyDuplicatedError и разлогин аккаунта, а PID-лок отправителя хостовый
+# процесс не увидит — пространства процессов у контейнера и Windows разные.
+# Ручные прогоны: docker compose exec autopilot python -m jobhunter...
+
+x-common: &common
+  # Образ собирает только migrate (ниже): все четыре сервиса используют один
+  # и тот же, а параллельная сборка одного тега даёт «image already exists».
+  image: jobhunter:latest
+  env_file: .env
+  environment: &common-env
+    TZ: Europe/Moscow
+    # Состояние в томе: SQLite на смонтированной папке Windows идёт через
+    # 9p/virtiofs, где файловые блокировки ненадёжны.
+    DB_PATH: /data/jobhunter.db
+    TELEGRAM_SESSION_PATH: /data/jobhunter.session
+    GOOGLE_TOKEN_PATH: /data/google_token.json
+    GOOGLE_CLIENT_SECRET_PATH: /data/google_client_secret.json
+    # Стоп-кран — общий файл для всех контейнеров. Относительный путь
+    # резолвился бы от /app, у каждого сервиса свой, и «СТОП» на дашборде не
+    # остановил бы отправку. Это отказ в опасную сторону, поэтому абсолютный.
+    KILL_SWITCH_PATH: /data/STOP_SENDING.flag
+    HEARTBEAT_DIR: /data
+    # Видимая часть — в папке проекта, открывается из Проводника.
+    OUT_DIR: /out
+    LOG_DIR: /out/logs
+    CV_OUT: /out/cv_out
+    SENT_ARCHIVE_DIR: /out/logs/sent
+    BASE_CV_PATH: /app/cv_base/Акопян_Сурен_Python.pdf
+  volumes:
+    - jobhunter-data:/data
+    - ./out:/out
+    - ./profile.yaml:/app/profile.yaml:ro
+    - ./lexicon:/app/lexicon:ro
+    - ./cv_base:/app/cv_base:ro
+  # Публичные DNS вместо резолвера Docker Desktop: его прокси на Windows
+  # периодически отваливается («No address associated with hostname»), бот в
+  # эти минуты не может забрать getUpdates — и кнопки в Telegram молчат.
+  dns:
+    - 8.8.8.8
+    - 1.1.1.1
+  restart: unless-stopped
+
+services:
+  # Схема БД создаётся один раз, до старта остальных: иначе три процесса
+  # одновременно выполняют ALTER TABLE и двое падают на duplicate column.
+  migrate:
+    <<: *common
+    build: .
+    command: ["python", "-m", "jobhunter.db", "--migrate"]
+    restart: "no"
+
+  # Единственный владелец jobhunter.session: сбор, отправка, переписка,
+  # исполнение решений владельца.
+  autopilot:
+    <<: *common
+    command: ["python", "-m", "jobhunter.autopilot"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      # Не «процесс жив», а «планировщик отмечался последнюю минуту»:
+      # зависший живой процесс — более вероятный отказ, чем умерший.
+      # Два пульса: общий и из однопоточной tg-очереди — зависший Telethon
+      # не виден общему пульсу. Порог tg свободный: сессия отправки легально
+      # держит очередь до ~25 минут.
+      test: ["CMD", "python", "-c",
+             "import sys;from jobhunter.health import check;sys.exit(0 if (check('autopilot',420) and check('autopilot_tg',2400)) else 1)"]
+      interval: 60s
+      timeout: 15s
+      start_period: 120s
+      retries: 3
+
+  # Пульт владельца. Отдельно от автопилота, чтобы отвечать на /status даже
+  # когда тот спит в FloodWait. Telethon не импортирует принципиально.
+  bot:
+    <<: *common
+    command: ["python", "-m", "jobhunter.bot"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import sys;from jobhunter.health import check;sys.exit(0 if check('bot',180) else 1)"]
+      interval: 60s
+      timeout: 15s
+      start_period: 60s
+      retries: 3
+
+  web:
+    <<: *common
+    command: ["python", "-m", "jobhunter.web.server"]
+    environment:
+      <<: *common-env
+      WEB_HOST: 0.0.0.0          # внутри контейнера; наружу — только localhost
+    ports:
+      - "127.0.0.1:8765:8765"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request,sys;urllib.request.urlopen('http://127.0.0.1:8765/ping',timeout=5)"]
+      interval: 60s
+      timeout: 10s
+      start_period: 30s
+      retries: 3
+
+volumes:
+  jobhunter-data:
+    name: jobhunter-data

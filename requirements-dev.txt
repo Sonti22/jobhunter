@@ -1,0 +1,5 @@
+-r requirements.txt
+pytest-cov>=5.0,<7
+ruff>=0.6,<1
+mypy>=1.11,<2
+pip-audit>=2.7,<3

@@ -1,0 +1,269 @@
+"""Чтение почтового ящика по IMAP: соединение, водяной знак, выборка.
+
+Два правила, которые здесь не обсуждаются:
+
+1. **Ящик открывается только на чтение.** `SELECT` в режиме readonly плюс
+   `BODY.PEEK[]` во всех выборках означает, что процесс физически не может
+   изменить ни один флаг. Владелец читает эту же почту с телефона, и
+   пометить ему непрочитанное как прочитанное — быстрый способ, чтобы
+   систему возненавидели. Обратное тоже верно: его чтение не влияет на нас,
+   потому что источник правды о «новом» — UID, а не флаг \\Seen.
+
+2. **Тело письма скачивается только после привязки к заявке.** Проход
+   двухфазный: сначала заголовки всех новых писем, потом тела — лишь для
+   тех, кого удалось связать с откликом. Владелец разрешил боту видеть весь
+   ящик, но видеть и хранить — разное. Личная переписка и банковские
+   уведомления не должны даже загружаться, и это выражено формой кода, а не
+   обещанием в комментарии.
+
+    python -m jobhunter.convo.imapbox --probe    # соединение и счётчики
+"""
+from __future__ import annotations
+
+import email
+import imaplib
+import logging
+import re
+import ssl
+import sys
+from datetime import date, datetime, timedelta, timezone
+from email import policy as email_policy
+
+from ..config import get_settings
+from ..db import session_scope
+
+log = logging.getLogger("imapbox")
+
+# Заголовки, которых хватает и для привязки, и для предфильтров.
+HEADER_FIELDS = ("MESSAGE-ID IN-REPLY-TO REFERENCES FROM TO CC SUBJECT DATE "
+                 "DELIVERED-TO X-ORIGINAL-TO LIST-ID LIST-UNSUBSCRIBE "
+                 "AUTO-SUBMITTED PRECEDENCE X-AUTOREPLY RETURN-PATH")
+
+_UIDVALIDITY = re.compile(rb"UIDVALIDITY\s+(\d+)", re.I)
+
+
+class MailboxError(RuntimeError):
+    """Ящик недоступен: сеть, пароль отозван, Gmail просит вход через веб."""
+
+
+def _state() -> tuple:
+    with session_scope() as sess:
+        # Строку кампании создаёт ТОЛЬКО policy.get_state: голый
+        # CampaignState(id=1) получал дефолт потолка 15 вместо настроенных
+        # 30, и кто первым успел создать строку — тот и задал квоту навсегда.
+        from ..outreach.policy import get_state
+        st = get_state(sess)
+        return int(st.imap_uidvalidity or 0), int(st.imap_last_uid or 0)
+
+
+def _save_state(uidvalidity: int, last_uid: int) -> None:
+    with session_scope() as sess:
+        from ..outreach.policy import get_state
+        st = get_state(sess)
+        st.imap_uidvalidity = uidvalidity
+        st.imap_last_uid = last_uid
+
+
+def connect():
+    """Соединение с ящиком. Бросает MailboxError с внятной причиной."""
+    s = get_settings()
+    if not (s.smtp_user and s.smtp_app_password):
+        raise MailboxError("нет SMTP_USER / SMTP_APP_PASSWORD")
+    try:
+        conn = imaplib.IMAP4_SSL(s.imap_host, s.imap_port,
+                                 ssl_context=ssl.create_default_context(),
+                                 timeout=30)
+        conn.login(s.smtp_user, s.smtp_app_password)
+    except imaplib.IMAP4.error as e:
+        # Gmail отвечает «[ALERT] Web login required» и подобным — текст
+        # пробрасываем дословно, иначе диагностировать невозможно.
+        raise MailboxError("вход не удался: %s" % str(e)[:200]) from None
+    except OSError as e:
+        raise MailboxError("сеть: %s: %s" % (type(e).__name__, str(e)[:120])) from None
+    return conn
+
+
+def _uidvalidity(conn, folder: str) -> int:
+    typ, data = conn.status(folder, "(UIDVALIDITY)")
+    if typ != "OK" or not data:
+        return 0
+    m = _UIDVALIDITY.search(data[0] if isinstance(data[0], bytes)
+                            else str(data[0]).encode())
+    return int(m.group(1)) if m else 0
+
+
+def new_uids(conn, folder: str = "") -> tuple:
+    """Номера новых писем. Возвращает (uids, uidvalidity, сброшен_ли_знак)."""
+    s = get_settings()
+    folder = folder or s.imap_folder
+    # readonly=True — это команда EXAMINE: изменить флаги нельзя в принципе.
+    typ, _ = conn.select(folder, readonly=True)
+    if typ != "OK":
+        raise MailboxError("папка %s недоступна" % folder)
+
+    validity = _uidvalidity(conn, folder)
+    saved_validity, last_uid = _state()
+    reset = bool(saved_validity and validity and validity != saved_validity)
+    if reset:
+        # UID уникальны только внутри одного uidvalidity: после смены старые
+        # номера указывают на другие письма, и продолжать с них — значит
+        # молча пропустить всё, что пришло. Начинаем заново по дате.
+        log.warning("uidvalidity сменился (%s → %s) — водяной знак сброшен",
+                    saved_validity, validity)
+        last_uid = 0
+
+    if last_uid:
+        typ, data = conn.uid("SEARCH", None, "UID", "%d:*" % (last_uid + 1))
+    else:
+        since = (date.today() - timedelta(days=s.inbox_lookback_days)
+                 ).strftime("%d-%b-%Y")
+        typ, data = conn.uid("SEARCH", None, "SINCE", since)
+    if typ != "OK" or not data or not data[0]:
+        return [], validity, reset
+
+    # Диапазон «N:*» по стандарту возвращает как минимум последнее письмо
+    # ящика, даже когда новых нет, — отсекаем сами.
+    uids = sorted(int(x) for x in data[0].split() if int(x) > last_uid)
+    return uids[-s.imap_max_fetch:], validity, reset
+
+
+def _parse(raw: bytes):
+    """Разбор через policy.default: тема приходит уже раскодированной из
+    =?UTF-8?B?...?=, а не строкой-абракадаброй."""
+    return email.message_from_bytes(raw, policy=email_policy.default)
+
+
+_UID_IN_RESPONSE = re.compile(rb"UID\s+(\d+)")
+
+# Сколько писем запрашивать одной командой. По одному было бы 200 обращений
+# к серверу за проход — минуты ожидания и лишняя нагрузка на Gmail.
+FETCH_CHUNK = 50
+
+
+def fetch_headers(conn, uids: list) -> list:
+    """[(uid, dict заголовков)]. Тела не трогаются."""
+    out = []
+    for start in range(0, len(uids), FETCH_CHUNK):
+        chunk = uids[start:start + FETCH_CHUNK]
+        typ, data = conn.uid("FETCH", ",".join(str(u) for u in chunk),
+                             "(BODY.PEEK[HEADER.FIELDS (%s)])" % HEADER_FIELDS)
+        if typ != "OK" or not data:
+            continue
+        for part in data:
+            if not (isinstance(part, tuple) and len(part) > 1):
+                continue
+            prefix, raw = part[0], part[1]
+            m = _UID_IN_RESPONSE.search(prefix if isinstance(prefix, bytes)
+                                        else str(prefix).encode())
+            if not m or not raw:
+                continue
+            msg = _parse(raw)
+            out.append((int(m.group(1)),
+                        {k.lower(): str(v) for k, v in msg.items()}))
+    return out
+
+
+def fetch_body(conn, uid: int) -> tuple:
+    """(текст, это_html) для одного письма. Зовётся только для опознанных."""
+    typ, data = conn.uid("FETCH", str(uid), "(BODY.PEEK[])")
+    if typ != "OK" or not data:
+        return "", False
+    raw = next((part[1] for part in data
+                if isinstance(part, tuple) and len(part) > 1), None)
+    if not raw:
+        return "", False
+    msg = _parse(raw)
+    try:
+        part = msg.get_body(preferencelist=("plain", "html"))
+    except Exception:
+        part = None
+    if part is None:
+        return "", False
+    try:
+        content = part.get_content()
+    except Exception:
+        content = ""
+    # Письмо без объявленной кодировки разбирается как us-ascii, и кириллица
+    # превращается в символы замены. Тогда очистка цитат не находит своих
+    # маркеров, процитированная история доезжает до классификатора, и он
+    # видит в ней время — то есть ровно та поломка, ради которой писалась
+    # очистка. Поэтому при виде «мусора» пробуем прочитать байты сами.
+    if not content or content.count("�") > max(2, len(content) // 50):
+        payload = part.get_payload(decode=True) or b""
+        for enc in ("utf-8", "cp1251", "koi8-r"):
+            try:
+                decoded = payload.decode(enc)
+            except UnicodeDecodeError:
+                continue
+            if decoded.count("�") == 0:
+                content = decoded
+                break
+        else:
+            content = payload.decode("utf-8", "replace") or content
+    return content, part.get_content_subtype() == "html"
+
+
+def msg_date(headers: dict) -> datetime:
+    """Дата письма в UTC. Нет или битая — сейчас."""
+    raw = headers.get("date", "")
+    try:
+        dt = email.utils.parsedate_to_datetime(raw)
+    except (TypeError, ValueError):
+        return datetime.now(timezone.utc)
+    if dt is None:
+        return datetime.now(timezone.utc)
+    return dt.astimezone(timezone.utc) if dt.tzinfo else dt.replace(
+        tzinfo=timezone.utc)
+
+
+def advance_watermark(uids: list, validity: int) -> None:
+    """Двигает знак после обработки пачки.
+
+    Именно после: падение посередине даст повтор, который погасится дедупом
+    по Message-ID, а обратный порядок потерял бы письма навсегда.
+    """
+    if uids:
+        _save_state(validity, max(uids))
+    elif validity:
+        saved, last = _state()
+        if saved != validity:
+            _save_state(validity, last)
+
+
+def main() -> int:
+    import argparse
+
+    ap = argparse.ArgumentParser(description="Проверка почтового ящика")
+    ap.add_argument("--probe", action="store_true",
+                    help="соединение и счётчики, без записи в БД")
+    args = ap.parse_args()
+
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+    s = get_settings()
+    try:
+        conn = connect()
+    except MailboxError as e:
+        print("Ящик недоступен: %s" % e)
+        return 2
+    try:
+        uids, validity, reset = new_uids(conn)
+        print("папка: %s" % s.imap_folder)
+        print("uidvalidity: %s%s" % (validity, " (СБРОШЕН)" if reset else ""))
+        print("новых писем: %d" % len(uids))
+        if args.probe and uids:
+            heads = fetch_headers(conn, uids[-5:])
+            print("тел скачано: 0")
+            for uid, h in heads:
+                print("  uid=%-8d from=%-38s subj=%s"
+                      % (uid, h.get("from", "?")[:38],
+                         (h.get("subject", "") or "")[:40]))
+    finally:
+        try:
+            conn.logout()
+        except Exception:
+            pass
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

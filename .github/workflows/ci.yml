@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install -r requirements-dev.txt
+      - run: python -m compileall -q jobhunter tests
+      - run: ruff check jobhunter tests
+      # В проекте есть старые интеграционные модули с динамическими SDK.
+      # Обязательный гейт покрывает изменённое ядро и не притворяется полной
+      # типизацией внешних адаптеров.
+      - run: >-
+          mypy --follow-imports=skip
+          jobhunter/models.py jobhunter/db.py jobhunter/notify.py
+          jobhunter/bot/state.py jobhunter/outreach/sender.py
+          jobhunter/outreach/mailer.py jobhunter/ingest/base.py
+          jobhunter/report.py jobhunter/web/server.py
+      - run: pytest --cov=jobhunter --cov-report=term-missing --cov-fail-under=50
+      - run: pip-audit -r requirements.txt

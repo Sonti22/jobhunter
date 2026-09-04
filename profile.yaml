@@ -1,0 +1,960 @@
+# ─────────────────────────────────────────────────────────────────────────────
+#  ЕДИНСТВЕННЫЙ ИСТОЧНИК ПРАВДЫ О КАНДИДАТЕ
+#
+#  Генератор резюме и сопроводительных писем может ТОЛЬКО выбирать и
+#  переформулировать то, что лежит здесь. Добавлять он не может — гейт
+#  (jobhunter/tailor/gate.py) механически блокирует любой факт, технологию
+#  или число, которых нет в этом файле.
+#
+#  Всё содержимое взято из "Акопян Сурен Суренович python(7).pdf".
+#  Ничего не додумано.
+#
+#  !! СУРЕН, ПРОВЕРЬ ПЕРЕД ПЕРВЫМ ЗАПУСКОМ:
+#     1. Уровни level: expert / working / familiar — проставлены по тому, как
+#        технология описана в резюме. Где ошибся — поправь. Завышенный уровень
+#        всплывёт на техническом созвоне.
+#     2. Список never_claim внизу. Туда идёт всё, что ты НЕ использовал, но что
+#        часто просят в вакансиях. Сейчас там C#/.NET и GitHub Actions — именно
+#        то, что требует целевая вакансия ITM. Если что-то из этого ты на самом
+#        деле трогал — перенеси в skills с честным уровнем.
+#     3. english_level: в исходном резюме заявлено C2. Здесь стоит c1_plus,
+#        потому что вакансия требует C1+ и заявлять C2 без подтверждения рискованно.
+# ─────────────────────────────────────────────────────────────────────────────
+
+meta:
+  version: 1
+  source_document: "Акопян_Сурен_Python(2).pdf"
+  updated_at: "2026-08-30"   # Linkero переписан под новое резюме
+  compiled_at: "2026-08-03"
+  timeline_start: "2019-01"          # начало отсчёта общего опыта
+
+identity:
+  full_name_ru: "Акопян Сурен Суренович"
+  full_name_en: "Suren Hakobyan"
+  birth_date: "2001-01-20"
+  location: "Москва, Россия"
+  citizenship: "Россия"
+  work_authorization: "Гражданство РФ — бессрочное право на работу в стране пребывания"
+  relocation: true
+  business_trips: true
+  phone: "+7 (999) 404-84-43"
+  email: "suren6pro@gmail.com"
+  telegram: "https://t.me/Sonti22"
+  driving_license: "B"
+
+  # Генератор выбирает заголовок ТОЛЬКО из этого списка. Свой придумать не может.
+  # ML-варианты — формулировки самого кандидата из исходного PDF
+  # («Python Developer / ML Systems Integrator»). Это инжиниринг и интеграция
+  # инференса, НЕ research и НЕ обучение моделей — так и заявляем.
+  headline_variants:
+    - "Senior Technical Product Manager"
+    - "Technical Product Manager"
+    - "Technical Product Manager / Tech Lead"
+    - "Tech Lead / Software Architect"
+    - "Senior Backend Engineer / Tech Lead"
+    - "Senior Backend Engineer (Python)"
+    - "DevOps / Platform Engineer"
+    - "Infrastructure Engineer"
+    - "Backend Engineer / ML Systems Integrator"
+    - "Python Engineer (ML/CV systems)"
+    # Добавлено под классификатор семейств ролей (jobhunter/match/role.py).
+    # Каждый заголовок опирается на уже существующие буллеты и навыки:
+    #   Data Engineer       — SQL и PostgreSQL expert, SQLAlchemy, Kafka,
+    #                         RabbitMQ, профилирование запросов
+    #   Systems Analyst     — requirements, tech_docs, stakeholder_mgmt, OpenAPI
+    #   QA Automation       — pytest expert, TDD, code_review
+    #   Engineering Manager — team_leadership, mentoring, planning, prioritization
+    #   Project Manager     — те же управленческие навыки + Agile
+    - "Data Engineer (Python / SQL)"
+    - "Systems Analyst / Requirements Engineer"
+    - "QA Automation Engineer (Python)"
+    - "Engineering Manager / Tech Lead"
+    - "Project Manager (Tech)"
+
+languages:
+  - code: ru
+    name_ru: "Русский"
+    name_en: "Russian"
+    level: "C2"
+    note: "родной"
+  - code: en
+    name_ru: "Английский"
+    name_en: "English"
+    level: "C1_plus"
+    note: >-
+      В исходном резюме заявлен C2. Понижено до C1+ сознательно: вакансии
+      требуют C1+, а C2 без сертификата проверяется на первом же созвоне.
+      Поднять обратно, если есть подтверждение.
+  - code: hy
+    name_ru: "Армянский"
+    name_en: "Armenian"
+    level: "C2"
+
+education:
+  - id: edu_1
+    institution_ru: "Воронежский экономико-правовой институт"
+    institution_en: "Voronezh Institute of Economics and Law"
+    city: "Воронеж"
+    degree_ru: "Высшее"
+    degree_en: "Higher education"
+    field_ru: "Юриспруденция"
+    field_en: "Law"
+    year: 2022
+
+# ─────────────────────────────────────────────────────────────── SKILLS ──
+# level: expert | working | familiar | none
+#   expert   — многолетнее ежедневное использование, можно защищать на интервью
+#   working  — уверенно решал реальные задачи
+#   familiar — трогал, но в резюме нельзя ставить в заголовок или рядом со
+#              словами "глубокий/экспертный/N+ лет" (гейт это ловит)
+#   none     — НЕ использовал; попадание в текст = хард-фейл
+# years — не больше суммы длительностей опыта, где навык отмечен (гейт проверяет)
+
+skills:
+  # ── языки и рантаймы ──
+  - id: python
+    canonical: "Python"
+    aliases: ["python3", "py", "cpython"]
+    level: expert
+    years: 7
+    evidence_ids: [exp_dominigames, exp_kaspersky, exp_1xbet, exp_linkero, exp_rnd_voice]
+  - id: bash
+    canonical: "Bash"
+    aliases: ["shell", "sh"]
+    level: working
+    years: 3
+    evidence_ids: [exp_dominigames, exp_kaspersky]
+  - id: sql
+    canonical: "SQL"
+    aliases: []
+    level: expert
+    years: 3
+    evidence_ids: [exp_dominigames, exp_1xbet]
+  - id: css
+    canonical: "CSS"
+    aliases: []
+    level: familiar
+    years: 1
+    evidence_ids: [exp_1xbet]
+
+  # ── фреймворки ──
+  - id: fastapi
+    canonical: "FastAPI"
+    aliases: []
+    level: expert
+    years: 5
+    evidence_ids: [exp_dominigames, exp_1xbet, exp_rnd_voice]
+  - id: django
+    canonical: "Django"
+    aliases: ["django framework", "django rest framework", "drf"]
+    level: expert
+    years: 3
+    evidence_ids: [exp_dominigames, exp_1xbet]
+  - id: sqlalchemy
+    canonical: "SQLAlchemy"
+    aliases: []
+    level: working
+    years: 1
+    evidence_ids: [exp_1xbet]
+  - id: pytest
+    canonical: "PyTest"
+    aliases: ["pytest"]
+    level: expert
+    years: 5
+    evidence_ids: [exp_dominigames, exp_kaspersky, exp_1xbet]
+  - id: asyncio
+    canonical: "asyncio"
+    aliases: ["async/await", "асинхронный python"]
+    level: expert
+    years: 3
+    evidence_ids: [exp_dominigames, exp_kaspersky]
+  - id: alembic
+    canonical: "Alembic"
+    aliases: []
+    level: working
+    years: 2
+    evidence_ids: [exp_dominigames]
+
+  # ── данные ──
+  - id: postgresql
+    canonical: "PostgreSQL"
+    aliases: ["postgres", "psql"]
+    level: expert
+    years: 5
+    evidence_ids: [exp_dominigames, exp_kaspersky, exp_1xbet]
+  - id: mongodb
+    canonical: "MongoDB"
+    aliases: ["mongo", "nosql"]
+    level: working
+    years: 5
+    evidence_ids: [exp_dominigames, exp_kaspersky, exp_rnd_voice]
+  - id: redis
+    canonical: "Redis"
+    aliases: []
+    level: working
+    years: 3
+    evidence_ids: [exp_dominigames, exp_rnd_voice]
+
+  # ── API и интеграции ──
+  - id: rest_api
+    canonical: "REST API"
+    aliases: ["rest", "restful"]
+    level: expert
+    years: 3
+    evidence_ids: [exp_dominigames, exp_1xbet]
+  - id: openapi
+    canonical: "OpenAPI"
+    aliases: ["swagger"]
+    level: expert
+    years: 2
+    evidence_ids: [exp_dominigames]
+  - id: grpc
+    canonical: "gRPC"
+    aliases: []
+    level: working
+    years: 2
+    evidence_ids: [exp_dominigames]
+  - id: graphql
+    canonical: "GraphQL"
+    aliases: ["graphql subscriptions"]
+    level: working
+    years: 3
+    evidence_ids: [exp_kaspersky, exp_1xbet]
+  - id: websocket
+    canonical: "WebSocket"
+    aliases: ["websockets"]
+    level: working
+    years: 3
+    evidence_ids: [exp_1xbet, exp_rnd_voice]
+  - id: webhooks
+    canonical: "Webhooks"
+    aliases: ["вебхуки", "вебхук"]
+    level: working
+    years: 3
+    evidence_ids: [exp_dominigames, exp_1xbet]
+  - id: stripe
+    canonical: "Stripe"
+    aliases: []
+    level: working
+    years: 2
+    evidence_ids: [exp_dominigames]
+  - id: paypal
+    canonical: "PayPal"
+    aliases: []
+    level: working
+    years: 2
+    evidence_ids: [exp_dominigames]
+  - id: s3
+    canonical: "S3"
+    aliases: ["amazon s3", "object storage"]
+    level: working
+    years: 2
+    evidence_ids: [exp_dominigames]
+
+  # ── очереди ──
+  - id: rabbitmq
+    canonical: "RabbitMQ"
+    aliases: []
+    level: working
+    years: 3
+    evidence_ids: [exp_dominigames, exp_kaspersky]
+  - id: kafka
+    canonical: "Kafka"
+    aliases: ["apache kafka"]
+    level: working
+    years: 3
+    evidence_ids: [exp_dominigames, exp_kaspersky]
+
+  # ── инфраструктура ──
+  - id: docker
+    canonical: "Docker"
+    aliases: ["docker-compose", "контейнеризация"]
+    level: expert
+    years: 5
+    evidence_ids: [exp_dominigames, exp_kaspersky, exp_1xbet]
+  - id: kubernetes
+    canonical: "Kubernetes"
+    aliases: ["k8s", "helm", "кубер"]
+    level: working
+    years: 2
+    evidence_ids: [exp_dominigames]
+  - id: gitlab_ci
+    canonical: "GitLab CI"
+    aliases: ["gitlab-ci", "gitlab ci/cd"]
+    level: expert
+    years: 5
+    evidence_ids: [exp_dominigames, exp_kaspersky, exp_1xbet]
+  - id: jenkins
+    canonical: "Jenkins"
+    aliases: []
+    level: working
+    years: 1
+    evidence_ids: [exp_kaspersky]
+  - id: azure_devops
+    canonical: "Azure DevOps"
+    aliases: ["azure", "azure pipelines", "azure devops pipelines"]
+    level: working
+    years: 1
+    evidence_ids: [exp_kaspersky]
+  - id: linux
+    canonical: "Linux"
+    aliases: []
+    level: expert
+    years: 3
+    evidence_ids: [exp_dominigames, exp_kaspersky]
+  - id: git
+    canonical: "Git"
+    aliases: ["github", "gitlab"]
+    level: expert
+    years: 5
+    evidence_ids: [exp_dominigames, exp_kaspersky, exp_1xbet]
+
+  # ── наблюдаемость ──
+  - id: kibana
+    canonical: "Kibana"
+    aliases: ["elk", "elasticsearch"]
+    level: working
+    years: 2
+    evidence_ids: [exp_dominigames]
+  - id: prometheus
+    canonical: "Prometheus"
+    aliases: []
+    level: working
+    years: 1
+    evidence_ids: [exp_kaspersky]
+  - id: grafana
+    canonical: "Grafana"
+    aliases: []
+    level: working
+    years: 1
+    evidence_ids: [exp_kaspersky]
+  - id: profiling
+    canonical: "Профилирование"
+    aliases: ["py-spy", "cprofile", "torch.profiler", "nsight systems"]
+    level: working
+    years: 3
+    evidence_ids: [exp_dominigames, exp_kaspersky]
+
+  # ── архитектура ──
+  - id: microservices
+    canonical: "Микросервисы"
+    aliases: ["microservices", "распределённые системы", "distributed systems"]
+    level: expert
+    years: 6
+    evidence_ids: [exp_dominigames, exp_kaspersky, exp_1xbet, exp_linkero]
+  - id: ddd
+    canonical: "DDD"
+    aliases: ["domain-driven design"]
+    level: working
+    years: 1
+    evidence_ids: [exp_linkero]
+  - id: cqrs
+    canonical: "CQRS"
+    aliases: []
+    level: working
+    years: 1
+    evidence_ids: [exp_linkero]
+  - id: event_sourcing
+    canonical: "Event Sourcing"
+    aliases: []
+    level: working
+    years: 1
+    evidence_ids: [exp_linkero]
+  - id: saga
+    canonical: "Saga"
+    aliases: ["saga pattern"]
+    level: working
+    years: 1
+    evidence_ids: [exp_linkero]
+  - id: algorithms
+    canonical: "Алгоритмы и структуры данных"
+    aliases: ["algorithms", "data structures"]
+    level: working
+    years: 2
+    evidence_ids: [exp_dominigames]
+
+  # ── процессы ──
+  - id: agile
+    canonical: "Agile"
+    aliases: ["scrum", "спринты", "груминг", "ретро"]
+    level: expert
+    years: 6
+    evidence_ids: [exp_dominigames, exp_kaspersky, exp_1xbet, exp_linkero]
+  - id: code_review
+    canonical: "Code Review"
+    aliases: ["ревью кода", "mr review"]
+    level: expert
+    years: 6
+    evidence_ids: [exp_dominigames, exp_kaspersky, exp_1xbet, exp_linkero]
+  - id: tdd
+    canonical: "TDD"
+    aliases: ["test-driven development"]
+    level: working
+    years: 1
+    evidence_ids: [exp_kaspersky]
+  - id: mentoring
+    canonical: "Менторинг"
+    aliases: ["mentoring", "наставничество"]
+    level: working
+    years: 2
+    evidence_ids: [exp_dominigames, exp_linkero]
+  - id: tech_docs
+    canonical: "Техническая документация"
+    aliases: ["adr", "архитектурная документация", "диаграммы"]
+    level: working
+    years: 1
+    evidence_ids: [exp_linkero]
+
+  # ── управленческие / продуктовые компетенции ──
+  # Все подтверждаются буллетами из блока «Управленческие навыки» исходного PDF
+  # и обязанностями Tech Lead. Ничего не додумано.
+  - id: prioritization
+    canonical: "Приоритизация"
+    aliases: ["оценка и приоритизация задач", "prioritization", "backlog",
+              "груминг бэклога", "приоритизация задач"]
+    level: working
+    years: 2
+    evidence_ids: [exp_linkero, exp_1xbet]
+  - id: planning
+    canonical: "Планирование"
+    aliases: ["стратегическое планирование", "тактическое планирование",
+              "planning", "планирование спринтов", "sprint planning"]
+    level: working
+    years: 2
+    evidence_ids: [exp_linkero, exp_1xbet]
+  - id: stakeholder_mgmt
+    canonical: "Работа со стейкхолдерами"
+    aliases: ["stakeholder", "stakeholder management", "коммуникация с бизнесом",
+              "работа с бизнесом", "нетехническая аудитория"]
+    level: working
+    years: 2
+    evidence_ids: [exp_linkero, exp_kaspersky]
+  - id: risk_mgmt
+    canonical: "Управление рисками и техдолгом"
+    aliases: ["управление рисками", "управление техническим долгом", "техдолг",
+              "risk management", "technical debt"]
+    level: working
+    years: 1
+    evidence_ids: [exp_linkero]
+  - id: team_leadership
+    canonical: "Техническое лидерство"
+    aliases: ["team leadership", "техническое лидерство", "координация команды",
+              "распределение задач", "tech lead"]
+    level: working
+    years: 2
+    evidence_ids: [exp_linkero, exp_1xbet]
+  - id: requirements
+    canonical: "Работа с требованиями"
+    aliases: ["требования", "технические требования", "requirements",
+              "согласование требований", "формирование требований",
+              "спецификация", "спецификации"]
+    level: working
+    years: 4
+    evidence_ids: [exp_kaspersky, exp_1xbet, exp_linkero]
+
+  # ── ML / CV / LLM ──
+  - id: opencv
+    canonical: "OpenCV"
+    aliases: []
+    level: working
+    years: 1
+    evidence_ids: [exp_kaspersky]
+  - id: yolov8
+    canonical: "Ultralytics YOLOv8"
+    aliases: ["yolo", "yolov8"]
+    level: working
+    years: 1
+    evidence_ids: [exp_kaspersky]
+  - id: tracking
+    canonical: "ByteTrack/DeepSORT"
+    aliases: ["bytetrack", "deepsort"]
+    level: familiar
+    years: 1
+    evidence_ids: [exp_kaspersky]
+  - id: video_pipeline
+    canonical: "RTSP/FFmpeg/GStreamer"
+    aliases: ["rtsp", "ffmpeg", "gstreamer", "video ingest"]
+    level: working
+    years: 3
+    evidence_ids: [exp_kaspersky, exp_1xbet]
+  - id: cuda
+    canonical: "CUDA/TensorRT"
+    aliases: ["cuda", "tensorrt", "gpu инференс"]
+    level: familiar
+    years: 1
+    evidence_ids: [exp_kaspersky]
+  - id: classic_ml
+    canonical: "Классическое машинное обучение"
+    aliases: ["classic ml", "machine learning"]
+    level: familiar
+    years: 1
+    evidence_ids: [exp_kaspersky]
+  - id: llm_stack
+    canonical: "LLM-инференс"
+    aliases: ["vllm", "openai", "openai api", "gpt", "prompt-тюнинг", "langchain"]
+    level: working
+    years: 1
+    evidence_ids: [exp_rnd_voice]
+  - id: speech
+    canonical: "STT/TTS"
+    aliases: ["whisper", "elevenlabs", "speech-to-text", "text-to-speech"]
+    level: working
+    years: 1
+    evidence_ids: [exp_rnd_voice]
+  - id: n8n
+    canonical: "n8n"
+    aliases: []
+    level: working
+    years: 1
+    evidence_ids: [exp_rnd_voice]
+  - id: mcp
+    canonical: "MCP"
+    aliases: ["model context protocol"]
+    level: familiar
+    years: 1
+    evidence_ids: [exp_rnd_voice]
+
+  # ── добавлено из резюме 28.08 (блок Linkero и «дополнительный опыт») ──
+  - id: matrix
+    canonical: "Matrix Synapse"
+    aliases: ["matrix", "synapse", "element", "matrix protocol"]
+    level: working
+    years: 1
+    evidence_ids: [exp_linkero]
+  - id: nginx
+    canonical: "Nginx"
+    aliases: []
+    level: working
+    years: 1
+    evidence_ids: [exp_linkero]
+  - id: clickhouse
+    canonical: "ClickHouse"
+    aliases: []
+    level: working
+    years: 1
+    evidence_ids: [exp_linkero]
+  - id: elasticsearch
+    canonical: "Elasticsearch"
+    aliases: ["elastic", "elk"]
+    level: working
+    years: 1
+    evidence_ids: [exp_linkero]
+  - id: react
+    canonical: "React"
+    aliases: []
+    level: familiar
+    years: 1
+    evidence_ids: [exp_linkero]
+  - id: aws
+    canonical: "AWS"
+    aliases: ["amazon web services"]
+    level: familiar
+    years: 1
+    evidence_ids: [exp_linkero, exp_dominigames]
+  - id: helm
+    canonical: "Helm"
+    aliases: []
+    level: working
+    years: 2
+    evidence_ids: [exp_dominigames]
+
+# ─────────────────────────────────────────────────────────── EXPERIENCE ──
+# Каждый буллет — источник. Генератор может его выбрать, переставить,
+# переформулировать (similarity >= 0.60 к оригиналу), выбросить. Не выдумать.
+
+experience:
+  - id: exp_linkero
+    company: "Linkero"
+    role_ru: "Tech Lead / Software Architect"
+    role_en: "Tech Lead / Software Architect"
+    start: "2025-10"
+    end: null
+    is_current: true
+    team_size_note: "маленькая команда, единственный архитектор"
+    # Дословно из резюме 28.08 (Акопян_Сурен_Python(2).pdf): проект —
+    # корпоративная коммуникационная платформа на базе Matrix Synapse
+    # и Element; архитектура backend/инфраструктуры, масштабирование,
+    # отказоустойчивость, observability, production-readiness, hands-on.
+    bullets:
+      - id: b_lnk_1
+        text_ru: "Прорабатывал multi-worker архитектуру Synapse: группы workers для разных типов нагрузки, маршрутизация через Nginx и независимое горизонтальное масштабирование bottleneck-компонентов."
+        text_en: "Designed the multi-worker Synapse architecture: worker groups per load type, routing through Nginx, and independent horizontal scaling of bottleneck components."
+        skills: [matrix, nginx, microservices, python]
+        metrics: []
+      - id: b_lnk_2
+        text_ru: "Проектировал topology PostgreSQL + Redis, сценарии деградации и поведение workers при отказе критических зависимостей."
+        text_en: "Designed the PostgreSQL + Redis topology, degradation scenarios, and worker behaviour on failure of critical dependencies."
+        skills: [postgresql, redis, microservices]
+        metrics: []
+      - id: b_lnk_3
+        text_ru: "Закладывал bounded queues и backpressure, чтобы при всплесках нагрузки очереди не росли бесконтрольно до OOM."
+        text_en: "Built in bounded queues and backpressure so that load spikes could not grow queues uncontrollably into OOM."
+        skills: [microservices, profiling]
+        metrics: []
+      - id: b_lnk_4
+        text_ru: "Реализовывал fail-fast / no silent degradation: health/degraded состояния, 503 при невозможности безопасно обслуживать запросы и понятные сигналы для балансировщика и мониторинга."
+        text_en: "Implemented fail-fast / no-silent-degradation: health/degraded states, 503 when requests cannot be served safely, and clear signals for the load balancer and monitoring."
+        skills: [nginx, prometheus, microservices]
+        # 503 — HTTP-статус из текста буллета; без метрики гейт чисел режет его
+        # как неподтверждённое число.
+        metrics: [{value: "503", unit: "http_status"}]
+      - id: b_lnk_5
+        text_ru: "Настраивал observability: requests/sec, error rate, p50/p95/p99, worker utilisation, queue saturation, PostgreSQL/Redis health и сквозные trace_id."
+        text_en: "Set up observability: requests/sec, error rate, p50/p95/p99, worker utilisation, queue saturation, PostgreSQL/Redis health, and end-to-end trace_id."
+        skills: [prometheus, grafana, profiling]
+        metrics: []
+      - id: b_lnk_6
+        text_ru: "Организовал deterministic unit/integration tests, E2E-проверки основных Matrix flows, runbooks и rollback-сценарии."
+        text_en: "Established deterministic unit/integration tests, E2E checks of the core Matrix flows, runbooks, and rollback scenarios."
+        skills: [pytest, tdd, matrix]
+        metrics: []
+      - id: b_lnk_7
+        text_ru: "Разрабатывал Integration Manager на FastAPI + React: registry приложений, permissions, allow/deny policy, security validation и административные ограничения."
+        text_en: "Built the Integration Manager on FastAPI + React: application registry, permissions, allow/deny policy, security validation, and administrative restrictions."
+        skills: [fastapi, react, rest_api, python]
+        metrics: []
+      - id: b_lnk_8
+        text_ru: "Проектировал API и интеграции с учётом таймаутов, повторных вызовов, безопасной деградации и контроля доступа."
+        text_en: "Designed APIs and integrations around timeouts, retries, safe degradation, and access control."
+        skills: [rest_api, openapi]
+        metrics: []
+      - id: b_lnk_9
+        text_ru: "Координировал команду, распределял задачи, проводил code review, участвовал в планировании спринтов, наставлял разработчиков и взаимодействовал с Product Manager и бизнесом."
+        text_en: "Coordinated the team, distributed tasks, ran code reviews, took part in sprint planning, mentored developers, and worked with the Product Manager and the business."
+        skills: [team_leadership, code_review, mentoring, agile, stakeholder_mgmt]
+        metrics: []
+      - id: b_lnk_10
+        text_ru: "Вёл архитектурную и техническую документацию; контролировал технический долг, риски и соответствие best practices."
+        text_en: "Maintained architecture and technical documentation; kept technical debt, risks, and best-practice compliance under control."
+        skills: [tech_docs, risk_mgmt]
+        metrics: []
+      - id: b_lnk_11
+        text_ru: "AWS/S3 и облачные backend-сценарии; ClickHouse для хранения и аналитической агрегации событий и технических метрик."
+        text_en: "AWS/S3 and cloud backend scenarios; ClickHouse for storage and analytical aggregation of events and technical metrics."
+        skills: [s3, clickhouse]
+        metrics: []
+      - id: b_lnk_12
+        text_ru: "Elasticsearch/Kibana для поиска по логам и расследования инцидентов; GraphQL API и subscriptions для real-time сценариев."
+        text_en: "Elasticsearch/Kibana for log search and incident investigation; GraphQL API and subscriptions for real-time scenarios."
+        skills: [elasticsearch, kibana, graphql]
+        metrics: []
+      - id: b_lnk_13
+        text_ru: "Linux/Bash для диагностики процессов и ресурсов, journalctl/systemd и автоматизации operational-задач и CI/CD."
+        text_en: "Linux/Bash for process and resource diagnostics, journalctl/systemd, and automation of operational and CI/CD tasks."
+        skills: [linux]
+        metrics: []
+  - id: exp_1xbet
+    company: "1xbet"
+    role_ru: "Tech Lead / Fullstack-разработчик"
+    role_en: "Tech Lead / Fullstack Engineer"
+    start: "2024-03"
+    end: "2025-10"
+    is_current: false
+    domain_note: "внутренние модули системы: проекты, сотрудники, локации, политики отпусков"
+    bullets:
+      - id: b_1xb_1
+        text_ru: "Писал и расширял REST API для внутренних модулей системы (проекты, сотрудники, локации, политики отпусков) на FastAPI и Django REST Framework."
+        text_en: "Wrote and extended REST APIs for internal system modules (projects, employees, locations, leave policies) using FastAPI and Django REST Framework."
+        skills: [rest_api, fastapi, django]
+        metrics: []
+      - id: b_1xb_2
+        text_ru: "Реализовывал интеграцию с внешними поставщиками данных (Stadel) для получения данных о сотрудниках: обрабатывал авторизацию, подписывал запросы, валидировал ответы."
+        text_en: "Implemented integration with external data providers (Stadel) for employee data: handled authorisation, signed requests, validated responses."
+        skills: [rest_api, webhooks]
+        metrics: []
+      - id: b_1xb_3
+        text_ru: "Реализовывал логику смены состояний сотрудника (приём, увольнение, перевод) через три канала: UI, API и базу данных, с валидаторами целостности."
+        text_en: "Implemented employee state transitions (hire, termination, transfer) across three channels — UI, API and database — with integrity validators."
+        skills: [postgresql, rest_api]
+        metrics: []
+      - id: b_1xb_4
+        text_ru: "Проектировал и оптимизировал SQL-запросы, участвовал в разработке и миграции схем данных, писал бизнес-логику на уровне SQL и ORM."
+        text_en: "Designed and optimised SQL queries, worked on schema design and migrations, wrote business logic at SQL and ORM level."
+        skills: [postgresql, sql, sqlalchemy, django]
+        metrics: []
+      - id: b_1xb_5
+        text_ru: "Покрывал backend-логику unit- и интеграционными тестами на PyTest с mock-объектами и factories."
+        text_en: "Covered backend logic with unit and integration tests in PyTest using mocks and factories."
+        skills: [pytest]
+        metrics: []
+      - id: b_1xb_6
+        text_ru: "Настраивал пайплайны в GitLab CI, автоматизировал запуск тестов при каждом коммите, работал с DevOps над окружениями (Docker, .env-шаблоны, миграции)."
+        text_en: "Set up GitLab CI pipelines, automated test runs on every commit, worked with DevOps on environments (Docker, .env templates, migrations)."
+        skills: [gitlab_ci, docker]
+        metrics: []
+      - id: b_1xb_7
+        text_ru: "Реализовывал кастомные валидаторы, ограничивающие доступ к данным по ролям, проверял целостность данных при массовых обновлениях."
+        text_en: "Implemented custom validators restricting data access by role; verified data integrity during bulk updates."
+        skills: [rest_api, postgresql]
+        metrics: []
+      - id: b_1xb_8
+        text_ru: "Готовил сервис к событиям реального времени (WebSocket / GraphQL subscriptions) и idempotent-обработке."
+        text_en: "Prepared the service for real-time events (WebSocket / GraphQL subscriptions) and idempotent processing."
+        skills: [websocket, graphql]
+        metrics: []
+      - id: b_1xb_9
+        text_ru: "Активно участвовал в ревью чужого кода, работал в Scrum-команде: планирования, daily, ретро, демо."
+        text_en: "Actively reviewed other people's code; worked in a Scrum team — planning, dailies, retros, demos."
+        skills: [code_review, agile]
+        metrics: []
+
+  - id: exp_kaspersky
+    company: "Лаборатория Касперского"
+    company_en: "Kaspersky Lab"
+    role_ru: "Python-разработчик"
+    role_en: "Python Developer"
+    start: "2022-07"
+    end: "2024-03"
+    is_current: false
+    bullets:
+      - id: b_ksp_1
+        text_ru: "Разрабатывал и поддерживал микросервисы на Python: проектировал архитектуру, писал новый код и оптимизировал существующие модули."
+        text_en: "Developed and maintained Python microservices: designed architecture, wrote new code and optimised existing modules."
+        skills: [python, microservices]
+        metrics: []
+      - id: b_ksp_2
+        text_ru: "Внедрял решения совместно с архитекторами и аналитиками, участвовал в оценке и согласовании технических требований."
+        text_en: "Delivered solutions together with architects and analysts; took part in estimation and sign-off of technical requirements."
+        skills: [agile, requirements, stakeholder_mgmt]
+        metrics: []
+      - id: b_ksp_3
+        text_ru: "Писал и поддерживал unit- и интеграционные тесты (TDD), обеспечивая надёжность и читаемость кода."
+        text_en: "Wrote and maintained unit and integration tests (TDD), keeping the code reliable and readable."
+        skills: [pytest, tdd]
+        metrics: []
+      - id: b_ksp_4
+        text_ru: "Интегрировал изменения в CI/CD-конвейеры (Jenkins, Azure DevOps), настраивал автоматические прогоны тестов и проверок безопасности."
+        text_en: "Integrated changes into CI/CD pipelines (Jenkins, Azure DevOps), configured automated test and security-check runs."
+        skills: [jenkins, azure_devops]
+        metrics: []
+      - id: b_ksp_5
+        text_ru: "Разворачивал и отлаживал сервисы в Linux-окружении, работал с асинхронным (asyncio) и многопоточным кодом."
+        text_en: "Deployed and debugged services in Linux, worked with async (asyncio) and multithreaded code."
+        skills: [linux, asyncio]
+        metrics: []
+      - id: b_ksp_6
+        text_ru: "Настраивал взаимодействие с брокерами сообщений (RabbitMQ, Kafka) и базами данных (PostgreSQL, MongoDB)."
+        text_en: "Set up interaction with message brokers (RabbitMQ, Kafka) and databases (PostgreSQL, MongoDB)."
+        skills: [rabbitmq, kafka, postgresql, mongodb]
+        metrics: []
+      - id: b_ksp_7
+        text_ru: "Проектировал real-time пайплайны (входные очереди, кэши, батчинг) под низкую p95-латентность, настраивал метрики fps и latency."
+        text_en: "Designed real-time pipelines (input queues, caches, batching) for low p95 latency; set up fps and latency metrics."
+        skills: [prometheus, grafana, redis]
+        metrics: []
+      - id: b_ksp_8
+        text_ru: "Расширял сервисы CV-инференсом на GPU (CUDA/TensorRT), интеграцией RTSP→FFmpeg/GStreamer и GraphQL-слоем."
+        text_en: "Extended services with GPU CV inference (CUDA/TensorRT), RTSP→FFmpeg/GStreamer integration and a GraphQL layer."
+        skills: [cuda, video_pipeline, graphql, opencv, yolov8]
+        metrics: []
+      - id: b_ksp_9
+        text_ru: "Внедрял профилирование горячих путей (torch.profiler, py-spy) и алерты (Prometheus/Grafana) для SLA по задержкам."
+        text_en: "Introduced hot-path profiling (torch.profiler, py-spy) and alerting (Prometheus/Grafana) for latency SLAs."
+        skills: [profiling, prometheus, grafana]
+        metrics: []
+      - id: b_ksp_10
+        text_ru: "Проводил code review в GitLab/GitHub, следил за соблюдением внутренних стандартов и best practices."
+        text_en: "Ran code review in GitLab/GitHub, enforced internal standards and best practices."
+        skills: [code_review, git]
+        metrics: []
+
+  - id: exp_rnd_voice
+    company: "Собственный продукт (R&D): голосовой ассистент / мультимодальная платформа"
+    company_en: "Own product (R&D): voice assistant / multimodal platform"
+    role_ru: "Python Developer / AI Systems Integrator"
+    role_en: "Python Developer / AI Systems Integrator"
+    start: "2021-01"
+    end: "2022-07"
+    is_current: false
+    is_own_project: true
+    note: >-
+      Объединяет две записи исходного резюме: "Multimodal Voice Assistant
+      Platform" (янв 2021 — окт 2021) и "AI Assistant" (окт 2021 — июл 2022).
+      Не коммерческий найм — собственный проект. Помечать честно.
+    bullets:
+      - id: b_rnd_1
+        text_ru: "Интегрировал пайплайн STT (Whisper) → LLM (vLLM/OpenAI) → TTS (ElevenLabs) в голосовой помощник с памятью контекста."
+        text_en: "Integrated an STT (Whisper) → LLM (vLLM/OpenAI) → TTS (ElevenLabs) pipeline into a voice assistant with context memory."
+        skills: [speech, llm_stack, python]
+        metrics: []
+      - id: b_rnd_2
+        text_ru: "Автоматизировал сценарии через n8n: создавал графы действий от запуска LLM до отправки email, связывал входной текст с внешними API."
+        text_en: "Automated scenarios in n8n: built action graphs from LLM invocation to sending email, wired input text to external APIs."
+        skills: [n8n, rest_api]
+        metrics: []
+      - id: b_rnd_3
+        text_ru: "Реализовал обработку команд через websocket-адаптер с поддержкой MCP-подобной схемы."
+        text_en: "Implemented command handling through a websocket adapter with an MCP-like schema."
+        skills: [websocket, mcp]
+        metrics: []
+      - id: b_rnd_4
+        text_ru: "Создал модуль централизованного логирования действий и сообщений LLM, вёл статистику инференса, ошибок STT/TTS и производительности."
+        text_en: "Built centralised logging of actions and LLM messages; tracked inference statistics, STT/TTS errors and performance."
+        skills: [python, mongodb]
+        metrics: []
+      - id: b_rnd_5
+        text_ru: "Разделил функциональность по слоям (распознавание, логика, действие, ответ) и разработал систему агентов: планировщик, исполнитель, аналитик."
+        text_en: "Split functionality into layers (recognition, logic, action, response) and built an agent system: planner, executor, analyst."
+        skills: [python, microservices]
+        metrics: []
+      - id: b_rnd_6
+        text_ru: "Система обрабатывает голосовые запросы и отвечает голосом менее чем за 2 секунды."
+        text_en: "The system processes voice requests and answers by voice in under 2 seconds."
+        skills: [speech, llm_stack]
+        metrics:
+          - value: 2
+            unit: "сек"
+            claim: "полный голосовой ответ"
+      - id: b_rnd_7
+        text_ru: "Формализовал подход к метрикам p50/p95 и стабилизации задержек пайплайна, практиковал async-рефакторинг и кэширование."
+        text_en: "Formalised p50/p95 metrics and pipeline latency stabilisation; practised async refactoring and caching."
+        skills: [asyncio, redis, profiling]
+        metrics: []
+      - id: b_rnd_8
+        text_ru: "Ассистент прошёл пилот в виде Telegram-бота и локального десктоп-приложения."
+        text_en: "The assistant was piloted as a Telegram bot and a local desktop application."
+        skills: [python]
+        metrics: []
+
+  - id: exp_dominigames
+    company: "DominiGames"
+    role_ru: "Python-разработчик"
+    role_en: "Python Developer"
+    start: "2019-01"
+    end: "2021-01"
+    is_current: false
+    city: "Воронеж"
+    bullets:
+      - id: b_dmg_1
+        text_ru: "Делал микросервисы на FastAPI и Django: разбирал монолит, создавал новые сервисы, подключал PostgreSQL и MongoDB."
+        text_en: "Built microservices in FastAPI and Django: broke apart the monolith, created new services, connected PostgreSQL and MongoDB."
+        skills: [fastapi, django, microservices, postgresql, mongodb]
+        metrics: []
+      - id: b_dmg_2
+        text_ru: "Проектировал API вместе с фронтендом: договаривался о виде endpoint-ов, описывал OpenAPI, выкладывал Swagger на общий сервер, использовал gRPC там, где нужна скорость."
+        text_en: "Designed APIs together with frontend: agreed endpoint shapes, wrote OpenAPI, published Swagger on a shared server, used gRPC where speed mattered."
+        skills: [openapi, rest_api, grpc]
+        metrics: []
+      - id: b_dmg_3
+        text_ru: "Писал unit- и интеграционные тесты на PyTest, подключал линтеры (flake8, black, mypy) с падением сборки при нарушениях."
+        text_en: "Wrote unit and integration tests in PyTest; wired in linters (flake8, black, mypy) that break the build on violations."
+        skills: [pytest, gitlab_ci]
+        metrics: []
+      - id: b_dmg_4
+        text_ru: "Собирал образы в Docker, использовал docker-compose локально, катил в Kubernetes через Helm; настроил в GitLab CI цепочку «линтеры → тесты → сборка → стейдж → автотесты → прод»."
+        text_en: "Built Docker images, used docker-compose locally, deployed to Kubernetes via Helm; set up a GitLab CI chain: linters → tests → build → staging → e2e → production."
+        skills: [docker, kubernetes, gitlab_ci]
+        metrics: []
+      - id: b_dmg_5
+        text_ru: "Профилировал код (py-spy, cProfile), переводил горячие пути на async и кэшировал в Redis — p95 сократилась почти в два раза."
+        text_en: "Profiled code (py-spy, cProfile), moved hot paths to async and cached in Redis — p95 nearly halved."
+        skills: [profiling, asyncio, redis]
+        metrics:
+          - value: 2
+            unit: "x"
+            claim: "сокращение p95"
+      - id: b_dmg_6
+        text_ru: "Подключал Stripe, PayPal и S3, обрабатывал асинхронные задачи на RabbitMQ и Kafka, писал ретраи и dead-letter очереди."
+        text_en: "Integrated Stripe, PayPal and S3; processed async jobs on RabbitMQ and Kafka; wrote retries and dead-letter queues."
+        skills: [stripe, paypal, s3, rabbitmq, kafka]
+        metrics: []
+      - id: b_dmg_7
+        text_ru: "В PostgreSQL ставил индексы, писал сложные запросы и миграции на Alembic; MongoDB держал для гибких схем с агрегациями через pipeline."
+        text_en: "In PostgreSQL added indexes, wrote complex queries and Alembic migrations; kept MongoDB for flexible schemas with aggregation pipelines."
+        skills: [postgresql, sql, alembic, mongodb]
+        metrics: []
+      - id: b_dmg_8
+        text_ru: "Дежурил по алертам, разбирал инциденты в Kibana, чинил баги на горячую, ввёл feature-flags для безопасного отката релизов."
+        text_en: "Was on call for alerts, investigated incidents in Kibana, fixed bugs hot, introduced feature flags for safe release rollback."
+        skills: [kibana]
+        metrics: []
+      - id: b_dmg_9
+        text_ru: "Ревьюил чужие merge request-ы, смотрел не только стиль, но и архитектуру; в спринтах вёл груминг, планирование, демо и ретро."
+        text_en: "Reviewed other people's merge requests looking at architecture, not only style; ran grooming, planning, demos and retros."
+        skills: [code_review, agile]
+        metrics: []
+      - id: b_dmg_10
+        text_ru: "Менторил джунов, проводил внутренние мини-лекции по качеству кода, разбирал вместе баги и делал рефакторинги."
+        text_en: "Mentored juniors, ran internal talks on code quality, debugged and refactored together with the team."
+        skills: [mentoring]
+        metrics: []
+
+# ────────────────────────────────────────────────────────── NEVER CLAIM ──
+# Технологии, которых у Сурена НЕТ. Попадание любого из этих терминов (или
+# синонима) в резюме или письмо = хард-фейл гейта, отправка блокируется.
+#
+# Список нужен именно потому, что вакансии просят это напрямую и подгонка
+# норовит подтянуть термин из описания вакансии. Кейс ITM: C#, .NET,
+# GitHub Actions — три из семи пунктов их стека.
+
+never_claim:
+  - id: csharp
+    canonical: "C#"
+    aliases: ["c sharp", "csharp", "си шарп"]
+  - id: dotnet
+    canonical: ".NET"
+    aliases: ["dotnet", "asp.net", "net core", ".net core", "entity framework"]
+  - id: github_actions
+    canonical: "GitHub Actions"
+    aliases: ["gh actions", "github workflows"]
+  - id: java
+    canonical: "Java"
+    aliases: ["spring", "spring boot", "jvm", "kotlin"]
+  - id: golang
+    canonical: "Go"
+    aliases: ["golang"]
+  - id: php
+    canonical: "PHP"
+    aliases: ["laravel", "symfony"]
+  - id: ruby
+    canonical: "Ruby"
+    aliases: ["rails", "ruby on rails"]
+  - id: rust
+    canonical: "Rust"
+    aliases: []
+  - id: terraform
+    canonical: "Terraform"
+    aliases: ["iac", "pulumi"]
+  # AWS и React перенесены в skills (уровень familiar): резюме 28.08 заявляет
+  # их явно — «AWS/S3 и облачные backend-сценарии» и «Integration Manager на
+  # FastAPI + React». Управляемые сервисы AWS, которых в резюме нет, остаются
+  # запрещёнными, как и остальной фронтенд.
+  - id: aws_managed
+    canonical: "Lambda"
+    aliases: ["ecs", "eks", "dynamodb", "cloudformation"]
+    note: "Из AWS в резюме только S3 и облачные backend-сценарии."
+  - id: frontend_frameworks
+    canonical: "Vue"
+    aliases: ["angular", "svelte", "next.js", "typescript"]
+    note: "React заявлен в резюме (Integration Manager); остальной фронтенд — нет."
+  - id: product_analytics
+    canonical: "Amplitude"
+    aliases: ["mixpanel", "posthog", "ga4"]
+    note: "Продуктовая аналитика в резюме не заявлена. Если использовал — перенеси в skills."
+
+# ────────────────────────────────────────────────── ЗАЯВЛЯЕМЫЙ ОПЫТ ──
+# Гейт сверяет: claimed_total_years должен совпадать с расчётом по experience.
+claims:
+  total_years_software: 7        # с 2019-01, считая по timeline_start
+  years_hands_on_engineer: 3.5   # DominiGames 2 года + R&D 1.5 года, до Kaspersky
+  # Продуктовое владение: с 2022-07 участие в формировании требований (Kaspersky),
+  # с 2024-03 — владение поведением модулей (1xbet, Linkero).
+  years_requirements_ownership: 4
+  years_product_module_ownership: 2
+
+# ── Готовые ответы на типовые вопросы рекрутёров ────────────────────────────
+# Заполняет владелец. Пусто — бот эскалирует такие вопросы как раньше.
+# Ответ пересказывается ботом почти дословно и проходит гейт правды, поэтому
+# пиши только то, что готов сказать рекрутёру сам.
+faq: []
+#  - id: about_me
+#    answer_ru: >-
+#      Семь лет в разработке: вырос из backend-инженера в технического лидера.
+#      Основной стек — Python, FastAPI, PostgreSQL, Docker. Ищу удалённую
+#      backend-роль, английский C1.
+
+# Зарплатное ожидание. Пусто — бот никогда не называет цифру, а на вопрос
+# о деньгах вежливо возвращает вопрос и зовёт владельца. Заполнено — цифра
+# появляется в ЧЕРНОВИКЕ ответа, но отправляет его всё равно владелец.
+salary_expectation: ""
+

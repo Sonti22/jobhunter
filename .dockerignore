@@ -1,0 +1,42 @@
+# Секреты — в образ не попадают ни при каких обстоятельствах.
+# Слои образа читаются кем угодно, у кого есть образ; .env приходит
+# переменными окружения в момент запуска (env_file в docker-compose.yml).
+.env
+.env.*
+!.env.example
+*.session
+*.session-journal
+google_token.json
+google_client_secret.json
+tg_code.txt
+tg_2fa.txt
+tg_code_request.json
+proxy_backup.json
+
+# Состояние: живёт в томе и в смонтированной папке, а не внутри образа.
+*.db
+*.db-wal
+*.db-shm
+*.db.moved
+cv_out/
+logs/
+out/
+probe_out/
+backup_*/
+sender.pid
+STOP_SENDING.flag
+
+# Мусор сборки и разработки
+.git/
+.gitignore
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+*.html
+*.md
+!README.md
+
+# Базовое резюме монтируется read-only: правки применяются без пересборки.
+cv_base/

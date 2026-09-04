@@ -1,0 +1,479 @@
+[
+ {
+  "username": "django_jobs_board",
+  "ok": true,
+  "reason": "",
+  "posts": 20,
+  "fresh7": 11,
+  "contacts": 14,
+  "py": 20
+ },
+ {
+  "username": "job_python",
+  "ok": true,
+  "reason": "",
+  "posts": 20,
+  "fresh7": 20,
+  "contacts": 5,
+  "py": 20
+ },
+ {
+  "username": "p_rabota",
+  "ok": true,
+  "reason": "",
+  "posts": 20,
+  "fresh7": 7,
+  "contacts": 5,
+  "py": 20
+ },
+ {
+  "username": "rabotapython",
+  "ok": true,
+  "reason": "",
+  "posts": 20,
+  "fresh7": 7,
+  "contacts": 2,
+  "py": 20
+ },
+ {
+  "username": "job_pythonz",
+  "ok": true,
+  "reason": "",
+  "posts": 20,
+  "fresh7": 3,
+  "contacts": 4,
+  "py": 19
+ },
+ {
+  "username": "pythonpythonjobs",
+  "ok": true,
+  "reason": "",
+  "posts": 20,
+  "fresh7": 15,
+  "contacts": 2,
+  "py": 18
+ },
+ {
+  "username": "de_rabota",
+  "ok": true,
+  "reason": "",
+  "posts": 20,
+  "fresh7": 7,
+  "contacts": 14,
+  "py": 17
+ },
+ {
+  "username": "python_djangojobs",
+  "ok": true,
+  "reason": "",
+  "posts": 20,
+  "fresh7": 2,
+  "contacts": 14,
+  "py": 16
+ },
+ {
+  "username": "forpython",
+  "ok": true,
+  "reason": "",
+  "posts": 20,
+  "fresh7": 9,
+  "contacts": 5,
+  "py": 16
+ },
+ {
+  "username": "pythonrabota",
+  "ok": true,
+  "reason": "",
+  "posts": 20,
+  "fresh7": 8,
+  "contacts": 5,
+  "py": 16
+ },
+ {
+  "username": "back_rabota",
+  "ok": true,
+  "reason": "",
+  "posts": 20,
+  "fresh7": 7,
+  "contacts": 2,
+  "py": 16
+ },
+ {
+  "username": "ya_jobs",
+  "ok": true,
+  "reason": "",
+  "posts": 20,
+  "fresh7": 17,
+  "contacts": 1,
+  "py": 16
+ },
+ {
+  "username": "devops_jobs_feed",
+  "ok": true,
+  "reason": "",
+  "posts": 20,
+  "fresh7": 20,
+  "contacts": 20,
+  "py": 14
+ },
+ {
+  "username": "remote_devops_jobs",
+  "ok": true,
+  "reason": "",
+  "posts": 20,
+  "fresh7": 9,
+  "contacts": 1,
+  "py": 13
+ },
+ {
+  "username": "datascienceml_jobs",
+  "ok": true,
+  "reason": "",
+  "posts": 20,
+  "fresh7": 4,
+  "contacts": 13,
+  "py": 12
+ },
+ {
+  "username": "data_engineer_jobs",
+  "ok": true,
+  "reason": "",
+  "posts": 18,
+  "fresh7": 4,
+  "contacts": 10,
+  "py": 12
+ },
+ {
+  "username": "devs_it",
+  "ok": true,
+  "reason": "",
+  "posts": 18,
+  "fresh7": 14,
+  "contacts": 4,
+  "py": 12
+ },
+ {
+  "username": "devopssre_jobs",
+  "ok": true,
+  "reason": "",
+  "posts": 20,
+  "fresh7": 16,
+  "contacts": 17,
+  "py": 11
+ },
+ {
+  "username": "remoteit",
+  "ok": true,
+  "reason": "",
+  "posts": 16,
+  "fresh7": 20,
+  "contacts": 15,
+  "py": 11
+ },
+ {
+  "username": "backend_frontend_jobs",
+  "ok": true,
+  "reason": "",
+  "posts": 20,
+  "fresh7": 5,
+  "contacts": 5,
+  "py": 11
+ },
+ {
+  "username": "datasciencejobs",
+  "ok": true,
+  "reason": "",
+  "posts": 20,
+  "fresh7": 8,
+  "contacts": 13,
+  "py": 10
+ },
+ {
+  "username": "opento_dev",
+  "ok": true,
+  "reason": "",
+  "posts": 20,
+  "fresh7": 11,
+  "contacts": 4,
+  "py": 10
+ },
+ {
+  "username": "zizu_it_ru",
+  "ok": true,
+  "reason": "",
+  "posts": 20,
+  "fresh7": 3,
+  "contacts": 9,
+  "py": 9
+ },
+ {
+  "username": "it_vakansii_jobs",
+  "ok": true,
+  "reason": "",
+  "posts": 20,
+  "fresh7": 9,
+  "contacts": 4,
+  "py": 9
+ },
+ {
+  "username": "itfreelancers",
+  "ok": true,
+  "reason": "",
+  "posts": 20,
+  "fresh7": 2,
+  "contacts": 19,
+  "py": 8
+ },
+ {
+  "username": "holder_job_devs",
+  "ok": true,
+  "reason": "",
+  "posts": 20,
+  "fresh7": 2,
+  "contacts": 16,
+  "py": 8
+ },
+ {
+  "username": "uzdev_jobs",
+  "ok": true,
+  "reason": "",
+  "posts": 20,
+  "fresh7": 7,
+  "contacts": 15,
+  "py": 8
+ },
+ {
+  "username": "youritjob",
+  "ok": true,
+  "reason": "",
+  "posts": 20,
+  "fresh7": 17,
+  "contacts": 7,
+  "py": 8
+ },
+ {
+  "username": "thehire",
+  "ok": true,
+  "reason": "",
+  "posts": 19,
+  "fresh7": 1,
+  "contacts": 1,
+  "py": 8
+ },
+ {
+  "username": "getitrussia",
+  "ok": true,
+  "reason": "",
+  "posts": 20,
+  "fresh7": 20,
+  "contacts": 19,
+  "py": 7
+ },
+ {
+  "username": "phystechcareerchannel",
+  "ok": true,
+  "reason": "",
+  "posts": 13,
+  "fresh7": 1,
+  "contacts": 8,
+  "py": 7
+ },
+ {
+  "username": "hiddengurus",
+  "ok": true,
+  "reason": "",
+  "posts": 16,
+  "fresh7": 20,
+  "contacts": 4,
+  "py": 7
+ },
+ {
+  "username": "opento_data",
+  "ok": true,
+  "reason": "",
+  "posts": 20,
+  "fresh7": 6,
+  "contacts": 1,
+  "py": 7
+ },
+ {
+  "username": "myresume_ru",
+  "ok": true,
+  "reason": "",
+  "posts": 14,
+  "fresh7": 20,
+  "contacts": 2,
+  "py": 6
+ },
+ {
+  "username": "workayte",
+  "ok": true,
+  "reason": "",
+  "posts": 20,
+  "fresh7": 17,
+  "contacts": 18,
+  "py": 5
+ },
+ {
+  "username": "geekjobs",
+  "ok": true,
+  "reason": "",
+  "posts": 20,
+  "fresh7": 16,
+  "contacts": 16,
+  "py": 5
+ },
+ {
+  "username": "workitkz",
+  "ok": true,
+  "reason": "",
+  "posts": 19,
+  "fresh7": 14,
+  "contacts": 16,
+  "py": 5
+ },
+ {
+  "username": "montenegro_it_jobs",
+  "ok": true,
+  "reason": "",
+  "posts": 20,
+  "fresh7": 4,
+  "contacts": 14,
+  "py": 5
+ },
+ {
+  "username": "careernoborders",
+  "ok": true,
+  "reason": "",
+  "posts": 16,
+  "fresh7": 2,
+  "contacts": 5,
+  "py": 5
+ },
+ {
+  "username": "remote_jobs_relocate",
+  "ok": true,
+  "reason": "",
+  "posts": 20,
+  "fresh7": 6,
+  "contacts": 3,
+  "py": 5
+ },
+ {
+  "username": "cyithr",
+  "ok": true,
+  "reason": "",
+  "posts": 20,
+  "fresh7": 20,
+  "contacts": 13,
+  "py": 3
+ },
+ {
+  "username": "refer_me_it",
+  "ok": true,
+  "reason": "",
+  "posts": 20,
+  "fresh7": 10,
+  "contacts": 8,
+  "py": 3
+ },
+ {
+  "username": "young_relocate",
+  "ok": true,
+  "reason": "",
+  "posts": 20,
+  "fresh7": 15,
+  "contacts": 6,
+  "py": 3
+ },
+ {
+  "username": "data_secrets_career",
+  "ok": true,
+  "reason": "",
+  "posts": 19,
+  "fresh7": 14,
+  "contacts": 1,
+  "py": 3
+ },
+ {
+  "username": "relocats",
+  "ok": true,
+  "reason": "",
+  "posts": 17,
+  "fresh7": 18,
+  "contacts": 16,
+  "py": 2
+ },
+ {
+  "username": "job_web3",
+  "ok": true,
+  "reason": "",
+  "posts": 20,
+  "fresh7": 15,
+  "contacts": 12,
+  "py": 2
+ },
+ {
+  "username": "rabota_v_ii",
+  "ok": true,
+  "reason": "",
+  "posts": 15,
+  "fresh7": 3,
+  "contacts": 4,
+  "py": 1
+ },
+ {
+  "username": "fordevops",
+  "ok": true,
+  "reason": "",
+  "posts": 20,
+  "fresh7": 14,
+  "contacts": 2,
+  "py": 1
+ },
+ {
+  "username": "evacuatejobs",
+  "ok": true,
+  "reason": "",
+  "posts": 20,
+  "fresh7": 20,
+  "contacts": 2,
+  "py": 0
+ },
+ {
+  "username": "rusukrjobs",
+  "ok": true,
+  "reason": "",
+  "posts": 19,
+  "fresh7": 5,
+  "contacts": 2,
+  "py": 0
+ },
+ {
+  "username": "remocate",
+  "ok": true,
+  "reason": "",
+  "posts": 20,
+  "fresh7": 20,
+  "contacts": 2,
+  "py": 0
+ },
+ {
+  "username": "choicy_work",
+  "ok": true,
+  "reason": "",
+  "posts": 20,
+  "fresh7": 6,
+  "contacts": 2,
+  "py": 0
+ },
+ {
+  "username": "forchiefs",
+  "ok": true,
+  "reason": "",
+  "posts": 20,
+  "fresh7": 12,
+  "contacts": 1,
+  "py": 0
+ }
+]

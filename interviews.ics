@@ -1,0 +1,25 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//jobhunter//interviews//RU
+CALSCALE:GREGORIAN
+METHOD:PUBLISH
+X-WR-CALNAME:Интервью
+BEGIN:VEVENT
+UID:jobhunter-3@local
+DTSTAMP:20260904T163914Z
+DTSTART:20260905T120000Z
+DTEND:20260905T130000Z
+SUMMARY:Интервью — Python Backend
+DESCRIPTION:@hr_ffcc2c83\n\nПодготовка:\n- Перечитать своё резюме под эту вакансию (лежит в cv_out) — вопросы будут по нему\n- Подготовить 2-3 истории по STAR: задача → что сделал → результат\n- Свой вопрос работодателю: как устроен процесс принятия продуктовых решений
+BEGIN:VALARM
+TRIGGER:-PT1H
+ACTION:DISPLAY
+DESCRIPTION:Интервью через час
+END:VALARM
+BEGIN:VALARM
+TRIGGER:-P1D
+ACTION:DISPLAY
+DESCRIPTION:Интервью завтра
+END:VALARM
+END:VEVENT
+END:VCALENDAR

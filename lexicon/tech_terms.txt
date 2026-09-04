@@ -1,0 +1,553 @@
+# Лексикон технологий для гейта. Одна строка — один термин (регистронезависимо).
+# Назначение: детектировать в сгенерированном резюме/письме ТЕХНОЛОГИЧЕСКИЙ термин,
+# затем сверить его с allowed/forbidden из profile.yaml. Термин НЕ из profile → хард-фейл.
+# Список фиксированный: гейт только матчит по нему, не выводит термины сам.
+# Комментарии и пустые строки игнорируются.
+
+# ── языки ──
+python
+python3
+c#
+c sharp
+csharp
+c++
+cpp
+c
+java
+kotlin
+scala
+groovy
+go
+golang
+rust
+ruby
+php
+perl
+swift
+objective-c
+objective c
+javascript
+typescript
+js
+ts
+dart
+elixir
+erlang
+haskell
+clojure
+f#
+r
+matlab
+julia
+lua
+bash
+shell
+powershell
+sql
+plsql
+pl/sql
+tsql
+solidity
+vyper
+assembly
+cobol
+fortran
+visual basic
+vba
+delphi
+pascal
+
+# ── бэкенд-фреймворки ──
+django
+django rest framework
+drf
+flask
+fastapi
+tornado
+aiohttp
+sanic
+starlette
+express
+express.js
+nestjs
+nest.js
+koa
+spring
+spring boot
+spring mvc
+micronaut
+quarkus
+.net
+dotnet
+asp.net
+asp.net core
+.net core
+entity framework
+laravel
+symfony
+codeigniter
+yii
+rails
+ruby on rails
+sinatra
+gin
+echo
+fiber
+actix
+axum
+rocket
+phoenix
+ktor
+vert.x
+
+# ── фронтенд ──
+react
+react.js
+reactjs
+vue
+vue.js
+vuejs
+angular
+angularjs
+svelte
+sveltekit
+next.js
+nextjs
+nuxt
+nuxt.js
+gatsby
+remix
+redux
+mobx
+zustand
+rxjs
+jquery
+backbone
+ember
+solid.js
+astro
+tailwind
+tailwindcss
+bootstrap
+material ui
+mui
+chakra ui
+css
+scss
+sass
+less
+html
+webpack
+vite
+rollup
+esbuild
+parcel
+babel
+storybook
+
+# ── мобайл ──
+android
+ios
+swiftui
+uikit
+jetpack compose
+flutter
+react native
+xamarin
+ionic
+cordova
+kmp
+kotlin multiplatform
+
+# ── базы данных ──
+postgresql
+postgres
+mysql
+mariadb
+sqlite
+oracle
+sql server
+mssql
+db2
+cockroachdb
+mongodb
+mongo
+cassandra
+scylladb
+dynamodb
+couchdb
+couchbase
+redis
+memcached
+elasticsearch
+opensearch
+solr
+neo4j
+arangodb
+influxdb
+timescaledb
+clickhouse
+snowflake
+bigquery
+redshift
+databricks
+duckdb
+supabase
+firebase
+firestore
+realm
+
+# ── очереди / стриминг ──
+rabbitmq
+kafka
+apache kafka
+activemq
+nats
+zeromq
+redis streams
+amazon sqs
+sqs
+google pubsub
+pub/sub
+celery
+sidekiq
+bull
+temporal
+airflow
+dagster
+prefect
+luigi
+flink
+spark
+apache spark
+storm
+beam
+
+# ── API / протоколы ──
+rest
+rest api
+restful
+graphql
+grpc
+soap
+websocket
+websockets
+webhook
+webhooks
+openapi
+swagger
+json
+json-rpc
+xml
+protobuf
+protocol buffers
+avro
+thrift
+oauth
+oauth2
+oidc
+openid connect
+jwt
+saml
+mtls
+mcp
+
+# ── DevOps / инфра ──
+docker
+docker-compose
+kubernetes
+k8s
+helm
+openshift
+nomad
+podman
+containerd
+terraform
+pulumi
+ansible
+chef
+puppet
+saltstack
+vagrant
+packer
+jenkins
+gitlab ci
+gitlab-ci
+github actions
+circleci
+travis ci
+travis
+teamcity
+bamboo
+argo cd
+argocd
+flux
+azure devops
+tekton
+drone
+buildkite
+spinnaker
+
+# ── облака ──
+aws
+amazon web services
+ec2
+s3
+lambda
+ecs
+eks
+fargate
+rds
+cloudfront
+route53
+cloudformation
+azure
+gcp
+google cloud
+gke
+cloud run
+app engine
+digitalocean
+heroku
+vercel
+netlify
+cloudflare
+linode
+hetzner
+
+# ── наблюдаемость ──
+prometheus
+grafana
+kibana
+elk
+elk stack
+logstash
+fluentd
+fluent bit
+datadog
+new relic
+sentry
+splunk
+jaeger
+zipkin
+opentelemetry
+otel
+loki
+tempo
+victoriametrics
+pagerduty
+nagios
+zabbix
+py-spy
+cprofile
+perf
+nsight
+torch.profiler
+
+# ── ML / DS ──
+machine learning
+deep learning
+pytorch
+tensorflow
+keras
+scikit-learn
+sklearn
+numpy
+pandas
+scipy
+xgboost
+lightgbm
+catboost
+opencv
+yolo
+yolov8
+ultralytics
+bytetrack
+deepsort
+hugging face
+transformers
+langchain
+llamaindex
+vllm
+openai
+whisper
+elevenlabs
+cuda
+tensorrt
+onnx
+mlflow
+kubeflow
+ray
+dask
+spacy
+nltk
+n8n
+
+# ── медиа / стриминг ──
+ffmpeg
+gstreamer
+rtsp
+webrtc
+hls
+rtmp
+
+# ── прочие инструменты ──
+git
+github
+gitlab
+bitbucket
+svn
+mercurial
+jira
+confluence
+trello
+asana
+linux
+unix
+windows
+macos
+nginx
+apache
+haproxy
+envoy
+traefik
+istio
+consul
+vault
+etcd
+zookeeper
+keycloak
+kong
+graphite
+alembic
+liquibase
+flyway
+dbt
+sqlalchemy
+hibernate
+prisma
+typeorm
+sequelize
+gorm
+pydantic
+pytest
+junit
+testng
+mocha
+jest
+cypress
+playwright
+selenium
+puppeteer
+cucumber
+locust
+k6
+jmeter
+gatling
+flake8
+black
+mypy
+eslint
+prettier
+ruff
+sonarqube
+
+# ── аналитика продукта ──
+amplitude
+mixpanel
+posthog
+google analytics
+ga4
+segment
+looker
+tableau
+power bi
+metabase
+superset
+
+# ── продуктовые и управленческие компетенции ──
+# ВАЖНО: наличие термина здесь делает его ВИДИМЫМ для гейта и скоринга,
+# но НЕ разрешает его. Разрешение даёт только запись в profile.yaml:skills.
+# Термина нет в профиле → hard-fail lexicon.unknown (в сочинённом тексте).
+roadmap
+дорожная карта
+roadmapping
+discovery
+продуктовый дискавери
+jtbd
+jobs to be done
+cjm
+customer journey
+prd
+product requirements document
+спецификация
+техническое задание
+backlog
+бэклог
+груминг
+prioritization
+приоритизация
+rice
+ice scoring
+moscow
+stakeholder
+стейкхолдер
+stakeholder management
+okr
+kpi
+north star
+funnel
+воронка
+conversion
+конверсия
+retention
+удержание
+churn
+отток
+ltv
+cac
+unit economics
+юнит-экономика
+a/b testing
+a/b тест
+ab test
+эксперимент
+experimentation
+user research
+custdev
+кастдев
+usability
+пользовательские интервью
+pricing
+монетизация
+monetization
+go-to-market
+gtm
+launch
+competitor analysis
+конкурентный анализ
+market research
+product analytics
+продуктовая аналитика
+jira
+confluence
+notion
+miro
+figma
+trello
+asana
+linear
+product strategy
+продуктовая стратегия
+requirements
+требования
+планирование
+planning
+technical debt
+техдолг
+risk management
+управление рисками
+team leadership
+техническое лидерство
+mentoring
+наставничество

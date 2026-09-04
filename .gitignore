@@ -1,0 +1,25 @@
+# секреты и учётки — НИКОГДА в git
+.env
+*.session
+*.session-journal
+sender.pid
+
+# данные кампании и личные артефакты
+data/
+backup/
+out/
+cv_base/
+*.db
+*.db-wal
+*.db-shm
+
+# python
+__pycache__/
+*.pyc
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+*.session.moved
+*.session.*
