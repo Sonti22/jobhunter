@@ -278,7 +278,11 @@ def pick_batch(limit: int) -> list:
             source_rates = source_preferences(min_sent=5)
         except Exception:
             source_rates = {}
-            source_priority_penalty = lambda source, preferences: 0.0
+
+            def source_priority_penalty(source: str,
+                                        preferences: dict | None = None
+                                        ) -> float:
+                return 0.0
         pairs = [(app, sess.get(Job, app.job_id)) for app in rows]
         pairs.sort(key=lambda pair: (
             (pair[0].score - source_priority_penalty(
