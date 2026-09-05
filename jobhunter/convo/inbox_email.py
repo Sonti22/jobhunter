@@ -23,7 +23,7 @@ from ..db import session_scope
 from ..models import Application, ContactKind, Job, Message, Status
 from ..textutil import clean_email_body
 from . import imapbox, mailmatch
-from .engine import LIVE, handle_message, store_incoming
+from .engine import LIVE, finish_incoming, handle_message, store_incoming
 
 log = logging.getLogger("inbox_mail")
 
@@ -46,7 +46,8 @@ def build_context() -> mailmatch.MatchContext:
         live_ids = []
         for app, job in rows:
             addr = (job.contact_url or "").replace("mailto:", "").strip().lower()
-            if app.status in LIVE_EMAIL or app.status in TERMINAL_NOTIFY:
+            if (app.status in LIVE_EMAIL or app.status in TERMINAL_NOTIFY or
+                    (app.status == Status.APPROVED.value and app.sent_at)):
                 live_ids.append(app.id)
                 if app.email_peer:
                     ctx.by_peer[app.email_peer.strip().lower()] = app.id
@@ -70,11 +71,28 @@ def _parse_plus(text: str) -> int:
 
 
 async def process(dry: bool = False) -> dict:
-    """Один проход по ящику."""
+    """Проход с наблюдаемым остатком; ошибка никогда не сдвигает границу."""
+    from ..observability import record
     s = get_settings()
     stats = {"seen": 0, "matched": 0, "incoming": 0, "auto": 0, "escalated": 0,
              "closed": 0, "skipped": 0, "bodies": 0, "by_rule": Counter(),
-             "ambiguous": 0}
+             "ambiguous": 0, "processed": 0, "remaining": None,
+             "folder": s.imap_folder, "lookback_days": s.inbox_lookback_days}
+    if not dry:
+        record("gmail", "running", details=dict(stats))
+    try:
+        result = await _process(dry, stats)
+    except Exception as exc:
+        stats["error"] = "%s: %s" % (type(exc).__name__, str(exc)[:220])
+        result = stats
+    if not dry:
+        status = "error" if result.get("error") else "partial" if result.get("remaining") else "ok"
+        record("gmail", status, details=result, error=result.get("error", ""))
+    return result
+
+
+async def _process(dry: bool, stats: dict) -> dict:
+    s = get_settings()
     if not s.imap_enabled:
         return dict(stats, error="IMAP выключен")
 
@@ -86,7 +104,11 @@ async def process(dry: bool = False) -> dict:
     try:
         uids, validity, _reset = imapbox.new_uids(conn)
         stats["seen"] = len(uids)
+        stats["available"] = getattr(conn, "_jobhunter_pending_count", len(uids))
+        stats["remaining"] = stats["available"]
         if not uids:
+            if not dry:
+                imapbox.advance_watermark([], validity)
             return stats
 
         ctx = build_context()
@@ -98,7 +120,8 @@ async def process(dry: bool = False) -> dict:
                 continue
             if cand.ambiguous:
                 stats["ambiguous"] += 1
-                _notify_ambiguous(headers, cand.ambiguous)
+                if not dry:
+                    _notify_ambiguous(headers, cand.ambiguous)
                 continue
             if not cand.need_body:
                 # Постороннее письмо: тело не скачивается вовсе. Именно так
@@ -137,6 +160,9 @@ async def process(dry: bool = False) -> dict:
 
     if not dry:
         imapbox.advance_watermark(uids, validity)
+    stats["processed"] = len(uids)
+    stats["last_uid"] = max(uids)
+    stats["remaining"] = max(0, stats["available"] - len(uids))
     stats["by_rule"] = dict(stats["by_rule"])
     return stats
 
@@ -168,15 +194,23 @@ async def _handle_one(app_id: int, uid: int, headers: dict, rule: str,
     with session_scope() as sess:
         status = sess.get(Application, app_id).status
     if status in TERMINAL_NOTIFY:
+        finish_incoming(app_id, new_ids, channel="email")
         return "сохранено, тред закрыт"
     if not text:
         # Письмо целиком из цитаты: факт ответа зафиксирован, а
         # классифицировать нечего — пустой текст даст ложный UNKNOWN.
+        finish_incoming(app_id, new_ids, channel="email")
         return "сохранено, нового текста нет"
 
     # client=None: handle_message передаёт его только в send_reply, а тот для
     # почтовой заявки уходит в SMTP и клиента не касается.
-    return await handle_message(None, app_id, text, dry=dry)
+    try:
+        verdict = await handle_message(None, app_id, text, dry=dry)
+    except Exception as exc:
+        finish_incoming(app_id, new_ids, channel="email", error=type(exc).__name__)
+        raise
+    finish_incoming(app_id, new_ids, channel="email", error=verdict if "не ушёл" in verdict else "")
+    return verdict
 
 
 def _notify_ambiguous(headers: dict, apps: list) -> None:

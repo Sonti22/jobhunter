@@ -14,6 +14,7 @@ import json
 import re
 import time
 from collections.abc import Iterator
+from html.parser import HTMLParser
 from pathlib import Path
 
 import httpx
@@ -222,6 +223,66 @@ _ROLE_OR_CONTACT = re.compile(
     r"[\w.+-]+@[\w.-]+\.[a-z]{2,})", re.I)
 _MIN_POST_LENGTH = 80
 
+_EMPLOYER_ACTION = re.compile(
+    r"(?:мы\s+ищем|ищем|требуется|требуются|нанимаем|ищу\s+в\s+команду)\s+"
+    r"(?:в\s+команду\s+)?(?:[\w+/#.-]+\s+){0,4}"
+    r"(?:разработчик|инженер|аналитик|менеджер|специалист|дизайнер|"
+    r"developer|engineer|devops|sre|qa|backend|frontend|python)|"
+    r"\b(?:we\s+(?:are\s+)?(?:hiring|looking\s+for)|we're\s+hiring)\b", re.I)
+
+
+def is_candidate_post(text: str) -> bool:
+    """Резюме не становится вакансией из-за слов «требования»/«вакансии»."""
+    t = text or ""
+    return bool(_RESUME_POST.search(t) and not _EMPLOYER_ACTION.search(t[:1200]))
+
+
+class _PostParser(HTMLParser):
+    """Текст, время и ID принадлежат одному data-post, включая медиа-посты."""
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.posts: list[dict] = []
+        self.depth = 0
+        self.current = None
+        self.post_depth = 0
+        self.text_depth = 0
+
+    def handle_starttag(self, tag, attrs):
+        attrs = dict(attrs)
+        if tag == "div":
+            self.depth += 1
+            if attrs.get("data-post"):
+                self.current = {"id": attrs["data-post"], "text": "", "date": ""}
+                self.posts.append(self.current)
+                self.post_depth = self.depth
+                self.text_depth = 0
+            if self.current is not None and "tgme_widget_message_text" in attrs.get("class", "").split():
+                self.text_depth = self.depth
+        if self.current is not None:
+            if tag == "time" and attrs.get("datetime"):
+                self.current["date"] = attrs["datetime"]
+            if tag == "br" and self.text_depth:
+                self.current["text"] += "\n"
+
+    def handle_data(self, data):
+        if self.current is not None and self.text_depth:
+            self.current["text"] += data
+
+    def handle_endtag(self, tag):
+        if tag == "div":
+            if self.depth == self.text_depth:
+                self.text_depth = 0
+            if self.depth == self.post_depth:
+                self.current = None
+            self.depth = max(0, self.depth - 1)
+
+
+def parse_posts(page: str) -> list[dict]:
+    parser = _PostParser()
+    parser.feed(page)
+    return parser.posts
+
 
 def _is_vacancy(text: str) -> bool:
     """Отсекаем рекламу каналов, дайджесты, болтовню и резюме соискателей."""
@@ -230,8 +291,14 @@ def _is_vacancy(text: str) -> bool:
         if not (_EXPLICIT_VACANCY.search(t)
                 and (_ROLE_OR_CONTACT.search(t) or _SALARY_RE.search(t))):
             return False
-    # резюме соискателя: контакт есть, но писать туда нельзя
-    if _RESUME_POST.search(t) and not _VACANCY_MARK.search(t):
+    # резюме соискателя: контакт есть, но писать туда нельзя. Две проверки
+    # намеренно: локальная ловит формулировки, postkind — метки публикатора
+    # и заголовки вида «Senior DevOps-инженер … #резюме», которые здесь
+    # проходили как вакансии (четырём соискателям система уже написала).
+    if is_candidate_post(t):
+        return False
+    from .postkind import is_seeker_post
+    if is_seeker_post(text):
         return False
     if re.search(r"(подпис|реклам|розыгрыш|дайджест|подборка каналов|"
                  r"курс|вебинар|марафон|бесплатный интенсив)", t) and \
@@ -285,6 +352,8 @@ class TelegramChannelSource:
                 "status": "pending", "error": "", "pages": 0,
                 "posts": 0, "vacancies": 0, "contacts": 0,
                 "requests": 0,
+                "oldest_id": 0, "newest_id": 0, "rejected": 0,
+                "history_complete": False,
             }
             for channel in self.channels
         }
@@ -335,20 +404,25 @@ class TelegramChannelSource:
                 page_html = self._fetch(channel, before)
                 if not page_html:
                     break
-                posts = list(_MSG_RE.finditer(page_html))
+                posts = parse_posts(page_html)
                 stat["pages"] += 1
                 stat["posts"] += len(posts)
-                ids = list(_ID_RE.finditer(page_html))
-                times = list(_TIME_RE.finditer(page_html))
                 if not posts:
+                    # Пустая HTML-страница может означать закрытый канал или
+                    # изменившуюся разметку, а не конец доступной истории.
                     break
-                for idx, m in enumerate(posts):
-                    text = _strip_html(m.group("body"))
+                ids = [int(p["id"].rsplit("/", 1)[-1]) for p in posts
+                       if p["id"].rsplit("/", 1)[-1].isdigit()]
+                if ids:
+                    stat["oldest_id"] = min(ids + ([stat["oldest_id"]] if stat["oldest_id"] else []))
+                    stat["newest_id"] = max(ids + [stat["newest_id"]])
+                for post in posts:
+                    text = post["text"].strip()
                     if not _is_vacancy(text):
+                        stat["rejected"] += 1
                         continue
                     stat["vacancies"] += 1
-                    post_id = (ids[idx].group("post") if idx < len(ids)
-                               else "%s/%d" % (channel, idx))
+                    post_id = post["id"]
                     # Канал и его кросс-промо семейство — не контакт вакансии.
                     # Денилист — не только текущий канал, но и ВСЕ, что мы
                     # читаем. Канал подписывает свои посты собственным
@@ -369,8 +443,7 @@ class TelegramChannelSource:
                     # Без неё все посты канала выглядели одинаково свежими, и
                     # отклики уходили в вакансии полугодовой давности —
                     # четыре ответа из семи были «вакансия закрыта».
-                    posted = (parse_ts(times[idx].group("dt"))
-                              if idx < len(times) else 0)
+                    posted = parse_ts(post["date"]) if post["date"] else 0
                     yield RawJob(
                         source="tg:%s" % channel,
                         external_uuid="tg:%s" % post_id,
@@ -387,17 +460,22 @@ class TelegramChannelSource:
                         contact_email=email,
                         all_links=[{"key": "telegram", "value": "https://t.me/%s" % handle}]
                                   if handle else [],
-                        raw={"channel": channel, "post": post_id},
+                        raw={"channel": channel, "post": post_id,
+                             "post_url": "https://t.me/%s" % post_id,
+                             "parser_version": 2},
                     )
                     produced += 1
                     if limit and produced >= limit:
                         return
                 # пагинация назад: id самого старого поста на странице
                 if ids:
-                    oldest = ids[0].group("post").split("/")[-1]
+                    oldest = str(min(ids))
                     if before == oldest:
                         break
                     before = oldest
+                    if min(ids) <= 1:
+                        stat["history_complete"] = True
+                        break
                 else:
                     break
             if stat["error"]:
@@ -431,6 +509,10 @@ def persist_telegram_scan_stats(scan_stats: dict) -> None:
             row.last_posts = int(data.get("posts", 0) or 0)
             row.last_vacancies = int(data.get("vacancies", 0) or 0)
             row.last_contacts = int(data.get("contacts", 0) or 0)
+            row.oldest_post_id = int(data.get("oldest_id", 0) or 0)
+            row.newest_post_id = int(data.get("newest_id", 0) or 0)
+            row.history_complete = bool(data.get("history_complete")) and not data.get("error")
+            row.rejected_posts = int(data.get("rejected", 0) or 0)
             attempted = status not in ("pending", "not_run")
             if attempted:
                 row.total_scans = (row.total_scans or 0) + 1

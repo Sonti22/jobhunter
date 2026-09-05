@@ -94,7 +94,7 @@ pre{white-space:pre-wrap;background:#f4f6f9;padding:11px;border-radius:8px;font-
 
 
 def _h(s) -> str:
-    return html.escape(str(s or ""))
+    return html.escape(str("" if s is None else s))
 
 
 def _safe_url(u: str) -> str:
@@ -119,6 +119,9 @@ def _layout(body: str, banner: str = "") -> HTMLResponse:
         "<a href='/'>Очередь</a><a href='/manual'>Отклик вручную</a>"
         "<a href='/sent'>Отправленные</a>"
         "<a href='/stats'>Статистика</a><a href='/blacklist'>Blacklist</a>"
+        "<a href='/sending'>Почему не отправляет</a>"
+        "<a href='/attention'>Нужен мой ответ</a>"
+        "<a href='/reading'>Полнота чтения</a><a href='/outcomes'>Результаты</a>"
         "<a href='/health'>Состояние</a></header>"
         "<div class='wrap'>%s%s</div>" % (CSS, banner, body))
 
@@ -214,8 +217,8 @@ def queue(q: str = "", source: str = "", page: int = 1,
                "Снять стоп" if policy.kill_switch_active() else "СТОП отправки"))
 
         if not rows:
-            body += "<p>Очередь пуста. Собери вакансии и подготовь отклики:</p><pre>" \
-                    "python -m jobhunter.ingest.all_sources\npython -m jobhunter.pipeline</pre>"
+            body += ("<p>Нет откликов, ожидающих одобрения. "
+                     "<a href='/sending'>Посмотреть уже одобренные и причины ожидания</a>.</p>")
         else:
             body += (
                 "<form method='get' action='/' class='bar'>"
@@ -319,6 +322,12 @@ def application_detail(app_id: int):
                         "<button class='btn ghost sm' type='submit'>%s</button></form>"
                         % (emp.id, "0" if emp.do_not_contact else "1",
                            "Снять blacklist" if emp.do_not_contact else "Добавить в blacklist"))
+        from ..dashboard import application_readiness
+        readiness = application_readiness(a, j, emp)
+        actions += "<p><b>Готовность:</b> %s · <a href='/sending'>расписание</a></p>" % _h(readiness["reason"])
+        post_url = (j.raw_json or {}).get("post_url", "")
+        if post_url:
+            actions += "<p><a href='%s' target='_blank' rel='noopener'>Исходная публикация</a></p>" % _h(_safe_url(post_url))
         body = (
             "<p><a href='/'>← очередь</a></p><h2>%s</h2>"
             "<div class='bar'><b>%s</b> · %s · score %.0f<br>контакт: %s<br>"
@@ -350,13 +359,182 @@ def application_requeue(app_id: int):
 @app.get("/api/summary")
 def api_summary():
     """Маленький read-only API для будущего внешнего виджета/мониторинга."""
-    from .. import report
+    from .. import dashboard, report
     payload = {"totals": report.totals(),
                "funnel": report.funnel(),
                "conversion": report.conversion_metrics(),
                "quota": report.quota(),
-               "telegram": report.telegram_health()}
+               "telegram": report.telegram_health(),
+               "attention": {"total": dashboard.attention(limit=1)["total"]},
+               "next_attempts": dashboard.next_attempts(),
+               "outcomes": dashboard.outcomes()}
     return JSONResponse(jsonable_encoder(payload))
+
+
+def _local_time(value) -> str:
+    from datetime import datetime, timezone
+    from zoneinfo import ZoneInfo
+    if not value:
+        return "неизвестно"
+    if isinstance(value, str):
+        value = datetime.fromisoformat(value)
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    return value.astimezone(ZoneInfo(get_settings().owner_tz)).strftime("%d.%m %H:%M")
+
+
+@app.get("/api/sending")
+def api_sending():
+    from ..dashboard import sending
+    return JSONResponse(jsonable_encoder(sending()))
+
+
+@app.get("/api/attention")
+def api_attention():
+    from ..dashboard import attention
+    return JSONResponse(jsonable_encoder(attention()))
+
+
+@app.get("/api/reading")
+def api_reading():
+    from ..dashboard import reading
+    return JSONResponse(jsonable_encoder(reading()))
+
+
+@app.get("/api/outcomes")
+def api_outcomes():
+    from ..dashboard import outcomes
+    return JSONResponse(jsonable_encoder(outcomes()))
+
+
+@app.get("/sending", response_class=HTMLResponse)
+def sending_page():
+    from ..dashboard import sending
+    data = sending()
+    times = "".join("<p><b>%s:</b> %s · %s%s</p>" % (
+        _h(channel), _h(_local_time(info["at"])),
+        "оценка по расписанию" if info["estimated"] else "назначено планировщиком",
+        " · планировщик не отмечается" if not info["scheduler_alive"] else "")
+        for channel, info in data["schedule"].items())
+    rows = "".join("<tr><td><a href='/applications/%d'>#%d · %s</a></td>"
+                   "<td>%s</td><td>%.0f</td><td>%s</td><td>%s</td></tr>" % (
+                       r["id"], r["id"], _h(r["title"]), _h(r["channel"]), r["score"],
+                       _h(r["reason"]), _h(("не ранее " if r["retry_at"] else "") +
+                                           _local_time(r["retry_at"] or r["next_attempt"])))
+                   for r in data["items"])
+    last = data["last_success"]
+    body = ("<h2>Почему не отправляет</h2><div class='bar'>"
+            "В работе: %d · прошли отбор: %d · Telegram сегодня: %d/%d<br>"
+            "Последняя успешная отправка: %s%s</div>"
+            "<p class='muted'>Время — %s. Квота и готовность заявки проверяются перед каждой отправкой. "
+            "Назначенное время может сдвинуться, если предыдущая задача ещё работает.</p>"
+            "<table><tr><th>Заявка</th><th>Канал</th><th>Оценка</th><th>Причина</th>"
+            "<th>Ближайшее время</th></tr>%s</table>" % (
+                data["total"], data["eligible"], data["quota"]["sent"], data["quota"]["cap"],
+                _h(_local_time(last["at"])) if last else "ещё нет", times,
+                _h(get_settings().owner_tz), rows or "<tr><td colspan='5'>Нет ожидающих заявок</td></tr>"))
+    return _layout(body)
+
+
+@app.get("/attention", response_class=HTMLResponse)
+def attention_page():
+    from ..dashboard import attention
+    data = attention()
+    rows = []
+    for r in data["items"]:
+        action = ("<form method='post' action='/attention/%d/card'><button class='btn ghost sm'>"
+                  "Открыть карточку для решения</button></form>" % r["id"]
+                  if r["status"] != Status.SEND_FAILED_AMBIGUOUS.value else "")
+        rows.append("<article class='bar'><h3><a href='/applications/%d'>#%d · %s</a></h3>"
+                    "<p>%s · ожидание %.1f ч</p><details><summary>Переписка и черновик</summary>"
+                    "<b>Рекрутёр:</b><pre>%s</pre><b>Черновик:</b><pre>%s</pre></details>%s</article>" % (
+                        r["id"], r["id"], _h(r["title"]), _h(r["reason"]), r["waiting_hours"] or 0,
+                        _h(r["incoming"] or "нет входящего текста"), _h(r["draft"] or "не подготовлен"), action))
+    return _layout("<h2>Нужен мой ответ · %d</h2><p class='muted'>"
+                   "Истёкшие карточки и ошибки доставки не закрывают диалог. "
+                   "Кнопка открывает карточку владельцу для проверки текста.</p>%s" % (
+                       data["total"], "".join(rows) or "<p>Незавершённых решений нет.</p>"))
+
+
+@app.post("/attention/{app_id}/card")
+def attention_card(app_id: int):
+    from ..models import OwnerRequest
+    from ..owner import create_human_request
+    with session_scope() as sess:
+        a = sess.get(Application, app_id)
+        if not a or a.status not in (Status.NEEDS_HUMAN.value, Status.REPLIED.value,
+                                     Status.IN_DIALOGUE.value, Status.SENT.value,
+                                     Status.AWAITING_REPLY.value, Status.INTERVIEW_CONFIRMED.value,
+                                     Status.INTERVIEW_PROPOSED.value):
+            return HTMLResponse("Диалог недоступен для новой карточки", status_code=409)
+        pending = sess.scalar(select(OwnerRequest).where(OwnerRequest.application_id == app_id,
+                              OwnerRequest.applied_at.is_(None), OwnerRequest.decision != "expired")
+                              .order_by(OwnerRequest.id.desc()).limit(1))
+        if pending and (pending.decision or not pending.expires_at or
+                        pending.expires_at > utcnow().replace(tzinfo=None)):
+            return RedirectResponse("/attention", status_code=303)
+        if pending:
+            pending.decision = "expired"
+            pending.answered_at = utcnow()
+        latest = sess.scalar(select(OwnerRequest).where(OwnerRequest.application_id == app_id)
+                             .order_by(OwnerRequest.id.desc()).limit(1))
+        incoming = sess.scalar(select(Message).where(Message.application_id == app_id,
+                                                     Message.direction == "in")
+                               .order_by(Message.id.desc()).limit(1))
+        draft = (latest.payload_json or {}).get("draft", "") if latest else ""
+        create_human_request(sess, a, sess.get(Job, a.job_id),
+                             incoming.body if incoming else "", "повторная проверка владельцем", draft)
+        if a.status != Status.NEEDS_HUMAN.value:
+            a.advance(Status.NEEDS_HUMAN)
+        for msg in sess.scalars(select(Message).where(Message.application_id == app_id,
+                               Message.direction == "in", Message.processing_pending.is_(True))):
+            msg.processing_pending = False
+            msg.processing_error = ""
+    return RedirectResponse("/attention", status_code=303)
+
+
+@app.get("/reading", response_class=HTMLResponse)
+def reading_page():
+    from ..dashboard import reading
+    data = reading()
+    cards = []
+    for key, title in (("gmail", "Gmail"), ("telegram_inbox", "Рабочие диалоги Telegram")):
+        r = data[key]
+        d = r["details"] or {}
+        remaining = d.get("remaining")
+        cards.append("<div class='bar'><h3>%s</h3><p>Последний проход: %s · %s</p>"
+                     "<p>Просмотрено: %s · обработано: %s · осталось: %s</p><p>%s</p></div>" % (
+                         title, _h(_local_time(r["at"])), _h(r["status"]),
+                         _h(d.get("seen", d.get("scanned", "нет данных"))),
+                         _h(d.get("processed", d.get("incoming", "нет данных"))),
+                         "неизвестно" if remaining is None else str(remaining), _h(r["error"])))
+    rows = "".join("<tr><td>%s</td><td>%s</td><td>%d</td><td>%d</td><td>%d</td>"
+                   "<td>%s</td><td>%s</td></tr>" % (
+                       _h(r["username"]), _h(_local_time(r["at"])), r["posts"], r["vacancies"],
+                       r["rejected"], "история пройдена" if r["history_complete"] else "остаток неизвестен",
+                       _h(r["error"] or r["status"])) for r in data["channels"])
+    return _layout("<h2>Полнота чтения</h2><p class='muted'>%s</p>"
+                   "<p>Gmail: папка %s; начальный поиск за %d дней. "
+                   "Счётчики относятся к последнему проходу.</p>%s"
+                   "<h3>Публикации Telegram</h3><table><tr><th>Канал</th><th>Проход</th>"
+                   "<th>Посты</th><th>Вакансии</th><th>Отсеяно</th><th>Покрытие</th><th>Состояние</th></tr>%s</table>" % (
+                       _h(data["scope_note"]), _h(data["gmail"]["folder"]), data["gmail"]["initial_lookback_days"],
+                       "".join(cards), rows or "<tr><td colspan='7'>Ожидается первый проход</td></tr>"))
+
+
+@app.get("/outcomes", response_class=HTMLResponse)
+def outcomes_page():
+    from ..dashboard import outcomes
+    data = outcomes()
+    titles = {"no_reply": "Пока без ответа", "interested": "Проявили интерес",
+              "cv_requested": "Запросили резюме", "rejected": "Отказы",
+              "interview": "Интервью", "offer": "Офферы", "other_reply": "Другие ответы"}
+    rows = "".join("<tr><td>%s</td><td>%d</td></tr>" % (titles[k], v)
+                   for k, v in data["categories"].items())
+    return _layout("<h2>Оценка результата</h2><p>Отправлено за %d дней: %d.</p>"
+                   "<p class='muted'>%s Каждая заявка учитывается в одной категории.</p>"
+                   "<table><tr><th>Результат</th><th>Заявок</th></tr>%s</table>" % (
+                       data["days"], data["sent"], _h(data["note"]), rows))
 
 
 @app.get("/api/applications")

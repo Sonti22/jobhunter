@@ -72,6 +72,12 @@ def prepare_application(app_id: int,
             raise ValueError("нет заявки %d" % app_id)
         job = sess.get(Job, app.job_id)
 
+        from .outreach.eligibility import vacancy_problem
+        problem = vacancy_problem(job)
+        if not problem.allowed:
+            app.transition(Status.REJECTED_SCORE, reason=problem.reason)
+            return Prepared(app.id, app.status, app.score, reason=problem.reason)
+
         score = score_job(job.title, job.tag, job.description_raw)
         app.score = score.total
         app.score_breakdown_json = {"reason": score.reason,

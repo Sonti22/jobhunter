@@ -78,7 +78,8 @@ ALLOWED_TRANSITIONS = {
     Status.HANDLE_MISSING: {Status.DISCOVERED, Status.WITHDRAWN},
     Status.PENDING_APPROVAL: {Status.APPROVED, Status.WITHDRAWN,
                               Status.DISCOVERED, Status.GATE_FAILED},
-    Status.APPROVED: {Status.SENDING, Status.PENDING_APPROVAL, Status.WITHDRAWN},
+    Status.APPROVED: {Status.SENDING, Status.PENDING_APPROVAL, Status.WITHDRAWN,
+                      Status.REPLIED},
     Status.SENDING: {Status.SENT, Status.SEND_FAILED,
                      Status.SEND_FAILED_AMBIGUOUS, Status.HANDLE_DEAD,
                      Status.APPROVED},
@@ -86,7 +87,7 @@ ALLOWED_TRANSITIONS = {
     # После ambiguous-доставки возврат в очередь допустим только как
     # явное решение владельца — автомат не должен слать дубль вслепую.
     Status.SEND_FAILED_AMBIGUOUS: {Status.APPROVED, Status.WITHDRAWN},
-    Status.SENT: {Status.AWAITING_REPLY, Status.REPLIED, Status.NEEDS_HUMAN},
+    Status.SENT: {Status.AWAITING_REPLY, Status.FOLLOWED_UP, Status.REPLIED, Status.NEEDS_HUMAN},
     Status.AWAITING_REPLY: {Status.REPLIED, Status.FOLLOWUP_PENDING_APPROVAL,
                             Status.NO_REPLY_CLOSED, Status.NEEDS_HUMAN,
                             Status.WITHDRAWN},
@@ -220,6 +221,7 @@ class Application(Base):
     worker_pid: Mapped[int | None] = mapped_column(Integer, nullable=True)
     telegram_random_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     telegram_file_random_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    telegram_followup_random_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     send_channel: Mapped[str] = mapped_column(String, default="")
     send_idempotency_key: Mapped[str] = mapped_column(String, default="", index=True)
     send_last_attempt_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
@@ -445,6 +447,10 @@ class Message(Base):
                                                              nullable=True)
     llm_error: Mapped[str] = mapped_column(String, default="")
     escalated: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Сохранение входящего и принятие решения — разные операции. Сбой между
+    # ними остаётся виден владельцу; старые сообщения не запускаются заново.
+    processing_pending: Mapped[bool] = mapped_column(Boolean, default=False)
+    processing_error: Mapped[str] = mapped_column(String, default="")
     # ── Почтовый канал ──
     # UID письма в папке IMAP; 0 у исходящих и у телеграмных.
     email_uid: Mapped[int] = mapped_column(Integer, default=0)
@@ -656,6 +662,22 @@ class TelegramChannelStat(Base):
     last_contacts: Mapped[int] = mapped_column(Integer, default=0)
     consecutive_failures: Mapped[int] = mapped_column(Integer, default=0)
     total_scans: Mapped[int] = mapped_column(Integer, default=0)
+    oldest_post_id: Mapped[int] = mapped_column(Integer, default=0)
+    newest_post_id: Mapped[int] = mapped_column(Integer, default=0)
+    history_complete: Mapped[bool] = mapped_column(Boolean, default=False)
+    rejected_posts: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class RuntimeState(Base):
+    """Последний проход источника или следующее выполнение задания."""
+    __tablename__ = "runtime_state"
+    key: Mapped[str] = mapped_column(String, primary_key=True)
+    status: Mapped[str] = mapped_column(String, default="never")
+    started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    next_run_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    error: Mapped[str] = mapped_column(String, default="")
+    details_json: Mapped[dict] = mapped_column(JSON, default=dict)
 
 
 class ApplyAnswer(Base):
@@ -774,6 +796,7 @@ class OwnerRequest(Base):
     # Счётчик попыток исполнения: карточка, роняющая исполнитель, не должна
     # уходить в бесконечный ретрай и блокировать очередь.
     attempts: Mapped[int] = mapped_column(Integer, default=0)
+    next_try_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
 
 class ChannelStat(Base):

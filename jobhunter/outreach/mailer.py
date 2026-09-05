@@ -32,7 +32,7 @@ from ..config import get_settings
 from ..db import session_scope
 from ..models import Application, ContactKind, Employer, Job, Message, SendLog, Status, utcnow
 from ..tailor.render import resolve_cv
-from . import policy
+from . import eligibility, policy
 
 
 def reply_to_addr(app_id: int) -> str:
@@ -262,8 +262,6 @@ EMPLOYER_COOLDOWN_DAYS = 30
 
 def pick_batch(limit: int) -> list:
     out, seen = [], set()
-    cooldown_edge = (datetime.now(timezone.utc).replace(tzinfo=None)
-                     - timedelta(days=EMPLOYER_COOLDOWN_DAYS))
     with session_scope() as sess:
         now = utcnow()
         rows = sess.scalars(
@@ -302,17 +300,13 @@ def pick_batch(limit: int) -> list:
             key = addr.lower() if domain in FREEMAIL else domain
             if key in seen:
                 continue
-            seen.add(key)
             emp = sess.get(Employer, app.employer_id) if app.employer_id else None
-            if emp and (emp.do_not_contact or emp.last_inbound_at):
-                continue
             # Кулдаун между ПРОГОНАМИ, а не только внутри партии: у sender
             # он есть, у почты не было — второй APPROVED к тому же
             # работодателю через день уходил бы повторным письмом.
-            if emp and emp.last_contacted_at and emp.last_contacted_at > cooldown_edge:
+            if not eligibility.check(app, job, emp).allowed:
                 continue
-            if app.send_next_try_at and app.send_next_try_at > utcnow():
-                continue
+            seen.add(key)
             out.append({"app_id": app.id, "email": addr, "lang": app.cv_lang or "ru",
                         "title": job.title or job.tag, "score": app.score,
                         "company": job.company_name, "cv_path": app.cv_path,
@@ -363,7 +357,11 @@ def send_batch(limit: int, dry: bool) -> int:
             break
         with session_scope() as sess:
             app = sess.get(Application, it["app_id"])
-            is_followup = bool(app.followup_body and not app.followup_sent_at)
+            job = sess.get(Job, it["job_id"])
+            emp = sess.get(Employer, app.employer_id) if app and app.employer_id else None
+            if not eligibility.check(app, job, emp).allowed:
+                continue
+            is_followup = eligibility.is_followup(app)
             text = app.followup_body if is_followup else app.message_body
             cv_path, lang = app.cv_path, app.cv_lang or "ru"
             job = sess.get(Job, it["job_id"])
@@ -384,8 +382,15 @@ def send_batch(limit: int, dry: bool) -> int:
         # отправлена повторно вслепую.
         with session_scope() as sess:
             a = sess.get(Application, it["app_id"])
-            if not a or a.status not in (Status.APPROVED.value,
-                                         Status.SEND_FAILED.value):
+            current_job = sess.get(Job, a.job_id) if a else None
+            employer = sess.get(Employer, a.employer_id) if a and a.employer_id else None
+            if not eligibility.check(a, current_job, employer).allowed:
+                continue
+            assert a is not None and current_job is not None
+            if (current_job.contact_url or "").replace("mailto:", "").strip() != it["email"]:
+                continue
+            current_text = a.followup_body if eligibility.is_followup(a) else a.message_body
+            if current_text != text:
                 continue
             now = utcnow()
             if a.status == Status.SEND_FAILED.value:
@@ -432,9 +437,10 @@ def send_batch(limit: int, dry: bool) -> int:
             a.transition(Status.SENT)
             a.sending_lease_until = None
             a.send_next_try_at = None
-            a.sent_at = utcnow()
+            if not is_followup:
+                a.sent_at = utcnow()
             a.last_outbound_at = utcnow()
-            a.transition(Status.AWAITING_REPLY)
+            a.transition(Status.FOLLOWED_UP if is_followup else Status.AWAITING_REPLY)
             if is_followup:
                 # Напоминание уже отправлено — второго не планируем: два
                 # «напоминаю о себе» подряд читаются как спам.

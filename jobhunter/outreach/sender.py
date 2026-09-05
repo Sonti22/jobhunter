@@ -29,7 +29,7 @@ from ..config import ROOT, get_settings
 from ..db import session_scope
 from ..models import Application, ContactKind, Employer, Job, Message, SendLog, Status, utcnow
 from ..tailor.render import resolve_cv
-from . import policy
+from . import eligibility, policy
 from .resolver import HandleDead, NotAUser, resolve
 
 # Привязан к корню проекта, а не к текущему каталогу: лок, зависящий от того,
@@ -199,17 +199,7 @@ def pick_batch(limit: int) -> list:
             if not job.contact_handle:
                 continue
             emp = sess.get(Employer, app.employer_id) if app.employer_id else None
-            if emp:
-                if emp.do_not_contact:
-                    continue
-                if emp.last_inbound_at:          # уже написали нам — не холодим
-                    continue
-                if emp.last_contacted_at:
-                    days = (datetime.now(timezone.utc).replace(tzinfo=None)
-                            - emp.last_contacted_at).days
-                    if days < 30:
-                        continue
-            if app.send_next_try_at and app.send_next_try_at > utcnow():
+            if not eligibility.check(app, job, emp).allowed:
                 continue
             # Дедуп внутри партии: last_contacted_at обновится только после
             # отправки, а партия собирается заранее — без этого набора два
@@ -253,11 +243,19 @@ async def send_one(client, item: dict, rng: random.Random, dry: bool) -> str:
     # резолв — лениво, прямо перед отправкой
     with session_scope() as sess:
         app = sess.get(Application, item["app_id"])
+        job = sess.get(Job, app.job_id) if app else None
+        emp = sess.get(Employer, app.employer_id) if app and app.employer_id else None
+        verdict = eligibility.check(app, job, emp)
+        if not verdict.allowed:
+            return "skipped:%s" % verdict.reason
+        assert app is not None and job is not None
+        if job.contact_handle != item["handle"]:
+            return "skipped:контакт изменился после выбора партии"
+        if dry:
+            print("      [dry-run] → @%s" % item["handle"])
+            return "ok"
         try:
-            if dry:
-                peer = None
-            else:
-                peer = await resolve(client, sess, item["handle"])
+            peer = await resolve(client, sess, item["handle"])
         except HandleDead as e:
             app.transition(Status.SENDING) if app.status == Status.APPROVED.value else None
             app.transition(Status.HANDLE_DEAD, reason=str(e))
@@ -279,9 +277,11 @@ async def send_one(client, item: dict, rng: random.Random, dry: bool) -> str:
         app.worker_pid = os.getpid()
         app.sending_lease_until = (datetime.now(timezone.utc).replace(tzinfo=None)
                                    + __import__("datetime").timedelta(seconds=180))
-        if not app.telegram_random_id:
-            app.telegram_random_id = rng.getrandbits(62)
-        random_id = app.telegram_random_id
+        is_followup = eligibility.is_followup(app)
+        key_field = "telegram_followup_random_id" if is_followup else "telegram_random_id"
+        if not getattr(app, key_field):
+            setattr(app, key_field, rng.getrandbits(62))
+        random_id = getattr(app, key_field)
         if not app.telegram_file_random_id:
             app.telegram_file_random_id = random_id + 1
         file_random_id = app.telegram_file_random_id
@@ -294,17 +294,8 @@ async def send_one(client, item: dict, rng: random.Random, dry: bool) -> str:
         # Напоминание, если оно подготовлено и ещё не ушло, иначе
         # исходное письмо. Исходник при этом сохраняется целиком —
         # он нужен владельцу при разборе и аналитике шаблонов.
-        is_followup = bool(app.followup_body and not app.followup_sent_at)
         text = app.followup_body if is_followup else app.message_body
         cv_path = app.cv_path
-
-    if dry:
-        print("      [dry-run] → @%s (%d симв.%s)"
-              % (item["handle"], len(text),
-                 ", + резюме" if (s.send_cv_with_first_message and cv_path) else ""))
-        with session_scope() as sess:
-            sess.get(Application, item["app_id"]).transition(Status.APPROVED)
-        return "ok"
 
     # Для dry-run peer намеренно None; до сетевой ветки мы уже вышли.
     assert peer is not None
@@ -455,15 +446,17 @@ async def send_one(client, item: dict, rng: random.Random, dry: bool) -> str:
     with session_scope() as sess:
         app = sess.get(Application, item["app_id"])
         app.transition(Status.SENT)
-        app.sent_at = utcnow()
+        if not is_followup:
+            app.sent_at = utcnow()
         app.telegram_msg_id = getattr(sent, "id", None)
         app.last_outbound_at = utcnow()
-        app.transition(Status.AWAITING_REPLY)
+        app.transition(Status.FOLLOWED_UP if is_followup else Status.AWAITING_REPLY)
         if is_followup:
             app.followup_sent_at = utcnow()
             app.followup_due_at = None
-        app.followup_due_at = (datetime.now(timezone.utc).replace(tzinfo=None)
-                               + __import__("datetime").timedelta(days=5))
+        else:
+            app.followup_due_at = (datetime.now(timezone.utc).replace(tzinfo=None)
+                                   + __import__("datetime").timedelta(days=3))
         policy.register_sent(sess, cold=True)
         sess.add(SendLog(application_id=item["app_id"], result="ok",
                          peer_id=item["handle"]))
@@ -540,7 +533,8 @@ async def run(limit: int, dry: bool, max_sessions: int | None = None) -> int:
     s = get_settings()
     rng = random.Random()
 
-    reclaim_stale_sending()
+    if not dry:
+        reclaim_stale_sending()
     batch = pick_batch(limit)
     if not batch:
         print("Нечего отправлять: нет заявок в статусе APPROVED с живым @handle.")

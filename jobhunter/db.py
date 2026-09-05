@@ -12,7 +12,7 @@ from .models import Base
 
 _engine = None
 _Session = None
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 
 def _init():
@@ -74,6 +74,7 @@ _ADDED_COLUMNS = {
         ("email_peer", "VARCHAR DEFAULT ''"),
         ("email_thread_refs", "JSON"),
         ("telegram_file_random_id", "INTEGER"),
+        ("telegram_followup_random_id", "INTEGER"),
         ("send_channel", "VARCHAR DEFAULT ''"),
         ("send_idempotency_key", "VARCHAR DEFAULT ''"),
         ("send_last_attempt_at", "DATETIME"),
@@ -89,6 +90,7 @@ _ADDED_COLUMNS = {
         ("imap_last_uid", "INTEGER DEFAULT 0"),
     ],
     "owner_requests": [
+        ("next_try_at", "DATETIME"),
         ("decision_arg", "TEXT DEFAULT ''"),
         ("owner_chat_id", "BIGINT DEFAULT 0"),
         ("channel", "VARCHAR DEFAULT ''"),
@@ -107,6 +109,8 @@ _ADDED_COLUMNS = {
         ("llm_attempts", "INTEGER DEFAULT 0"),
         ("llm_next_try_at", "DATETIME"),
         ("llm_error", "VARCHAR DEFAULT ''"),
+        ("processing_pending", "INTEGER DEFAULT 0"),
+        ("processing_error", "VARCHAR DEFAULT ''"),
     ],
     "bot_tasks": [
         ("status", "VARCHAR DEFAULT 'pending'"),
@@ -118,6 +122,12 @@ _ADDED_COLUMNS = {
     ],
     "bot_outbox": [
         ("claimed_at", "DATETIME"),
+    ],
+    "telegram_channel_stats": [
+        ("oldest_post_id", "INTEGER DEFAULT 0"),
+        ("newest_post_id", "INTEGER DEFAULT 0"),
+        ("history_complete", "INTEGER DEFAULT 0"),
+        ("rejected_posts", "INTEGER DEFAULT 0"),
     ],
 }
 

@@ -118,13 +118,17 @@ def new_uids(conn, folder: str = "") -> tuple:
         since = (date.today() - timedelta(days=s.inbox_lookback_days)
                  ).strftime("%d-%b-%Y")
         typ, data = conn.uid("SEARCH", None, "SINCE", since)
-    if typ != "OK" or not data or not data[0]:
+    if typ != "OK":
+        raise MailboxError("не удалось получить список новых писем")
+    if not data or not data[0]:
+        conn._jobhunter_pending_count = 0
         return [], validity, reset
 
     # Диапазон «N:*» по стандарту возвращает как минимум последнее письмо
     # ящика, даже когда новых нет, — отсекаем сами.
     uids = sorted(int(x) for x in data[0].split() if int(x) > last_uid)
-    return uids[-s.imap_max_fetch:], validity, reset
+    conn._jobhunter_pending_count = len(uids)
+    return uids[:max(1, s.imap_max_fetch)], validity, reset
 
 
 def _parse(raw: bytes):
@@ -148,7 +152,7 @@ def fetch_headers(conn, uids: list) -> list:
         typ, data = conn.uid("FETCH", ",".join(str(u) for u in chunk),
                              "(BODY.PEEK[HEADER.FIELDS (%s)])" % HEADER_FIELDS)
         if typ != "OK" or not data:
-            continue
+            raise MailboxError("не удалось загрузить заголовки писем; граница чтения сохранена")
         for part in data:
             if not (isinstance(part, tuple) and len(part) > 1):
                 continue
@@ -160,6 +164,10 @@ def fetch_headers(conn, uids: list) -> list:
             msg = _parse(raw)
             out.append((int(m.group(1)),
                         {k.lower(): str(v) for k, v in msg.items()}))
+        missing = set(chunk) - {uid for uid, _ in out}
+        if missing:
+            raise MailboxError("неполная загрузка заголовков: %d писем; повтор следующим проходом"
+                               % len(missing))
     return out
 
 
@@ -167,11 +175,11 @@ def fetch_body(conn, uid: int) -> tuple:
     """(текст, это_html) для одного письма. Зовётся только для опознанных."""
     typ, data = conn.uid("FETCH", str(uid), "(BODY.PEEK[])")
     if typ != "OK" or not data:
-        return "", False
+        raise MailboxError("не удалось загрузить тело письма UID %d" % uid)
     raw = next((part[1] for part in data
                 if isinstance(part, tuple) and len(part) > 1), None)
     if not raw:
-        return "", False
+        raise MailboxError("пустой ответ загрузки письма UID %d" % uid)
     msg = _parse(raw)
     try:
         part = msg.get_body(preferencelist=("plain", "html"))
@@ -227,7 +235,7 @@ def advance_watermark(uids: list, validity: int) -> None:
     elif validity:
         saved, last = _state()
         if saved != validity:
-            _save_state(validity, last)
+            _save_state(validity, 0)
 
 
 def main() -> int:

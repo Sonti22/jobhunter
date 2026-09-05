@@ -344,17 +344,17 @@ def step_submit_ashby() -> dict:
     return stats
 
 
-def step_send_email() -> int:
+def step_send_email() -> dict:
     from .outreach.mailer import send_batch
     s = get_settings()
     if not (s.smtp_user and s.smtp_app_password):
         log.info("email пропущен: SMTP не настроен")
-        return 0
+        return {"blocked": "SMTP не настроен"}
     if policy.kill_switch_active():
         log.warning("email пропущен: активен стоп-кран")
-        return 0
+        return {"blocked": "активен стоп-кран"}
     try:
-        send_batch(s.email_daily_limit, dry=False)
+        rc = send_batch(s.email_daily_limit, dry=False)
     except Exception as e:
         # Не только в лог: молча съеденная ошибка SMTP означает, что почтовый
         # канал может стоять днями, а владелец узнает об этом по нулям в
@@ -366,22 +366,23 @@ def step_send_email() -> int:
                     % (type(e).__name__, str(e)[:300]),
                     dedup="email_fail:%s" % datetime.now(timezone.utc)
                                                     .strftime("%Y-%m-%d"))
-    return 0
+        raise
+    return {"error": "почтовая партия завершилась с ошибкой"} if rc else {"ok": True}
 
 
-def step_send_telegram() -> int:
+def step_send_telegram() -> dict:
     from .outreach.sender import run as sender_run
     s = get_settings()
     if not (s.tg_api_id and s.telegram_api_hash):
         log.info("telegram пропущен: нет API-ключей")
-        return 0
+        return {"blocked": "нет API-ключей Telegram"}
     from pathlib import Path
     if not Path(s.telegram_session_path).exists():
         log.info("telegram пропущен: нет сессии (python tg_login.py)")
-        return 0
+        return {"blocked": "нет Telegram-сессии"}
     if policy.kill_switch_active():
         log.warning("telegram пропущен: активен стоп-кран")
-        return 0
+        return {"blocked": "активен стоп-кран"}
     with session_scope() as sess:
         v = policy.can_send_cold(sess)
     if not v.allowed:
@@ -392,7 +393,7 @@ def step_send_telegram() -> int:
                         % v.reason,
                         dedup="quota:%s" % datetime.now(timezone.utc)
                                                     .strftime("%Y-%m-%d"))
-        return 0
+        return {"blocked": v.reason}
     try:
         from .outreach.sender import MORE_TO_SEND, ProcessLock, lock_path
         # В демоне — по одной сессии за вызов: межсессионные паузы держит
@@ -414,9 +415,18 @@ def step_send_telegram() -> int:
                 replace_existing=True, run_date=when,
                 misfire_grace_time=3600, executor="tg")
             log.info("продолжение отправки в %s", when.strftime("%H:%M"))
+            from .observability import record
+            record("sender:telegram", "partial", next_run_at=when.astimezone())
+        else:
+            from .observability import record
+            record("sender:telegram", "ok" if rc == 0 else "blocked",
+                   details={"return_code": rc})
     except Exception as e:
         log.error("telegram: %s: %s", type(e).__name__, str(e)[:120])
-    return 0
+        from .observability import record
+        record("sender:telegram", "error", error=type(e).__name__)
+        raise
+    return {"ok": True} if rc in (0, MORE_TO_SEND) else {"blocked": "код %d" % rc}
 
 
 def step_discover() -> dict:
@@ -985,7 +995,21 @@ def run_daemon() -> int:
                 sp.write_text(datetime.now().isoformat())
             except OSError:
                 pass
-            result = fn()
+            from .observability import record
+            record("task:" + job_id, "running")
+            try:
+                result = fn()
+            except Exception as exc:
+                record("task:" + job_id, "error", error=type(exc).__name__)
+                sp.unlink(missing_ok=True)
+                raise
+            failed = isinstance(result, dict) and bool(result.get("error") or result.get("errors"))
+            blocked = isinstance(result, dict) and bool(result.get("blocked"))
+            record("task:" + job_id, "error" if failed else "blocked" if blocked else "ok",
+                   details=result if isinstance(result, dict) else {"result": result})
+            sp.unlink(missing_ok=True)
+            if failed or blocked:
+                return result
             try:
                 _mark_path(job_id).write_text(
                     datetime.now().strftime("%Y-%m-%d"))
@@ -1069,6 +1093,26 @@ def run_daemon() -> int:
     sched.add_job(catch_up, "date",
                   run_date=datetime.now() + timedelta(seconds=30),
                   id="catchup_boot", misfire_grace_time=3600)
+
+    def publish_schedule():
+        from .observability import record
+        for job_id in ("tg1", "tg2", "tg_more", "email"):
+            job = sched.get_job(job_id)
+            at = getattr(job, "next_run_time", None) if job else None
+            record("schedule:" + job_id, "scheduled", next_run_at=at)
+
+    # Продолжение партии сохраняется отдельно от APScheduler MemoryJobStore.
+    from .models import RuntimeState
+    with session_scope() as sess:
+        pending = sess.get(RuntimeState, "sender:telegram")
+        resume_at = pending.next_run_at if pending and pending.status == "partial" else None
+    if resume_at:
+        when = max(resume_at.replace(tzinfo=timezone.utc),
+                   datetime.now(timezone.utc) + timedelta(minutes=1))
+        sched.add_job(step_send_telegram, "date", id="tg_more", replace_existing=True,
+                      run_date=when, misfire_grace_time=3600, executor="tg")
+    sched.add_job(publish_schedule, "interval", seconds=30, id="schedule_state",
+                  max_instances=1, coalesce=True, executor="beat")
 
     health.beat("autopilot")
     health.beat("autopilot_tg")     # первый пульс до старта interval-джоба

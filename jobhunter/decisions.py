@@ -21,7 +21,7 @@ Telethon — файл, который нельзя открывать двумя
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select, update
 
@@ -62,6 +62,8 @@ def pending(limit: int = 10) -> list:
             .where(OwnerRequest.decision != "",
                    OwnerRequest.decision != "expired",
                    OwnerRequest.applied_at.is_(None),
+                   ((OwnerRequest.next_try_at.is_(None)) |
+                    (OwnerRequest.next_try_at <= utcnow())),
                    OwnerRequest.attempts < MAX_ATTEMPTS)
             .order_by(OwnerRequest.id)
             .limit(limit)).all()
@@ -98,8 +100,15 @@ def finish(req_id: int, ok: bool, note: str, error: str = "") -> None:
         r = sess.get(OwnerRequest, req_id)
         if not r:
             return
-        r.applied_at = utcnow()
-        r.decision_note = (note or "")[:500]
+        # stop возникает до отправки: решение сохраняется до снятия
+        # ограничения. Неизвестная доставка требует ручной проверки.
+        deferred = not ok and (error or "").startswith("stop:")
+        r.applied_at = None if deferred else utcnow()
+        r.next_try_at = utcnow() + timedelta(minutes=15) if deferred else None
+        if deferred:
+            r.attempts = max(0, (r.attempts or 0) - 1)
+        r.decision_note = ("Отложено: %s" % error if deferred else (note or ""))[:500]
+        note = r.decision_note
         r.apply_error = (error or "")[:200]
         chat_id, msg_id = r.owner_chat_id, r.owner_msg_id
         question = r.question

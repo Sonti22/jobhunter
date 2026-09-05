@@ -22,6 +22,17 @@ os.environ.setdefault("LLM_ENABLED", "false")
 
 
 @pytest.fixture(autouse=True)
+def _isolated_artifacts(tmp_path, monkeypatch):
+    """Календарь, архив и пульс теста никогда не пишутся в проект."""
+    from jobhunter.config import get_settings
+    for name in ("OUT_DIR", "LOG_DIR", "CV_OUT", "SENT_ARCHIVE_DIR", "HEARTBEAT_DIR"):
+        monkeypatch.setenv(name, str(tmp_path / name.lower()))
+    get_settings.cache_clear()
+    yield
+    get_settings.cache_clear()
+
+
+@pytest.fixture(autouse=True)
 def _no_external_network(monkeypatch):
     """Любой сокет наружу — падение с понятным текстом, а не тихий запрос.
 

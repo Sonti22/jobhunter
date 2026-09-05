@@ -45,7 +45,7 @@ def _job_app(db, *, status, email="", handle="", score=70, employer=None,
                   contact_kind=kind,
                   contact_handle=handle,
                   contact_url=("mailto:" + email) if email else "",
-                  description_raw="Python, FastAPI")
+                  description_raw="Вакансия Python developer. Требования: Python, FastAPI")
         sess.add(job)
         sess.flush()
         app = Application(job_id=job.id, score=score, status=status.value,

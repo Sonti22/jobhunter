@@ -52,7 +52,7 @@ LIVE = {Status.SENT.value, Status.AWAITING_REPLY.value, Status.FOLLOWED_UP.value
 
 # ─────────────────────────────────────────────────── чтение входящих ──
 
-async def fetch_incoming(client) -> list:
+async def fetch_incoming(client, progress: dict | None = None) -> list:
     """Новые входящие по всем живым заявкам.
 
     Возвращает [(app_id, [(msg_id, text, received_utc), ...]), ...].
@@ -61,7 +61,10 @@ async def fetch_incoming(client) -> list:
     """
     with session_scope() as sess:
         rows = sess.scalars(
-            select(Application).where(Application.status.in_(LIVE))).all()
+            select(Application).where(
+                Application.status.in_(LIVE) |
+                ((Application.status == Status.APPROVED.value) &
+                 Application.sent_at.is_not(None)))).all()
         targets = []
         for a in rows:
             job = sess.get(Job, a.job_id)
@@ -70,18 +73,36 @@ async def fetch_incoming(client) -> list:
                 targets.append((a.id, h, int(a.last_inbound_msg_id or 0)))
 
     out = []
+    progress = progress if progress is not None else {}
+    progress.update(dialogs=len(targets), scanned=0, limited_dialogs=0, errors=0,
+                    cursors={}, remaining=0)
     for app_id, handle, last_id in targets:
         try:
             batch = []
-            async for m in client.iter_messages(handle, limit=20, min_id=last_id):
-                if m.out or not (m.message or "").strip():
+            fetched, cursor = 0, last_id
+            async for m in client.iter_messages(handle, limit=200, min_id=last_id, reverse=True):
+                fetched += 1
+                cursor = max(cursor, m.id)
+                if m.out:
+                    continue
+                body = (m.message or "").strip()
+                if not body and getattr(m, "media", None):
+                    body = "[Входящее вложение без текста. Требуется просмотр владельцем в Telegram.]"
+                if not body:
                     continue
                 received = m.date or datetime.now(timezone.utc)
-                batch.append((m.id, m.message.strip(), received))
+                batch.append((m.id, body, received))
+            progress["scanned"] += fetched
+            progress["cursors"][app_id] = cursor
+            if fetched >= 200:
+                progress["limited_dialogs"] += 1
+                progress["remaining"] = None
             if batch:
                 batch.sort(key=lambda x: x[0])          # от старых к новым
                 out.append((app_id, batch))
         except Exception as e:
+            progress["errors"] += 1
+            progress["remaining"] = None
             # Обрыв на одном диалоге не должен останавливать остальные.
             print("      входящие @%s: %s" % (handle, type(e).__name__))
         await asyncio.sleep(random.uniform(1.5, 4.0))    # не частим по API
@@ -125,6 +146,7 @@ def store_incoming(app_id: int, batch: list, channel: str = "telegram") -> list:
                                                  .replace(tzinfo=None),
                              classifier_label=intent.label,
                              classifier_confidence=intent.confidence,
+                             processing_pending=True,
                              **chan_fields))
             if channel == "telegram":
                 app.last_inbound_msg_id = msg_id
@@ -145,7 +167,8 @@ def store_incoming(app_id: int, batch: list, channel: str = "telegram") -> list:
                     emp.last_inbound_at = utcnow()
             if app.status in (Status.SENT.value, Status.AWAITING_REPLY.value,
                               Status.FOLLOWED_UP.value,
-                              Status.FOLLOWUP_PENDING_APPROVAL.value):
+                              Status.FOLLOWUP_PENDING_APPROVAL.value) or (
+                                  app.status == Status.APPROVED.value and app.sent_at):
                 app.advance(Status.REPLIED)
             # Человек ответил — напоминание отменяется. Иначе подготовленное
             # «напоминаю о своём отклике» уйдёт тому, кто только что написал,
@@ -161,6 +184,16 @@ def store_incoming(app_id: int, batch: list, channel: str = "telegram") -> list:
                            batch[-1][1].strip()[:400]),
                         dedup="reply:%d:%s" % (app_id, new_ids[-1]), sess=sess)
     return new_ids
+
+
+def finish_incoming(app_id: int, ids: list, *, channel="telegram", error="") -> None:
+    """Не переотправлять автоматически после неопределённого сбоя обработки."""
+    field = Message.telegram_msg_id if channel == "telegram" else Message.email_uid
+    with session_scope() as sess:
+        for msg in sess.scalars(select(Message).where(
+                Message.application_id == app_id, Message.direction == "in", field.in_(ids))):
+            msg.processing_pending = bool(error)
+            msg.processing_error = error[:200]
 
 
 # ───────────────────────────────────────────────── обработка одного ──
@@ -476,7 +509,16 @@ async def process_inbox(client, dry: bool = False) -> dict:
     stats = {"incoming": 0, "auto": 0, "escalated": 0, "closed": 0,
              "cards": 0, "commands": 0, "expired": 0, "deferred": 0}
 
-    incoming = await fetch_incoming(client)
+    progress: dict = {}
+    incoming = await fetch_incoming(client, progress)
+    # Сначала сохраняем ВСЕ тексты. Даже сбой ночной очереди/классификации
+    # не оставит их только в оперативной памяти.
+    fresh_incoming = []
+    for app_id, batch in incoming:
+        ids = store_incoming(app_id, batch)
+        fresh_incoming.append((app_id, [row for row in batch if row[0] in ids]))
+        stats["incoming"] += len(ids)
+    incoming = fresh_incoming
 
     # Ночная очередь — ДО обработки свежих: если по заявке есть и ночной
     # текст, и утренний, они склеиваются в одно решение внутри drain, и
@@ -492,10 +534,10 @@ async def process_inbox(client, dry: bool = False) -> dict:
         drained_apps = before - set(fresh_map)   # склеенные с ночными
 
     for app_id, batch in incoming:
-        new_ids = store_incoming(app_id, batch)
+        new_ids = [row[0] for row in batch]
         if app_id in drained_apps:
             # текст уже вошёл в решение по ночной очереди
-            stats["incoming"] += len(new_ids)
+            finish_incoming(app_id, new_ids)
             continue
         by_id = {mid: (mid, txt, ts) for mid, txt, ts in batch}
         fresh = [by_id[i] for i in new_ids if i in by_id]
@@ -504,8 +546,13 @@ async def process_inbox(client, dry: bool = False) -> dict:
         # Отвечаем на СКЛЕЙКУ новых сообщений одним решением: рекрутёры
         # часто пишут тремя сообщениями подряд, и три ответа на них — спам.
         merged = "\n".join(t for _, t, _ in fresh)
-        stats["incoming"] += len(fresh)
-        verdict = await handle_message(client, app_id, merged, dry=dry)
+        try:
+            verdict = await handle_message(client, app_id, merged, dry=dry)
+        except Exception as exc:
+            finish_incoming(app_id, new_ids, error=type(exc).__name__)
+            progress["errors"] += 1
+            continue
+        finish_incoming(app_id, new_ids, error=verdict if "не ушёл" in verdict else "")
         print("   #%d: %s" % (app_id, verdict))
         if verdict.startswith("автоответ ("):
             stats["auto"] += 1
@@ -530,6 +577,19 @@ async def process_inbox(client, dry: bool = False) -> dict:
                 print("      [dry-run] ответ владельцу: %s" % answer.split("\n")[0])
     else:
         await owner.advance_watermark(client)
+    if not dry:
+        # Двигаем и через обработанные медиа/исходящие, только после обработки
+        # текстов; исключение выше оставляет старый курсор для повтора.
+        with session_scope() as sess:
+            for app_id, cursor in progress.get("cursors", {}).items():
+                app = sess.get(Application, app_id)
+                if app:
+                    app.last_inbound_msg_id = max(app.last_inbound_msg_id or 0, cursor)
+        from ..observability import record
+        detail = {k: v for k, v in progress.items() if k != "cursors"}
+        detail.update(incoming=stats["incoming"])
+        record("telegram_inbox", "partial" if progress.get("errors") or
+               progress.get("limited_dialogs") else "ok", details=detail)
     return stats
 
 

@@ -68,7 +68,8 @@ def test_smtp_failure_notifies_owner(db, monkeypatch):
         raise ConnectionError("smtp.gmail.com timed out")
 
     monkeypatch.setattr("jobhunter.outreach.mailer.send_batch", boom)
-    autopilot.step_send_email()
+    with pytest.raises(ConnectionError):
+        autopilot.step_send_email()
 
     rows = [r for r in notify.pending(20) if r["kind"] == "error"]
     assert rows, "владелец не узнал, что почта стоит"
