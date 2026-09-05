@@ -85,6 +85,8 @@ def _message(msg: dict, chat_id: int) -> list:
         return [{"do": "screen", "chat_id": chat_id, "name": "ch"}]
     if cmd in ("manual", "hand"):
         return [{"do": "screen", "chat_id": chat_id, "name": "manual"}]
+    if cmd.split("@", 1)[0] == "outreach":
+        return _manual_outreach(chat_id, "message:%s" % msg.get("message_id", "command"))
     if cmd in ("mail", "pochta"):
         # IMAP занимает секунды — из главного цикла его выгнали: пока шёл
         # сбор, бот не забирал вообще ничего, включая нажатия кнопок.
@@ -154,6 +156,42 @@ def _callback(cbq: dict, chat_id: int) -> list:
                 {"do": "screen", "chat_id": chat_id, "name": "queue",
                  "msg_id": msg_id}]
 
+    if data["kind"] == "manual_telegram":
+        from .. import manual_telegram as manual_tg
+        aid, action = data["app_id"], data["action"]
+        answer = {"do": "answer", "cb_id": cb_id}
+        if chat_id not in get_settings().bot_owner_ids:
+            return [{**answer, "text": "Ручные отклики — только в личном чате бота"}]
+        if action == "next":
+            return [answer] + _manual_outreach(chat_id, "callback:" + cb_id)
+        if action == "cancel":
+            return [{**answer, "text": "Ничего не изменено"}]
+        if action in ("text", "handle", "cv", "confirm"):
+            row = manual_tg.get_card(aid)
+            if not row:
+                return [{**answer, "text": "Карточка уже обработана"}]
+            if action in ("text", "handle", "cv"):
+                if row["problem"]:
+                    return [answer, {"do": "send", "chat_id": chat_id,
+                                     "text": "Не отправляй: " + row["problem"]}]
+                if action == "cv":
+                    manual_tg.queue_cv(chat_id, aid, cb_id)
+                    return [{**answer, "text": "Присылаю PDF сюда в чат"}]
+                return [answer, {"do": "send", "chat_id": chat_id,
+                                 "text": row["text"] if action == "text" else "@" + row["handle"]}]
+            return [answer, {"do": "send", "chat_id": chat_id,
+                "text": f"Ты уже отправил сообщение @{row['handle']} по заявке #{aid}? "
+                        "Эта кнопка только запишет факт, ничего не отправит.",
+                "markup": {"inline_keyboard": [[
+                    {"text": "Окей, всё отправил", "callback_data": f"t:{aid}:sent"},
+                    {"text": "Нет", "callback_data": f"t:{aid}:cancel"}]]}}]
+        ok, note = manual_tg.mark(aid, action, next_chat_id=chat_id)
+        if not ok:
+            return [answer, {"do": "send", "chat_id": chat_id, "text": note}]
+        return [answer, {"do": "edit", "chat_id": chat_id, "msg_id": msg_id,
+                         "text": f"#{aid}: {note}", "markup": {"inline_keyboard": [[
+                             {"text": "Моя подборка / следующая", "callback_data": "t:0:next"}]]}}]
+
     if data["kind"] == "manual":
         if data["action"] == "form":
             # Только план: сборка анкеты ходит в сеть (до 6 секунд), и
@@ -179,6 +217,19 @@ def _callback(cbq: dict, chat_id: int) -> list:
     if data["kind"] == "decision":
         return _decision(data, cb_id, chat_id, msg_id)
     return [{"do": "answer", "cb_id": cb_id}]
+
+
+def _manual_outreach(chat_id: int, request_key: str = "") -> list:
+    from .. import manual_telegram as manual_tg
+    if chat_id not in get_settings().bot_owner_ids:
+        return [{"do": "send", "chat_id": chat_id,
+                 "text": "Открой личный чат бота и нажми /outreach — данные не публикуются в группе."}]
+    aid = manual_tg.queue_current(chat_id, request_key)
+    return [{"do": "send", "chat_id": chat_id,
+             "text": (manual_tg.WARNING + "\n\n" +
+                      (f"Текущий отклик #{aid} и PDF придут сюда. "
+                       "После «Окей, всё отправил» следующий отклик появится автоматически."
+                       if aid else "Сейчас нет подходящих новых откликов."))}]
 
 
 def _decision(data: dict, cb_id: str, chat_id: int, msg_id: int) -> list:

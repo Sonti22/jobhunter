@@ -32,6 +32,7 @@ import asyncio
 import random
 import re
 import sys
+import time
 from datetime import datetime, timedelta, timezone
 
 import httpx
@@ -53,11 +54,30 @@ QUERIES_RU = [
     "вакансии разработчик", "job python", "team lead вакансии",
     "вакансии тимлид", "айти вакансии", "вакансии backend python",
     "работа удаленно it", "python developer вакансии",
+    # добавлено 06.09: автопоиск выдохся на прежнем наборе — всё найденное
+    # по нему уже в реестре
+    "python удаленно", "вакансии ml", "data science вакансии",
+    "sre вакансии", "kubernetes вакансии", "работа devops",
+    "инженер данных вакансии", "вакансии стартап it", "django вакансии",
+    "fastapi вакансии", "вакансии архитектор", "работа python удаленно",
+    "вакансии аналитик данных", "ml engineer вакансии", "вакансии it кипр",
+    "вакансии it сербия", "вакансии it казахстан", "вакансии it грузия",
 ]
 QUERIES_EN = [
     "python jobs", "backend jobs", "remote it jobs", "developer jobs",
     "devops jobs", "remote python jobs", "remote developer",
     "backend engineer jobs", "remote work tech",
+    "python developer remote", "ml jobs", "data engineer jobs",
+    "sre jobs", "tech lead jobs", "startup jobs remote", "backend remote",
+    "software engineer jobs", "remote jobs europe", "it jobs armenia",
+    "it jobs georgia", "it jobs serbia", "it jobs cyprus",
+]
+# Поиск по тексту постов — шумный и дорогой, поэтому запросов мало и они
+# максимально «вакансионные»: слово «вакансия» плюс роль.
+GLOBAL_QUERIES = [
+    "вакансия python удаленно", "ищем python разработчика",
+    "вакансия backend удаленка", "вакансия devops удаленно",
+    "hiring python developer remote", "вакансия data engineer",
 ]
 
 # Слова, по которым канал считается вакансионным (в названии или описании).
@@ -133,17 +153,67 @@ async def _search_titles(client, queries: list, limit: int) -> dict:
     return found
 
 
+async def _search_global(client, queries: list, limit: int) -> dict:
+    """Каналы по тексту свежих постов (messages.SearchGlobal).
+
+    Третий источник из докстринга модуля — раньше был описан, но не написан.
+    Самый шумный: берём только каналы (broadcast), запросов мало, паузы
+    длиннее — глобальный поиск с личного аккаунта не должен выглядеть как
+    парсер.
+    """
+    from telethon.tl.functions.messages import SearchGlobalRequest
+    from telethon.tl.types import InputMessagesFilterEmpty, InputPeerEmpty
+
+    found = {}
+    for q in queries:
+        if len(found) >= limit:
+            break
+        try:
+            res = await client(SearchGlobalRequest(
+                q=q, filter=InputMessagesFilterEmpty(), min_date=None,
+                max_date=None, offset_rate=0, offset_peer=InputPeerEmpty(),
+                offset_id=0, limit=30))
+        except Exception:
+            continue
+        for ch in getattr(res, "chats", []) or []:
+            u = getattr(ch, "username", None)
+            if u and getattr(ch, "broadcast", False):
+                found.setdefault(u.lower(), "по постам «%s»" % q)
+        await asyncio.sleep(random.uniform(2.0, 4.0))
+    return found
+
+
+def pick_seeds(all_channels: list, k: int = 15, rng=None) -> list:
+    """Случайные seed-каналы на прогон.
+
+    Фиксированные первые 12 из списка давали одни и те же рекомендации, и
+    автопоиск выдыхался за два дня: проверок по дням 152, 105, 6, 2, 1, 0.
+    Ротация по всем активным каналам даёт новые «похожие» каждый день.
+    """
+    rng = rng or random.Random()
+    pool = list(dict.fromkeys(c.lower() for c in all_channels if c))
+    if len(pool) <= k:
+        return pool
+    return rng.sample(pool, k)
+
+
 async def collect_candidates(client, seeds: list, max_checks: int) -> dict:
     """Кандидаты из всех источников. {username: откуда}."""
     out = {}
-    out.update(await _recommendations(client, seeds[:12], max_checks))
+    out.update(await _recommendations(client, seeds, max_checks))
     print("   рекомендации Telegram: %d" % len(out))
     if len(out) < max_checks:
-        titles = await _search_titles(client, QUERIES_RU + QUERIES_EN,
-                                      max_checks - len(out))
+        queries = QUERIES_RU + QUERIES_EN
+        random.shuffle(queries)          # каждый день — другой порядок
+        titles = await _search_titles(client, queries, max_checks - len(out))
         for k, v in titles.items():
             out.setdefault(k, v)
         print("   поиск по названиям: всего %d" % len(out))
+    if len(out) < max_checks:
+        glob = await _search_global(client, GLOBAL_QUERIES, max_checks - len(out))
+        for k, v in glob.items():
+            out.setdefault(k, v)
+        print("   поиск по постам: всего %d" % len(out))
     return out
 
 
@@ -257,7 +327,9 @@ async def run(max_checks: int | None = None, apply: bool = False) -> dict:
     max_checks = max_checks or s.discover_max_checks
 
     known = _known_usernames()
-    seeds = [c[0] for c in CHANNELS]
+    from .tgchannels import _discovered, _verified_channels
+    seeds = pick_seeds([c[0] for c in CHANNELS] + _verified_channels()
+                       + _discovered())
 
     client = TelegramClient(s.telegram_session_path, s.tg_api_id,
                             s.telegram_api_hash)
@@ -290,9 +362,57 @@ async def run(max_checks: int | None = None, apply: bool = False) -> dict:
                 stats["rejected"] += 1
             _save_candidate(info, source)
             # t.me читаем как обычный посетитель: не чаще раза в 2 секунды
-            import time as _t
-            _t.sleep(random.uniform(1.8, 3.2))
+            time.sleep(random.uniform(1.8, 3.2))
 
+    if apply and good:
+        stats["added"] = _apply_to_registry(good)
+    # Второй шанс старым отказам — без MTProto, только t.me.
+    re_stats = recheck_rejected(apply=apply, limit=30)
+    stats.update({"rechecked": re_stats["rechecked"],
+                  "revived": re_stats["revived"]})
+    stats["added"] = stats.get("added", 0) + re_stats.get("added", 0)
+    return stats
+
+
+# Причины, с которыми канал стоит перепроверить: летнее затишье или
+# временная закрытость — не приговор.
+RECHECK_REASONS = re.compile(
+    r"^(мёртвый|мало прямых контактов|нет постов|HTTP \d|ConnectError|"
+    r"ReadTimeout|ConnectTimeout)")
+
+
+def recheck_rejected(days: int = 14, limit: int = 30,
+                     apply: bool = False) -> dict:
+    """Перепроверить отбракованных старше N дней по открытой t.me-странице.
+
+    Отказ был окончательным: кандидат навсегда попадал в «известные», и
+    канал, молчавший в августе, не получал шанса в сентябре. MTProto здесь
+    не нужен — можно запускать хоть при живом автопилоте.
+    """
+    edge = utcnow() - timedelta(days=days)
+    with session_scope() as sess:
+        rows = sess.scalars(select(ChannelCandidate).where(
+            ChannelCandidate.passed.is_(False),
+            ChannelCandidate.enabled.is_(False),
+            ChannelCandidate.checked_at < edge)
+            .order_by(ChannelCandidate.checked_at)).all()
+        todo = [(r.username, r.found_via or "перепроверка") for r in rows
+                if RECHECK_REASONS.match(r.reason or "")][:limit]
+    stats = {"rechecked": 0, "revived": 0, "added": 0}
+    if not todo:
+        return stats
+    known = _known_usernames()
+    good = []
+    with httpx.Client(http2=False, trust_env=False, follow_redirects=True) as http:
+        for username, source in todo:
+            info = evaluate(username, http, known)
+            stats["rechecked"] += 1
+            _save_candidate(info, source)
+            if info["ok"]:
+                stats["revived"] += 1
+                good.append((info, source))
+                print("   ↺ @%-28s ожил: %s" % (username, info["reason"][:50]))
+            time.sleep(random.uniform(1.8, 3.2))
     if apply and good:
         stats["added"] = _apply_to_registry(good)
     return stats
@@ -327,6 +447,14 @@ def _apply_to_registry(good: list) -> int:
                 row.enabled = True
                 row.enabled_at = utcnow()
                 n += 1
+        # Всё, что когда-либо прошло проверку, но осталось выключенным
+        # (прогон без --apply): 18 таких каналов пролежали с 25.08 по 06.09.
+        for row in sess.scalars(select(ChannelCandidate).where(
+                ChannelCandidate.passed.is_(True),
+                ChannelCandidate.enabled.is_(False))).all():
+            row.enabled = True
+            row.enabled_at = utcnow()
+            n += 1
     return n
 
 
@@ -343,7 +471,15 @@ def main() -> int:
                     help="включить найденные каналы в сбор")
     ap.add_argument("--limit", type=int, default=0, help="сколько проверить")
     ap.add_argument("--list", action="store_true", help="показать найденное")
+    ap.add_argument("--recheck", action="store_true",
+                    help="только перепроверить старые отказы (без Telegram-сессии)")
     args = ap.parse_args()
+
+    if args.recheck:
+        st = recheck_rejected(apply=args.apply, limit=args.limit or 30)
+        print("Перепроверено %d, ожило %d, включено %d"
+              % (st["rechecked"], st["revived"], st.get("added", 0)))
+        return 0
 
     if args.list:
         with session_scope() as sess:

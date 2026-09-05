@@ -57,6 +57,29 @@ def can_reply(sess) -> tuple:
     return True, "%d/%d за сегодня" % (n, policy.WARM_REPLY_DAILY)
 
 
+def reply_target_problem(sess, app) -> str:
+    """Старая карточка не даёт права писать отозванному/запрещённому контакту."""
+    from ..ingest.postkind import is_seeker_post
+    from ..models import Employer, Status
+    if app is None:
+        return "заявка не найдена"
+    if (app.outcome or "").startswith("manual_tg_"):
+        return "переписку ведёт владелец вручную"
+    if app.status in (Status.WITHDRAWN.value, Status.REJECTED_SCORE.value,
+                      Status.REJECTED_BY_EMPLOYER.value, Status.DUPLICATE.value,
+                      Status.HANDLE_DEAD.value):
+        return "заявка закрыта: %s" % app.status
+    job = sess.get(Job, app.job_id)
+    if not job:
+        return "вакансия не найдена"
+    if is_seeker_post((job.title or "") + "\n" + (job.description_raw or "")):
+        return "автор публикации — соискатель"
+    employer = sess.get(Employer, app.employer_id) if app.employer_id else None
+    if employer and employer.do_not_contact:
+        return "контакт отмечен «не писать»"
+    return ""
+
+
 async def send_reply(client, app_id: int, text: str, attach_cv: bool = False,
                      is_auto: bool = True, dry: bool = False,
                      rng: random.Random | None = None) -> str:
@@ -72,6 +95,9 @@ async def send_reply(client, app_id: int, text: str, attach_cv: bool = False,
         app = sess.get(Application, app_id)
         if not app:
             return "skipped:заявка %d не найдена" % app_id
+        problem = reply_target_problem(sess, app)
+        if problem:
+            return "skipped:" + problem
         job = sess.get(Job, app.job_id)
         channel, peer = route.channel_for(app, job)
         cv_path = app.cv_path
@@ -106,6 +132,19 @@ async def send_reply(client, app_id: int, text: str, attach_cv: bool = False,
             await asyncio.sleep(policy.typing_seconds(text, rng))
     except Exception:
         pass
+
+    # Re-read after typing: stop/withdrawal/contact changes can arrive while
+    # this coroutine yields. An old owner card cannot bypass live guards.
+    with session_scope() as sess:
+        ok, why = can_reply(sess)
+        if not ok:
+            return "stop:" + why
+        current = sess.get(Application, app_id)
+        problem = reply_target_problem(sess, current)
+        if problem:
+            return "skipped:" + problem
+        if route.channel_for(current, sess.get(Job, current.job_id)) != (route.TELEGRAM, handle):
+            return "skipped:контакт изменился во время подготовки"
 
     try:
         cv_real = resolve_cv(cv_path) if attach_cv else ""

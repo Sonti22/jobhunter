@@ -104,6 +104,17 @@ async def send_reply_email(app_id: int, text: str, attach_cv: bool = False,
     msg = build_message(to=addr, subject=subject, body=text, cv_path=cv_path,
                         app_id=app_id, in_reply_to=parent, references=refs,
                         auto=is_auto)
+    from .send import can_reply, reply_target_problem
+    with session_scope() as sess:
+        current = sess.get(Application, app_id)
+        problem = reply_target_problem(sess, current)
+        if problem:
+            return "skipped:" + problem
+        allowed, why = can_reply(sess)
+        if not allowed:
+            return "stop:" + why
+        if route.channel_for(current, sess.get(Job, current.job_id)) != (route.EMAIL, addr):
+            return "skipped:контакт изменился во время подготовки"
     try:
         # smtplib блокирующий, а цикл входящих асинхронный: без выноса в
         # поток таймаут SMTP в 30 секунд заморозил бы весь проход по почте.

@@ -22,7 +22,7 @@ from __future__ import annotations
 from contextlib import nullcontext
 from datetime import timezone
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
 from .config import get_settings
@@ -117,15 +117,17 @@ def claim_pending(limit: int = 20) -> list:
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     edge = now - timedelta(minutes=OUTBOX_LEASE_MIN)
     with session_scope() as sess:
-        rows = sess.scalars(
-            select(BotOutbox)
-            .where(BotOutbox.sent_at.is_(None), BotOutbox.attempts < 5,
-                   ((BotOutbox.claimed_at.is_(None)) |
-                    (BotOutbox.claimed_at < edge)))
-            .order_by(BotOutbox.id).limit(limit)).all()
-        for row in rows:
-            row.claimed_at = now
-        return [_outbox_dict(r) for r in rows]
+        eligible = (
+            BotOutbox.sent_at.is_(None), BotOutbox.attempts < 5,
+            ((BotOutbox.claimed_at.is_(None)) | (BotOutbox.claimed_at < edge)))
+        ids = (
+            select(BotOutbox.id).where(*eligible)
+            .order_by(BotOutbox.id).limit(max(0, limit)))
+        # One statement chooses AND claims. SELECT followed by ORM writes
+        # allowed two workers to both send the same notification.
+        rows = sess.scalars(update(BotOutbox).where(BotOutbox.id.in_(ids), *eligible)
+                            .values(claimed_at=now).returning(BotOutbox)).all()
+        return [_outbox_dict(r) for r in sorted(rows, key=lambda row: row.id)]
 
 
 def mark_sent(row_id: int, msg_id: int | None = None,
@@ -155,3 +157,13 @@ def mark_failed(row_id: int, error: str) -> None:
             row.attempts += 1
             row.last_error = (error or "")[:200]
             row.claimed_at = None
+
+
+def cancel(row_id: int, reason: str) -> None:
+    """Cancel obsolete notification without claiming Telegram accepted it."""
+    with session_scope() as sess:
+        row = sess.get(BotOutbox, row_id)
+        if row and row.sent_at is None:
+            row.attempts = 5
+            row.claimed_at = None
+            row.last_error = ("cancelled: " + reason)[:200]

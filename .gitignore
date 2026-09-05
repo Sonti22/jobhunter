@@ -1,17 +1,33 @@
 # секреты и учётки — НИКОГДА в git
 .env
+.env.*
+!.env.example
+google_token.json
+google_client_secret.json
+tg_code.txt
+tg_2fa.txt
+tg_code_request.json
+proxy_backup.json
 *.session
 *.session-journal
 sender.pid
+*-sender.lock
+job-*.lock
 
 # данные кампании и личные артефакты
 data/
 backup/
+backup_*/
 out/
+logs/
+cv_out/
+probe_out/
 cv_base/
 *.db
 *.db-wal
 *.db-shm
+*.db.*
+STOP_SENDING.flag
 
 # python
 __pycache__/
@@ -21,5 +37,7 @@ __pycache__/
 htmlcov/
 .mypy_cache/
 .ruff_cache/
+.venv/
+venv/
 *.session.moved
 *.session.*

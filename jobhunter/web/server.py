@@ -117,6 +117,7 @@ def _layout(body: str, banner: str = "") -> HTMLResponse:
         "<style>%s</style>"
         "<header><h1>jobhunter</h1>"
         "<a href='/'>Очередь</a><a href='/manual'>Отклик вручную</a>"
+        "<a href='/manual-telegram'>Telegram — отправлю сам</a>"
         "<a href='/sent'>Отправленные</a>"
         "<a href='/stats'>Статистика</a><a href='/blacklist'>Blacklist</a>"
         "<a href='/sending'>Почему не отправляет</a>"
@@ -444,7 +445,7 @@ def attention_page():
     for r in data["items"]:
         action = ("<form method='post' action='/attention/%d/card'><button class='btn ghost sm'>"
                   "Открыть карточку для решения</button></form>" % r["id"]
-                  if r["status"] != Status.SEND_FAILED_AMBIGUOUS.value else "")
+                  if r["can_open_card"] else "")
         rows.append("<article class='bar'><h3><a href='/applications/%d'>#%d · %s</a></h3>"
                     "<p>%s · ожидание %.1f ч</p><details><summary>Переписка и черновик</summary>"
                     "<b>Рекрутёр:</b><pre>%s</pre><b>Черновик:</b><pre>%s</pre></details>%s</article>" % (
@@ -467,6 +468,10 @@ def attention_card(app_id: int):
                                      Status.AWAITING_REPLY.value, Status.INTERVIEW_CONFIRMED.value,
                                      Status.INTERVIEW_PROPOSED.value):
             return HTMLResponse("Диалог недоступен для новой карточки", status_code=409)
+        from ..convo.send import reply_target_problem
+        problem = reply_target_problem(sess, a)
+        if problem:
+            return HTMLResponse(_h(problem), status_code=409)
         pending = sess.scalar(select(OwnerRequest).where(OwnerRequest.application_id == app_id,
                               OwnerRequest.applied_at.is_(None), OwnerRequest.decision != "expired")
                               .order_by(OwnerRequest.id.desc()).limit(1))
@@ -503,15 +508,19 @@ def reading_page():
         d = r["details"] or {}
         remaining = d.get("remaining")
         cards.append("<div class='bar'><h3>%s</h3><p>Последний проход: %s · %s</p>"
-                     "<p>Просмотрено: %s · обработано: %s · осталось: %s</p><p>%s</p></div>" % (
+                     "<p>Просмотрено: %s · обработано: %s · осталось загрузить: %s</p>"
+                     "<p>Сохранено, но разбор не завершён: %d · <a href='/attention'>Проверить</a></p>"
+                     "<p>%s</p></div>" % (
                          title, _h(_local_time(r["at"])), _h(r["status"]),
                          _h(d.get("seen", d.get("scanned", "нет данных"))),
                          _h(d.get("processed", d.get("incoming", "нет данных"))),
-                         "неизвестно" if remaining is None else str(remaining), _h(r["error"])))
-    rows = "".join("<tr><td>%s</td><td>%s</td><td>%d</td><td>%d</td><td>%d</td>"
+                         "неизвестно" if remaining is None else str(remaining),
+                         r["pending_processing"], _h(r["error"])))
+    rows = "".join("<tr><td>%s</td><td>%s</td><td>%d</td><td>%d</td><td>%s</td>"
                    "<td>%s</td><td>%s</td></tr>" % (
                        _h(r["username"]), _h(_local_time(r["at"])), r["posts"], r["vacancies"],
-                       r["rejected"], "история пройдена" if r["history_complete"] else "остаток неизвестен",
+                       str(r["rejected"]) if r["rejected"] is not None else "нет данных",
+                       "история пройдена" if r["history_complete"] else "остаток неизвестен",
                        _h(r["error"] or r["status"])) for r in data["channels"])
     return _layout("<h2>Полнота чтения</h2><p class='muted'>%s</p>"
                    "<p>Gmail: папка %s; начальный поиск за %d дней. "
@@ -595,6 +604,72 @@ def blacklist_toggle(employer_id: int, on: str = Form("1")):
         if employer:
             employer.do_not_contact = on == "1"
     return RedirectResponse("/blacklist", status_code=303)
+
+
+@app.get("/manual-telegram", response_class=HTMLResponse)
+def manual_telegram_page(note: str = ""):
+    from .. import manual_telegram as manual_tg
+    data = manual_tg.listing()
+    body = "<h2>Telegram — отправлю сам</h2><p>%s</p>" % _h(manual_tg.WARNING)
+    if note:
+        body += "<p role='status'>%s</p>" % _h(note)
+    body += ("<p>Ждут отметки: %d · отправлено с твоих слов: %d · не подошло: %d · "
+             "не получилось: %d</p>" % (data["ready"], data["sent"], data["skipped"], data["failed"]))
+    body += ("<form method='post' action='/manual-telegram/next'>"
+             "<button class='btn'>Подготовить следующие 5</button></form>"
+             "<p class='muted'>Пока текущие карточки не отмечены, новая подборка не создаётся. "
+             "В Telegram эта же очередь доступна по /outreach. Автоответы и напоминания "
+             "по переданным тебе заявкам выключены.</p>")
+    for row in data["items"]:
+        aid = row["id"]
+        body += ("<section class='bar'><h3>#%d · %s</h3><p>%s · соответствие %.0f</p>"
+                 % (aid, _h(row["title"]), _h(row["company"]), row["score"]))
+        if row["problem"]:
+            body += "<p class='pill bad'>Не отправляй: %s</p>" % _h(row["problem"])
+        else:
+            body += ("<p><a href='https://t.me/%s' target='_blank' rel='noopener'>@%s</a></p>"
+                     "<textarea id='draft-%d' readonly rows='9' style='width:100%%'>%s</textarea>"
+                     "<p><button class='btn ghost' type='button' onclick='copyDraft(%d,this)'>"
+                     "Скопировать текст</button></p>"
+                     % (_h(row["handle"]), _h(row["handle"]), aid, _h(row["text"]), aid))
+        if row["vacancy_url"]:
+            body += "<p><a target='_blank' rel='noopener' href='%s'>Исходная вакансия</a></p>" % _h(row["vacancy_url"])
+        if row["cv_path"]:
+            body += "<p><a href='/cv/%d'>Скачать резюме</a></p>" % aid
+        for action, label in (("sent", "Я уже отправил"), ("skip", "Не подходит"),
+                              ("failed", "Не получилось")):
+            confirm = (" onsubmit=\"return confirm('Сообщение уже отправлено тобой в Telegram?')\""
+                       if action == "sent" else "")
+            body += ("<form style='display:inline' method='post' action='/manual-telegram/mark'%s>"
+                     "<input type='hidden' name='app_id' value='%d'>"
+                     "<input type='hidden' name='action' value='%s'>"
+                     "<button class='btn ghost sm'>%s</button></form> "
+                     % (confirm, aid, action, label))
+        body += "</section>"
+    body += """<script>async function copyDraft(id,button){
+      const field=document.getElementById('draft-'+id);
+      try{await navigator.clipboard.writeText(field.value);button.textContent='Скопировано';}
+      catch(e){field.focus();field.select();button.textContent='Нажми Ctrl+C';}
+    }</script>"""
+    return _layout(body)
+
+
+@app.post("/manual-telegram/next")
+def manual_telegram_next():
+    from urllib.parse import urlencode
+
+    from ..manual_telegram import issue
+    result = issue()
+    return RedirectResponse("/manual-telegram?" + urlencode({"note": result["reason"]}), status_code=303)
+
+
+@app.post("/manual-telegram/mark")
+def manual_telegram_mark(app_id: int = Form(...), action: str = Form(...)):
+    from urllib.parse import urlencode
+
+    from ..manual_telegram import mark
+    _, note = mark(app_id, action)
+    return RedirectResponse("/manual-telegram?" + urlencode({"note": note}), status_code=303)
 
 
 # ─────────────────────────────────────────── отклик вручную (ATS) ──

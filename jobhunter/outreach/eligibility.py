@@ -53,11 +53,17 @@ def is_followup(app) -> bool:
     return bool(app.sent_at and app.followup_body and not app.followup_sent_at)
 
 
-def check(app, job, employer=None, *, now=None) -> Eligibility:
+def check(app, job, employer=None, *, now=None, sending: bool = False,
+          manual: bool = False) -> Eligibility:
     now = _utc_naive(now or utcnow())
     if app is None:
         return Eligibility("missing_application", "Заявка не найдена")
-    if app.status not in (Status.APPROVED.value, Status.SEND_FAILED.value):
+    if (getattr(app, "outcome", "") or "").startswith("manual_tg_") and not manual:
+        return Eligibility("manual_owner", "Передано владельцу: отправка только вручную")
+    allowed_statuses: tuple[str, ...] = (Status.APPROVED.value, Status.SEND_FAILED.value)
+    if sending:
+        allowed_statuses += (Status.SENDING.value,)
+    if app.status not in allowed_statuses:
         reasons = {Status.PENDING_APPROVAL.value: "Отклик ожидает одобрения",
                    Status.FOLLOWUP_PENDING_APPROVAL.value: "Напоминание ожидает одобрения",
                    Status.SENDING.value: "Отправка выполняется; повтор заблокирован",
@@ -76,6 +82,10 @@ def check(app, job, employer=None, *, now=None) -> Eligibility:
         return Eligibility("contact_missing", "Не указан Telegram-контакт")
     if job.contact_kind == ContactKind.EMAIL.value and "@" not in (job.contact_url or ""):
         return Eligibility("contact_missing", "Не указан email-контакт")
+    if job.contact_kind == ContactKind.EMAIL.value:
+        from .mailer import _mailbox_ok
+        if not _mailbox_ok((job.contact_url or "").replace("mailto:", "").strip()):
+            return Eligibility("contact_filtered", "Служебный адрес не предназначен для откликов")
     if app.first_reply_at or app.last_inbound_at or (employer and employer.last_inbound_at):
         return Eligibility("already_replied", "Рекрутёр уже ответил — продолжение в диалогах")
     if employer and employer.do_not_contact:

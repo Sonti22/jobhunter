@@ -83,6 +83,7 @@ def _nav(active: str = "") -> list:
     q = report.quota()
     f = report.funnel()
     rows = [
+        [{"text": "✍️ Отправлю сам — Telegram", "callback_data": "t:0:next"}],
         [{"text": "📊 Статистика", "callback_data": cb("s", "stats")},
          {"text": "🔻 Воронка", "callback_data": cb("s", "funnel")}],
         [{"text": "📤 Очередь %d" % f["counts"].get("PENDING_APPROVAL", 0),
@@ -356,6 +357,7 @@ HELP = (
     "/start, /stats — главный экран\n"
     "/mail — сводка почты: что непрочитано и от кого\n"
     "/queue — очередь на отправку\n"
+    "/outreach — ник, текст и PDF; отметил отправку — получаешь следующий отклик\n"
     "/cards — что ждёт решения\n"
     "/interviews — ближайшие интервью\n"
     "/channels — каналы-источники\n"
@@ -375,6 +377,7 @@ COMMANDS = [
     ("interviews", "ближайшие интервью"),
     ("channels", "каналы-источники"),
     ("manual", "ручные отклики"),
+    ("outreach", "Telegram: отправлю сам"),
     ("stop", "остановить отправку"),
     ("go", "возобновить отправку"),
     ("help", "справка"),

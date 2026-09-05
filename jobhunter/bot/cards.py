@@ -44,6 +44,8 @@ def parse_cb(data: str) -> dict:
         return {"kind": "manual",
                 "app_id": int(parts[1]) if parts[1].isdigit() else 0,
                 "action": parts[2]}
+    if head == "t" and len(parts) == 3 and parts[1].isdigit():
+        return {"kind": "manual_telegram", "app_id": int(parts[1]), "action": parts[2]}
     return {}
 
 

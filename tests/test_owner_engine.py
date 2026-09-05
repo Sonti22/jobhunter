@@ -173,15 +173,18 @@ def test_slot_proposal_creates_card_not_reply(db, fresh_app):
         assert req.payload_json["slots"]
 
 
-def test_ok_command_confirms_interview(db, fresh_app):
+def test_ok_command_confirms_interview(db, fresh_app, monkeypatch):
     from jobhunter import owner
     from jobhunter.convo.engine import handle_message, store_incoming
     from jobhunter.models import Application, Status
     txt = "Удобно завтра в 15:00?"
     store_incoming(fresh_app, [(31, txt, datetime.now(timezone.utc))])
     run(handle_message(FakeClient(), fresh_app, txt, dry=True))
+    async def sent_without_network(*args, **kwargs):
+        return "ok"
+    monkeypatch.setattr("jobhunter.convo.send.send_reply", sent_without_network)
     ans = run(owner.apply_command(
-        FakeClient(), {"cmd": "ok", "app_id": fresh_app, "arg": ""}, dry=True))
+        FakeClient(), {"cmd": "ok", "app_id": fresh_app, "arg": ""}, dry=False))
     assert "интервью" in ans
     with db.session_scope() as sess:
         app = sess.get(Application, fresh_app)

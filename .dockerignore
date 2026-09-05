@@ -6,6 +6,7 @@
 !.env.example
 *.session
 *.session-journal
+*.session.*
 google_token.json
 google_client_secret.json
 tg_code.txt
@@ -18,11 +19,14 @@ proxy_backup.json
 *.db-wal
 *.db-shm
 *.db.moved
+*.db.*
 cv_out/
 logs/
 out/
 probe_out/
 backup_*/
+backup/
+data/
 sender.pid
 STOP_SENDING.flag
 

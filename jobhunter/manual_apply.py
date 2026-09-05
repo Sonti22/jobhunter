@@ -188,6 +188,8 @@ def mark(app_id: int, outcome: str, snooze_days: int = 3) -> str:
         a = sess.get(Application, app_id)
         if not a:
             return "заявка #%d не найдена" % app_id
+        if a.status != Status.HANDLE_MISSING.value:
+            return "эта отметка доступна только для отклика через форму компании"
         a.outcome = outcome
         a.applied_at = utcnow() if outcome == OUTCOME_APPLIED else a.applied_at
         a.snooze_until = (utcnow().replace(tzinfo=None)

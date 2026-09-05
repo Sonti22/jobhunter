@@ -28,22 +28,60 @@ def drain(http=None, limit: int = 20) -> int:
     # Берём короткий lease до сетевого вызова. Это не делает Telegram
     # exactly-once (краш после accepted всё ещё принципиально неоднозначен),
     # но убирает параллельную доставку из двух bot-потоков/процессов.
-    rows = notify.claim_pending(limit)
-    if not rows:
-        return 0
-
     owners = sorted(get_settings().bot_owner_ids)
     if not owners:
+        return 0
+    rows = notify.claim_pending(limit)
+    if not rows:
         return 0
 
     sent = 0
     last = len(rows) - 1
     for idx, row in enumerate(rows):
+        # Rebuild manual cards at delivery time. A queued old draft must not
+        # be presented as ready after the owner has already marked it or the
+        # vacancy/contact has changed. Internal app_id metadata is not markup.
+        manual_row = None
+        if row["kind"] in ("manual_tg_step", "manual_tg_document"):
+            from .. import manual_telegram as manual_tg
+            try:
+                app_id = int(row["markup"].get("app_id") or 0)
+            except (TypeError, ValueError):
+                notify.cancel(row["id"], "некорректный номер ручной карточки")
+                continue
+            manual_row = manual_tg.get_card(app_id)
+            if not manual_row:
+                notify.cancel(row["id"], "ручная карточка уже обработана")
+                continue
+            if row["kind"] == "manual_tg_document" and manual_row["problem"]:
+                notify.cancel(row["id"], "ручная карточка требует проверки")
+                continue
         targets = [row["chat_id"]] if row["chat_id"] else owners
         ok, msg_id, chat_used, err = False, None, None, ""
         for chat_id in targets:
             try:
-                if row["target_msg_id"]:
+                if manual_row is not None:
+                    if chat_id not in owners:
+                        raise PermissionError("ручные карточки доступны только владельцу")
+                    if row["kind"] == "manual_tg_document":
+                        try:
+                            filename, content = manual_tg.cv_document(manual_row["id"])
+                        except (ValueError, OSError):
+                            notify.push("manual_tg_cv_error",
+                                        f"Не удалось приложить PDF к карточке #{manual_row['id']}. "
+                                        "Резюме не отправлено. Попробуй «📎 Получить резюме» "
+                                        "или сообщи об ошибке.", chat_id=chat_id,
+                                        dedup=f"manual_tg_cv_error:{row['id']}:{chat_id}")
+                            notify.cancel(row["id"], "PDF недоступен; владелец уведомлён")
+                            break
+                        res = api.send_document(chat_id, filename, content,
+                            caption=f"📎 Резюме для #{manual_row['id']} · @{manual_row['handle']}\n"
+                                    "Прикрепи этот PDF в переписке, если отправляешь резюме.", http=http)
+                    else:
+                        res = api.send_message(chat_id, manual_tg.card(manual_row),
+                                               manual_tg.keyboard(manual_row), http=http)
+                    msg_id, chat_used = res.get("message_id"), chat_id
+                elif row["target_msg_id"]:
                     api.edit_message_text(chat_id, row["target_msg_id"],
                                           row["text"],
                                           row["markup"] or {"inline_keyboard": []},
@@ -87,7 +125,7 @@ def drain(http=None, limit: int = 20) -> int:
             else:
                 log.info("уведомление #%d ждёт: владелец ещё не нажал /start",
                          row["id"])
-        else:
+        elif err:
             notify.mark_failed(row["id"], err)
     return sent
 

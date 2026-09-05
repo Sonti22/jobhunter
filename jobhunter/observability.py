@@ -18,7 +18,7 @@ def record(key: str, status: str, *, details: dict | None = None,
         row.error = error[:300]
         if status == "running":
             row.started_at = utcnow()
-        elif status != "scheduled":
+        else:
             row.finished_at = utcnow()
         row.next_run_at = next_run_at
         if details is not None:

@@ -178,7 +178,7 @@ def test_close_command(db):
                                    "похоже на отказ")
     cmd = owner.parse_command("/close %d" % app_id)
     assert cmd["cmd"] == "close"
-    out = aio.run(owner.apply_command(None, cmd, dry=True))
+    out = aio.run(owner.apply_command(None, cmd, dry=False))
     assert "закрыта" in out
     with db.session_scope() as sess:
         assert sess.get(Application, app_id).status \

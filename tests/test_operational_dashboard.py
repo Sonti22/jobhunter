@@ -335,3 +335,152 @@ def test_outcome_categories_do_not_double_count(isolated_db):
     assert data["sent"] == 4
     assert sum(data["categories"].values()) == 4
     assert data["categories"]["offer"] == data["categories"]["interview"] == 1
+
+
+def test_withdrawn_application_is_not_an_open_dialog(isolated_db):
+    from jobhunter.dashboard import attention
+    from jobhunter.models import OwnerRequest
+    app_id = make_app(isolated_db, status="WITHDRAWN")
+    with isolated_db.session_scope() as sess:
+        sess.add(OwnerRequest(application_id=app_id, decision=""))
+    assert attention()["total"] == 0
+
+
+def test_old_card_cannot_send_after_withdrawal(isolated_db, monkeypatch):
+    from jobhunter import decisions
+    from jobhunter.models import OwnerRequest
+    app_id = make_app(isolated_db, status="WITHDRAWN")
+    with isolated_db.session_scope() as sess:
+        req = OwnerRequest(application_id=app_id, decision="say", decision_arg="Здравствуйте!")
+        sess.add(req)
+        sess.flush()
+        req_id = req.id
+    async def unexpected(*args, **kwargs):
+        pytest.fail("Закрытой заявке нельзя отправлять ответ")
+    monkeypatch.setattr("jobhunter.convo.send.send_reply", unexpected)
+    assert asyncio.run(decisions.apply_one(None, req_id)).startswith("skipped:")
+
+
+def test_reply_to_do_not_contact_is_blocked(isolated_db):
+    from jobhunter.convo.send import send_reply
+    from jobhunter.models import Employer
+    app_id = make_app(isolated_db, employer=True, status="REPLIED")
+    with isolated_db.session_scope() as sess:
+        sess.scalar(select(Employer)).do_not_contact = True
+    assert asyncio.run(send_reply(None, app_id, "Здравствуйте!")).startswith("skipped:")
+
+
+def test_unknown_uidvalidity_does_not_read_using_old_boundary(isolated_db, monkeypatch):
+    from jobhunter.convo import imapbox
+    monkeypatch.setattr(imapbox, "_uidvalidity", lambda *args: 0)
+    conn = SimpleNamespace(select=lambda *args, **kwargs: ("OK", []))
+    with pytest.raises(imapbox.MailboxError, match="UIDVALIDITY"):
+        imapbox.new_uids(conn)
+
+
+def test_reading_separates_download_backlog_and_pending_processing(isolated_db):
+    from jobhunter.convo.engine import store_incoming
+    from jobhunter.dashboard import reading
+    from jobhunter.observability import record
+    app_id = make_app(isolated_db, status="AWAITING_REPLY")
+    store_incoming(app_id, [(5, "Ответ рекрутёра", datetime.now(timezone.utc))])
+    record("telegram_inbox", "ok", details={"remaining": 0})
+    data = reading()["telegram_inbox"]
+    assert data["details"]["remaining"] == 0
+    assert data["pending_processing"] == 1
+
+
+def test_email_daily_limit_checked_before_smtp_login(isolated_db, monkeypatch):
+    from jobhunter.models import SendLog
+    from jobhunter.outreach import mailer, policy
+    monkeypatch.setenv("EMAIL_DAILY_LIMIT", "1")
+    monkeypatch.setattr(policy, "within_send_window", lambda *args: True)
+    with isolated_db.session_scope() as sess:
+        sess.add(SendLog(result="ok", peer_id="hr@example.com"))
+    monkeypatch.setattr(mailer.smtplib, "SMTP", lambda *args, **kwargs: pytest.fail("Квота исчерпана"))
+    assert mailer.send_batch(40, dry=False) == 0
+    with isolated_db.session_scope() as sess:
+        assert not policy.can_send_email(sess).allowed
+
+
+def test_panel_uses_actual_recovery_quota(isolated_db):
+    from jobhunter import report
+    from jobhunter.outreach import policy
+    with isolated_db.session_scope() as sess:
+        policy.get_state(sess).quota_ceiling = 25
+        policy.get_quota(sess).planned_cap = 3
+    assert report.quota()["cap"] == 3
+
+
+def fake_sender_client(monkeypatch, *, during_typing=None):
+    from jobhunter.outreach import folder, sender
+    async def resolve(*args):
+        return SimpleNamespace(user_id=7)
+    async def no_sleep(*args):
+        pass
+    async def no_folder(*args):
+        return ""
+    monkeypatch.setattr(sender, "resolve", resolve)
+    monkeypatch.setattr(sender.asyncio, "sleep", no_sleep)
+    monkeypatch.setattr(sender, "_telethon_input_peer", lambda peer: peer)
+    monkeypatch.setattr(folder, "add_to_folder", no_folder)
+    monkeypatch.setenv("SEND_CV_WITH_FIRST_MESSAGE", "false")
+    from jobhunter.config import get_settings
+    get_settings.cache_clear()
+    class Client:
+        _jobhunter_use_raw_requests = True
+        def __init__(self):
+            self.requests = []
+        def action(self, *args):
+            class Action:
+                async def __aenter__(self):
+                    return self
+                async def __aexit__(self, *args):
+                    if during_typing:
+                        during_typing()
+            return Action()
+        async def __call__(self, request):
+            self.requests.append(request)
+            return SimpleNamespace(id=91)
+    return Client()
+
+
+def test_stop_during_typing_prevents_network_send(isolated_db, monkeypatch):
+    from jobhunter.models import Application
+    from jobhunter.outreach import sender
+    app_id = make_app(isolated_db)
+    item = sender.pick_batch(1)[0]
+    client = fake_sender_client(monkeypatch, during_typing=lambda: monkeypatch.setattr(
+        sender.policy, "kill_switch_active", lambda: True))
+    assert asyncio.run(sender.send_one(client, item, random.Random(1), dry=False)).startswith("stop:")
+    assert not client.requests
+    with isolated_db.session_scope() as sess:
+        assert sess.get(Application, app_id).status == "APPROVED"
+
+
+def test_followup_has_own_random_id_and_preserves_initial_send_time(isolated_db, monkeypatch):
+    from jobhunter.models import Application
+    from jobhunter.outreach import sender
+    app_id = make_app(isolated_db, followup=True)
+    with isolated_db.session_scope() as sess:
+        app = sess.get(Application, app_id)
+        app.telegram_random_id = 101
+        original_sent = app.sent_at
+    client = fake_sender_client(monkeypatch)
+    assert asyncio.run(sender.send_one(client, sender.pick_batch(1)[0], random.Random(1), dry=False)) == "ok"
+    with isolated_db.session_scope() as sess:
+        app = sess.get(Application, app_id)
+        assert app.telegram_random_id == 101
+        assert app.telegram_followup_random_id == client.requests[0].random_id != 101
+        assert app.sent_at == original_sent
+        assert app.status == "FOLLOWED_UP"
+
+
+def test_stale_schedule_is_only_an_estimate(isolated_db):
+    from jobhunter.dashboard import next_attempts
+    from jobhunter.models import RuntimeState
+    with isolated_db.session_scope() as sess:
+        sess.add(RuntimeState(key="schedule:tg_more", status="scheduled",
+                              finished_at=datetime.now(timezone.utc) - timedelta(hours=1),
+                              next_run_at=datetime.now(timezone.utc) + timedelta(hours=1)))
+    assert next_attempts()["telegram"]["estimated"]

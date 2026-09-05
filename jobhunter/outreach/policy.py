@@ -105,6 +105,28 @@ def register_sent(sess, cold: bool = True) -> None:
         q.sent_count += 1
 
 
+def email_sent_today(sess) -> int:
+    """Одинаковый счётчик для панели и отправщика; день кампании — UTC."""
+    from sqlalchemy import func, select
+
+    from ..models import SendLog
+    day_start = datetime.now(timezone.utc).replace(tzinfo=None, hour=0, minute=0,
+                                                  second=0, microsecond=0)
+    return int(sess.scalar(select(func.count(SendLog.id)).where(
+        SendLog.result == "ok", SendLog.attempted_at >= day_start,
+        SendLog.peer_id.contains("@"), ~SendLog.peer_id.startswith("@"))) or 0)
+
+
+def can_send_email(sess) -> Verdict:
+    if kill_switch_active():
+        return Verdict(False, "активен стоп-кран")
+    sent = email_sent_today(sess)
+    cap = get_settings().email_daily_limit
+    if sent >= cap:
+        return Verdict(False, "дневная квота email исчерпана (%d/%d)" % (sent, cap))
+    return Verdict(True, "%d/%d email за сегодня" % (sent, cap))
+
+
 def register_resolve(sess) -> None:
     """Резолв юзернейма имеет свои лимиты — считаем отдельно."""
     get_quota(sess).resolve_count += 1

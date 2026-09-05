@@ -87,20 +87,24 @@ def step_ingest() -> dict:
         totals["telegram"] = step_ingest_telegram()
     except Exception as e:
         log.warning("telegram-каналы: %s", str(e)[:100])
+        totals["telegram"] = {"error": type(e).__name__}
     try:
         totals["hn"] = save_jobs(HackerNewsSource().iter_jobs(threads=1), verbose=False)
     except Exception as e:
         log.warning("HN: %s", str(e)[:100])
+        totals["hn"] = {"error": type(e).__name__}
     try:
         from .ingest.ats import ATSSource
         totals["ats"] = save_jobs(ATSSource().iter_jobs(), verbose=False)
     except Exception as e:
         log.warning("ATS: %s", str(e)[:100])
+        totals["ats"] = {"error": type(e).__name__}
     try:
         from .ingest.boards import BoardsSource
         totals["boards"] = save_jobs(BoardsSource().iter_jobs(), verbose=False)
     except Exception as e:
         log.warning("job-борды: %s", str(e)[:100])
+        totals["boards"] = {"error": type(e).__name__}
     # API-источники (Трудвсем с прямыми email, кросс-поиск Workable, Muse):
     # были написаны давно, но к автопилоту не подключены — один ручной
     # прогон 5 августа. Каждый в своём try: смерть одного API не должна
@@ -111,12 +115,14 @@ def step_ingest() -> dict:
         # Голый импорт между защищёнными блоками ронял бы весь шаг вместе
         # с cycle_once — источники обязаны умирать поодиночке.
         log.warning("jobapis import: %s", str(e)[:100])
+        totals["jobapis"] = {"error": type(e).__name__}
         API_SOURCES = {}
     for api_name, api_cls in API_SOURCES.items():
         try:
             totals[api_name] = save_jobs(api_cls().iter_jobs(), verbose=False)
         except Exception as e:
             log.warning("%s: %s", api_name, str(e)[:100])
+            totals[api_name] = {"error": type(e).__name__}
 
     # Сбор ссылок на непокрытые ATS-доски — чистый regex по свежесобранному,
     # без сети; сами проверки идут отдельным воскресным шагом.
@@ -139,7 +145,7 @@ def step_ingest() -> dict:
     new = sum(t.get("new", 0) for t in totals.values())
     contacts = sum(t.get("with_contact", 0) for t in totals.values())
     log.info("ingest: новых %d, с прямым контактом %d", new, contacts)
-    return {"new": new, "with_contact": contacts}
+    return {"new": new, "with_contact": contacts, "sources": totals}
 
 
 def step_ingest_telegram() -> dict:
@@ -189,7 +195,7 @@ def step_prepare() -> dict:
                     % (type(e).__name__, str(e)[:300]),
                     dedup="prepare_fail:%s" % datetime.now(timezone.utc)
                                                       .strftime("%Y-%m-%d"))
-        return {}
+        return {"error": type(e).__name__}
     log.info("подготовка: готово %d, отсеяно %d, гейт отклонил %d",
              stats["pending"], stats["rejected"], stats["gate_failed"])
     return stats
@@ -321,7 +327,7 @@ def step_stage_ashby() -> dict:
         stats = stage(limit=10)
     except Exception as e:                                  # noqa: BLE001
         log.error("ashby stage: %s: %s", type(e).__name__, str(e)[:160])
-        return {}
+        return {"error": type(e).__name__}
     if stats.get("staged"):
         log.info("ashby: в подготовку писем: %d", stats["staged"])
     return stats
@@ -333,12 +339,12 @@ def step_submit_ashby() -> dict:
     s = get_settings()
     if policy.kill_switch_active():
         log.warning("ashby пропущен: активен стоп-кран")
-        return {}
+        return {"blocked": "активен стоп-кран"}
     try:
         stats = ashby_run(limit=s.ats_daily_limit, dry=False)
     except Exception as e:                                  # noqa: BLE001
         log.error("ashby подача: %s: %s", type(e).__name__, str(e)[:160])
-        return {}
+        return {"error": type(e).__name__}
     log.info("ashby: подано %d, пропущено %d, ошибок %d",
              stats["ok"], stats["skipped"], stats["errors"])
     return stats
@@ -444,7 +450,7 @@ def step_discover() -> dict:
         stats = asyncio.run(discover_run(apply=True))
     except Exception as e:
         log.error("discover: %s: %s", type(e).__name__, str(e)[:120])
-        return {}
+        return {"error": type(e).__name__}
     if stats.get("error"):
         log.warning("discover: %s", stats["error"])
     elif stats.get("checked"):
@@ -466,7 +472,7 @@ def step_inbox() -> dict:
         stats = asyncio.run(inbox_run(dry=False))
     except Exception as e:
         log.error("inbox: %s: %s", type(e).__name__, str(e)[:120])
-        return {}
+        return {"error": type(e).__name__}
     if stats.get("error"):
         log.warning("inbox: %s", stats["error"])
     elif any(stats.get(k) for k in ("incoming", "cards", "commands", "expired")):
@@ -488,7 +494,7 @@ def step_inbox_email() -> dict:
         stats = asyncio.run(mail_run(dry=False))
     except Exception as e:
         log.error("почта: %s: %s", type(e).__name__, str(e)[:120])
-        return {}
+        return {"error": type(e).__name__}
     if stats.get("error"):
         log.warning("почта: %s", stats["error"])
     elif stats.get("seen"):
@@ -508,7 +514,7 @@ def step_retry_drafts() -> dict:
         stats = retry_missing_drafts(limit=5)
     except Exception as e:
         log.error("повтор черновиков: %s: %s", type(e).__name__, str(e)[:120])
-        return {}
+        return {"error": type(e).__name__}
     if stats.get("ready"):
         log.info("повтор черновиков: проверено %d, готово %d",
                  stats.get("checked", 0), stats["ready"])
@@ -522,7 +528,7 @@ def step_recheck() -> dict:
         st = recheck_run(limit=20)
     except Exception as e:
         log.error("повтор классификации: %s: %s", type(e).__name__, str(e)[:140])
-        return {}
+        return {"error": type(e).__name__}
     if st.get("due"):
         log.info("повтор классификации: ждали %d, прояснилось %d",
                  st["due"], st.get("resolved", 0))
@@ -536,7 +542,7 @@ def step_revive() -> dict:
         st = revive_run(limit=10)
     except Exception as e:
         log.error("оживление диалогов: %s: %s", type(e).__name__, str(e)[:140])
-        return {}
+        return {"error": type(e).__name__}
     if st.get("revived"):
         log.info("оживление: разобрано %d из %d застрявших",
                  st["revived"], st.get("stale", 0))
@@ -586,7 +592,7 @@ def step_manual_prepare() -> dict:
     except Exception as e:
         log.error("подготовка ручной очереди: %s: %s",
                   type(e).__name__, str(e)[:140])
-        return {}
+        return {"error": type(e).__name__}
     log.info("ручная очередь: оценено %d, годных %d, резюме готово %d",
              st.get("scored", 0), st.get("relevant", 0), len(made))
 
@@ -613,7 +619,7 @@ def step_manual_batch() -> dict:
         return batch_run()
     except Exception as e:
         log.error("ручные отклики: %s: %s", type(e).__name__, str(e)[:120])
-        return {}
+        return {"error": type(e).__name__}
 
 
 def step_interview_reminders() -> dict:
@@ -628,7 +634,7 @@ def step_interview_reminders() -> dict:
         return remind_run()
     except Exception as e:
         log.error("напоминания: %s: %s", type(e).__name__, str(e)[:120])
-        return {}
+        return {"error": type(e).__name__}
 
 
 def step_decisions() -> dict:
@@ -650,7 +656,7 @@ def step_decisions() -> dict:
         stats = asyncio.run(decisions.run(limit=10))
     except Exception as e:
         log.error("решения: %s: %s", type(e).__name__, str(e)[:120])
-        return {}
+        return {"error": type(e).__name__}
     if stats.get("taken"):
         log.info("решения владельца: взято %d, исполнено %d, ошибок %d",
                  stats["taken"], stats["done"], stats["failed"])
@@ -964,60 +970,9 @@ def run_daemon() -> int:
         except OSError:
             return False
 
-    def _start_path(job_id):
-        return Path(get_settings().heartbeat_dir) / ("start_%s.txt" % job_id)
-
     def _wrap_marked(fn, job_id):
-        """Идемпотентная обёртка шага.
-
-        Три правила, каждое закрывает свой найденный аудитом сбой:
-          - done-маркер пишется только при УСПЕХЕ: finally-вариант помечал
-            упавший шаг «выполненным», и догон его не перезапускал;
-          - повторный вызов в тот же день выходит сразу — гонка «обычный
-            крон × догон» перестаёт слать дублирующие письма;
-          - start-маркер отражает «шаг исполняется прямо сейчас»: второй
-            конкурентный вход в пределах двух часов тоже выходит.
-        """
-        def run():
-            if _ran_today(job_id):
-                return None
-            sp = _start_path(job_id)
-            try:
-                raw = sp.read_text().strip()
-                started = datetime.fromisoformat(raw)
-                if (datetime.now() - started < timedelta(hours=2)
-                        and started.date() == datetime.now().date()):
-                    log.info("%s уже исполняется — пропускаю дубль", job_id)
-                    return None
-            except (OSError, ValueError):
-                pass
-            try:
-                sp.write_text(datetime.now().isoformat())
-            except OSError:
-                pass
-            from .observability import record
-            record("task:" + job_id, "running")
-            try:
-                result = fn()
-            except Exception as exc:
-                record("task:" + job_id, "error", error=type(exc).__name__)
-                sp.unlink(missing_ok=True)
-                raise
-            failed = isinstance(result, dict) and bool(result.get("error") or result.get("errors"))
-            blocked = isinstance(result, dict) and bool(result.get("blocked"))
-            record("task:" + job_id, "error" if failed else "blocked" if blocked else "ok",
-                   details=result if isinstance(result, dict) else {"result": result})
-            sp.unlink(missing_ok=True)
-            if failed or blocked:
-                return result
-            try:
-                _mark_path(job_id).write_text(
-                    datetime.now().strftime("%Y-%m-%d"))
-            except OSError:
-                pass
-            return result
-        run.__name__ = getattr(fn, "__name__", job_id)
-        return run
+        from .scheduled import wrap_marked
+        return wrap_marked(fn, job_id, Path(get_settings().heartbeat_dir))
 
     for job_id, *_ in daily:
         j = sched.get_job(job_id)

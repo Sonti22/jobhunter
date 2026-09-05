@@ -3,7 +3,7 @@ from collections import Counter
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from .config import get_settings
 from .db import session_scope
@@ -20,6 +20,10 @@ from .models import (
     TelegramChannelStat,
 )
 from .outreach import eligibility
+
+ATTENTION_CLOSED = {Status.WITHDRAWN.value, Status.REJECTED_SCORE.value,
+                    Status.REJECTED_BY_EMPLOYER.value, Status.DUPLICATE.value,
+                    Status.HANDLE_DEAD.value}
 
 
 def _now():
@@ -40,6 +44,7 @@ def next_attempts() -> dict:
                                   ("email", {"email"}, [(10, 30)])):
         candidates = [r.next_run_at.replace(tzinfo=timezone.utc) for r in rows
                       if r.key.split(":", 1)[1] in jobs and r.next_run_at
+                      and r.finished_at and _now() - r.finished_at < timedelta(minutes=2)
                       and r.next_run_at.replace(tzinfo=timezone.utc) > now]
         estimated = not bool(candidates)
         if not candidates:
@@ -101,6 +106,9 @@ def sending(limit: int = 200) -> dict:
                     state.update(ready=False, code="configuration", reason="Telegram не настроен")
                 elif channel == "email" and not (s.smtp_user and s.smtp_app_password):
                     state.update(ready=False, code="configuration", reason="Почта не настроена")
+                elif not schedule[channel]["scheduler_alive"]:
+                    state.update(ready=False, code="scheduler_offline",
+                                 reason="Нет свежего пульса планировщика; время запуска не подтверждено")
                 else:
                     state.update(code="scheduled", reason="Готово; ожидает запуска по расписанию")
             reasons[state["code"]] += 1
@@ -116,6 +124,7 @@ def sending(limit: int = 200) -> dict:
 
 def attention(limit: int = 200) -> dict:
     """Истёкшая карточка и неотправленное решение остаются видимыми."""
+    from .decisions import DELIVERY_UNCONFIRMED
     now = _now()
     with session_scope() as sess:
         requests = sess.scalars(select(OwnerRequest).order_by(OwnerRequest.id.desc())).all()
@@ -134,9 +143,13 @@ def attention(limit: int = 200) -> dict:
                                     if r.application_id and (r.apply_error or not r.decision)] +
                                    list(unfinished)))).all():
             req = latest.get(app.id)
+            if app.status in ATTENTION_CLOSED:
+                continue
             if req and req.decision in ("skip", "close") and app.id not in unfinished:
                 continue
-            if req and req.apply_error:
+            if req and req.apply_error == DELIVERY_UNCONFIRMED:
+                reason = "Доставка ответа не подтверждена; проверь диалог. Автоповтор запрещён"
+            elif req and req.apply_error:
                 reason = "Ответ не отправлен: " + req.apply_error
             elif req and (req.decision == "expired" or
                           (not req.decision and req.expires_at and req.expires_at <= now)):
@@ -163,6 +176,11 @@ def attention(limit: int = 200) -> dict:
             waiting = app.last_inbound_at or (req.created_at if req else app.updated_at)
             items.append({"id": app.id, "title": job.title or job.tag, "status": app.status,
                           "reason": reason, "request_id": req.id if req else None,
+                          "can_open_card": app.status in (
+                              Status.NEEDS_HUMAN.value, Status.REPLIED.value, Status.IN_DIALOGUE.value,
+                              Status.SENT.value, Status.AWAITING_REPLY.value, Status.INTERVIEW_CONFIRMED.value,
+                              Status.INTERVIEW_PROPOSED.value) and not (
+                                  req and req.apply_error == DELIVERY_UNCONFIRMED),
                           "waiting_hours": max(0, (now - waiting).total_seconds() / 3600)
                           if waiting else None, "incoming": last.body if last else "",
                           "draft": (req.payload_json or {}).get("draft", "") if req else ""})
@@ -178,9 +196,14 @@ def reading() -> dict:
                                .order_by(TelegramChannelStat.username)).all()
         states = {r.key: r for r in sess.scalars(select(RuntimeState).where(
             RuntimeState.key.in_(["gmail", "telegram_inbox"]))).all()}
+        pending = dict(sess.execute(select(
+            (Message.email_uid > 0).label("email"), func.count(Message.id)).where(
+            Message.direction == "in", Message.processing_pending.is_(True))
+            .group_by(Message.email_uid > 0)).all())
     result: dict = {"telegram": telegram_health(), "channels": [
         {"username": r.username, "status": r.last_status, "at": r.last_finished_at,
-         "posts": r.last_posts, "vacancies": r.last_vacancies, "rejected": r.rejected_posts,
+         "posts": r.last_posts, "vacancies": r.last_vacancies,
+         "rejected": r.rejected_posts if r.newest_post_id or not r.last_posts else None,
          "pages": r.last_pages, "oldest_id": r.oldest_post_id, "newest_id": r.newest_post_id,
          "history_complete": r.history_complete, "remaining": 0 if r.history_complete else None,
          "error": r.last_error} for r in channels]}
@@ -188,10 +211,13 @@ def reading() -> dict:
         row = states.get(key)
         result[key] = {"status": row.status if row else "never",
                        "at": row.finished_at if row else None,
+                       "started_at": row.started_at if row else None,
+                       "pending_processing": pending.get(key == "gmail", 0),
                        "error": row.error if row else "",
                        "details": row.details_json if row else {"remaining": None}}
     result["gmail"].update(folder=s.imap_folder, initial_lookback_days=s.inbox_lookback_days)
     result["scope_note"] = ("Публичные Telegram-каналы и рабочие диалоги; Gmail: указанная папка. "
+                            "Остаток относится к загрузке после сохранённой границы, а не ко всей истории. "
                             "Неизвестный остаток не означает, что всё прочитано.")
     return result
 

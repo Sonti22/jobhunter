@@ -102,6 +102,8 @@ def new_uids(conn, folder: str = "") -> tuple:
         raise MailboxError("папка %s недоступна" % folder)
 
     validity = _uidvalidity(conn, folder)
+    if not validity:
+        raise MailboxError("сервер не подтвердил UIDVALIDITY; граница чтения не изменена")
     saved_validity, last_uid = _state()
     reset = bool(saved_validity and validity and validity != saved_validity)
     if reset:

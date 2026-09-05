@@ -56,6 +56,8 @@ def due(sess) -> list:
                                     Status.FOLLOWED_UP.value]))).all()
     now = _now()
     for a in rows:
+        if (a.outcome or "").startswith("manual_tg_"):
+            continue
         if a.first_reply_at or a.last_inbound_at:
             continue                                  # ответили — не трогаем
         n = 0

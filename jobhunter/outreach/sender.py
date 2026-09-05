@@ -92,6 +92,26 @@ class ProcessLock:
 
 
 def _pid_alive(pid: int) -> bool:
+    if pid <= 0:
+        return False
+    if sys.platform == "win32":
+        # os.kill(pid, 0) TERMINATES processes on Windows. Query a process
+        # handle without signalling it instead (including the current PID).
+        import ctypes
+        from ctypes import wintypes
+        kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+        kernel.OpenProcess.restype = wintypes.HANDLE
+        kernel.WaitForSingleObject.argtypes = [wintypes.HANDLE, wintypes.DWORD]
+        kernel.WaitForSingleObject.restype = wintypes.DWORD
+        kernel.CloseHandle.argtypes = [wintypes.HANDLE]
+        handle = kernel.OpenProcess(0x00100000, False, pid)  # SYNCHRONIZE
+        if not handle:
+            return ctypes.get_last_error() != 87  # invalid PID; denied stays conservative
+        try:
+            return kernel.WaitForSingleObject(handle, 0) != 0
+        finally:
+            kernel.CloseHandle(handle)
     try:
         os.kill(pid, 0)
     except OSError:
@@ -297,7 +317,7 @@ async def send_one(client, item: dict, rng: random.Random, dry: bool) -> str:
         text = app.followup_body if is_followup else app.message_body
         cv_path = app.cv_path
 
-    # Для dry-run peer намеренно None; до сетевой ветки мы уже вышли.
+    # Dry-run завершился до разрешения контакта и выдачи лизинга.
     assert peer is not None
 
     # имитация набора
@@ -325,6 +345,25 @@ async def send_one(client, item: dict, rng: random.Random, dry: bool) -> str:
         with session_scope() as sess:
             sess.get(Application, item["app_id"]).transition(Status.APPROVED)
         return "skipped:нет резюме"
+
+    # Во время паузы набора владелец мог нажать стоп или отозвать заявку,
+    # а почтовый опрос — сохранить ответ. Не отправляем устаревший снимок.
+    with session_scope() as sess:
+        current = sess.get(Application, item["app_id"])
+        current_job = sess.get(Job, current.job_id) if current else None
+        employer = sess.get(Employer, current.employer_id) if current and current.employer_id else None
+        verdict = eligibility.check(current, current_job, employer, sending=True)
+        safety = policy.can_send_cold(sess)
+        reason = verdict.reason if not verdict.allowed else safety.reason if not safety.allowed else ""
+        if current and current_job and not reason:
+            current_text = current.followup_body if eligibility.is_followup(current) else current.message_body
+            if current_job.contact_handle != item["handle"] or current_text != text:
+                reason = "контакт или текст изменился во время подготовки"
+        if reason:
+            if current and current.status == Status.SENDING.value:
+                current.transition(Status.APPROVED)
+                current.sending_lease_until = None
+            return ("stop:" if not safety.allowed else "skipped:") + reason
 
     try:
         # Сначала текст, затем файл отдельным сообщением (решение владельца,

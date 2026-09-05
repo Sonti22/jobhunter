@@ -317,6 +317,18 @@ def pick_batch(limit: int) -> list:
 
 
 def send_batch(limit: int, dry: bool) -> int:
+    if dry:
+        return _send_batch(limit, dry=True)
+    from ..locking import FileLock, LockBusy
+    try:
+        with FileLock(Path(get_settings().db_path).with_name("email-sender.lock")):
+            return _send_batch(limit, dry=False)
+    except LockBusy:
+        print("Email: другая партия уже отправляется; повтор не запущен.")
+        return 1
+
+
+def _send_batch(limit: int, dry: bool) -> int:
     s = get_settings()
     # То же окно вежливости, что у Telegram-отправщика: ночное холодное
     # письмо — прямой сигнал спам-фильтру и раздражение живому человеку.
@@ -326,6 +338,12 @@ def send_batch(limit: int, dry: bool) -> int:
         if not policy.within_send_window(hour_msk):
             print("Вне окна 09-21 МСК (%02d:xx) — почта подождёт утра." % hour_msk)
             return 0
+        with session_scope() as sess:
+            verdict = policy.can_send_email(sess)
+            if not verdict.allowed:
+                print("Email: %s" % verdict.reason)
+                return 0
+            limit = min(limit, max(0, s.email_daily_limit - policy.email_sent_today(sess)))
     batch = pick_batch(limit)
     if not batch:
         print("Нет одобренных заявок с email-контактом.")
@@ -341,157 +359,155 @@ def send_batch(limit: int, dry: bool) -> int:
               "Пароли приложений. Вписать в .env самому.")
         return 2
 
-    server = None
-    if not dry:
-        ctx = ssl.create_default_context()
-        server = smtplib.SMTP(s.smtp_host, s.smtp_port, timeout=30)
-        server.starttls(context=ctx)
-        server.login(s.smtp_user, s.smtp_app_password)
-        print("\nSMTP: подключено как %s\n" % s.smtp_user)
+    from contextlib import nullcontext
+    with (smtp_session() if not dry else nullcontext(None)) as server:
+        rng = random.Random()
+        ok = 0
+        errors = 0
+        for i, it in enumerate(batch):
+            if policy.kill_switch_active():
+                print("СТОП: kill-switch")
+                break
+            with session_scope() as sess:
+                if not dry and not policy.can_send_email(sess).allowed:
+                    break
+                app = sess.get(Application, it["app_id"])
+                job = sess.get(Job, it["job_id"])
+                emp = sess.get(Employer, app.employer_id) if app and app.employer_id else None
+                if not eligibility.check(app, job, emp).allowed:
+                    continue
+                is_followup = eligibility.is_followup(app)
+                text = app.followup_body if is_followup else app.message_body
+                cv_path, lang = app.cv_path, app.cv_lang or "ru"
+                job = sess.get(Job, it["job_id"])
+                subj = _subject(job, lang)
 
-    rng = random.Random()
-    ok = 0
-    for i, it in enumerate(batch):
-        if policy.kill_switch_active():
-            print("СТОП: kill-switch")
-            break
-        with session_scope() as sess:
-            app = sess.get(Application, it["app_id"])
-            job = sess.get(Job, it["job_id"])
-            emp = sess.get(Employer, app.employer_id) if app and app.employer_id else None
-            if not eligibility.check(app, job, emp).allowed:
+            if dry:
+                print("  [dry-run] → %s | тема: %s | вложение: %s"
+                      % (it["email"], subj[:52], Path(cv_path).name if cv_path else "нет"))
+                ok += 1
                 continue
-            is_followup = eligibility.is_followup(app)
-            text = app.followup_body if is_followup else app.message_body
-            cv_path, lang = app.cv_path, app.cv_lang or "ru"
-            job = sess.get(Job, it["job_id"])
-            subj = _subject(job, lang)
 
-        if dry:
-            print("  [dry-run] → %s | тема: %s | вложение: %s"
-                  % (it["email"], subj[:52], Path(cv_path).name if cv_path else "нет"))
-            ok += 1
-            continue
-
-        mid = _stable_message_id(it["app_id"], is_followup)
-        msg = build_message(to=it["email"], subject=subj, body=text,
-                            cv_path=cv_path, app_id=it["app_id"],
-                            message_id=mid)
-        # Lease и idempotency-ключ фиксируются ДО сетевого вызова. При падении
-        # между SMTP и БД такая заявка будет остановлена как ambiguous, а не
-        # отправлена повторно вслепую.
-        with session_scope() as sess:
-            a = sess.get(Application, it["app_id"])
-            current_job = sess.get(Job, a.job_id) if a else None
-            employer = sess.get(Employer, a.employer_id) if a and a.employer_id else None
-            if not eligibility.check(a, current_job, employer).allowed:
-                continue
-            assert a is not None and current_job is not None
-            if (current_job.contact_url or "").replace("mailto:", "").strip() != it["email"]:
-                continue
-            current_text = a.followup_body if eligibility.is_followup(a) else a.message_body
-            if current_text != text:
-                continue
-            now = utcnow()
-            if a.status == Status.SEND_FAILED.value:
-                a.transition(Status.APPROVED, reason="повтор после SMTP 4xx")
-            a.transition(Status.SENDING)
-            a.sending_lease_until = now + timedelta(seconds=180)
-            a.send_channel = "email"
-            a.send_idempotency_key = "email:%d:%s" % (a.id, mid)
-            a.send_last_attempt_at = now
-            a.send_next_try_at = None
-            a.send_error_detail = ""
-            a.send_attempts += 1
-            if sess.scalar(select(Message).where(
-                Message.application_id == a.id,
-                Message.direction == "out",
-                Message.email_message_id == mid).limit(1)) is None:
-                sess.add(Message(application_id=a.id, direction="out", body=text,
-                                 is_auto=True, email_message_id=mid,
-                                 email_from=s.smtp_user, email_subject=subj))
-        try:
-            if server is None:
-                raise RuntimeError("SMTP-сессия не открыта")
-            server.send_message(msg)
-        except Exception as e:
+            mid = _stable_message_id(it["app_id"], is_followup)
+            msg = build_message(to=it["email"], subject=subj, body=text,
+                                cv_path=cv_path, app_id=it["app_id"],
+                                message_id=mid)
+            # Lease и idempotency-ключ фиксируются ДО сетевого вызова. При падении
+            # между SMTP и БД такая заявка будет остановлена как ambiguous, а не
+            # отправлена повторно вслепую.
             with session_scope() as sess:
                 a = sess.get(Application, it["app_id"])
-                target = (Status.SEND_FAILED_AMBIGUOUS
-                          if _smtp_delivery_ambiguous(e) else Status.SEND_FAILED)
-                a.transition(target, reason=type(e).__name__)
+                if not policy.can_send_email(sess).allowed:
+                    break
+                current_job = sess.get(Job, a.job_id) if a else None
+                employer = sess.get(Employer, a.employer_id) if a and a.employer_id else None
+                if not eligibility.check(a, current_job, employer).allowed:
+                    continue
+                assert a is not None and current_job is not None
+                if (current_job.contact_url or "").replace("mailto:", "").strip() != it["email"]:
+                    continue
+                current_text = a.followup_body if eligibility.is_followup(a) else a.message_body
+                if current_text != text:
+                    continue
+                now = utcnow()
+                if a.status == Status.SEND_FAILED.value:
+                    a.transition(Status.APPROVED, reason="повтор после SMTP 4xx")
+                a.transition(Status.SENDING)
+                a.sending_lease_until = now + timedelta(seconds=180)
+                a.send_channel = "email"
+                a.send_idempotency_key = "email:%d:%s" % (a.id, mid)
+                a.send_last_attempt_at = now
+                a.send_next_try_at = None
+                a.send_error_detail = ""
+                a.send_attempts += 1
+                if sess.scalar(select(Message).where(
+                    Message.application_id == a.id,
+                    Message.direction == "out",
+                    Message.email_message_id == mid).limit(1)) is None:
+                    sess.add(Message(application_id=a.id, direction="out", body=text,
+                                     is_auto=True, email_message_id=mid,
+                                     email_from=s.smtp_user, email_subject=subj))
+            try:
+                if server is None:
+                    raise RuntimeError("SMTP-сессия не открыта")
+                server.send_message(msg)
+            except Exception as e:
+                errors += 1
+                with session_scope() as sess:
+                    a = sess.get(Application, it["app_id"])
+                    target = (Status.SEND_FAILED_AMBIGUOUS
+                              if _smtp_delivery_ambiguous(e) else Status.SEND_FAILED)
+                    a.transition(target, reason=type(e).__name__)
+                    a.sending_lease_until = None
+                    a.send_error_class = type(e).__name__
+                    a.send_error_detail = str(e)[:500]
+                    a.send_next_try_at = (utcnow() + timedelta(minutes=15)
+                                          if _smtp_retryable(e) else None)
+                    sess.add(SendLog(application_id=it["app_id"],
+                                     result="ambiguous" if target == Status.SEND_FAILED_AMBIGUOUS
+                                     else "error",
+                                     error_class=type(e).__name__, peer_id=it["email"]))
+                print("  ! %s: %s" % (it["email"], str(e)[:60]))
+                continue
+
+            with session_scope() as sess:
+                a = sess.get(Application, it["app_id"])
+                a.transition(Status.SENT)
                 a.sending_lease_until = None
-                a.send_error_class = type(e).__name__
-                a.send_error_detail = str(e)[:500]
-                a.send_next_try_at = (utcnow() + timedelta(minutes=15)
-                                      if _smtp_retryable(e) else None)
-                sess.add(SendLog(application_id=it["app_id"],
-                                 result="ambiguous" if target == Status.SEND_FAILED_AMBIGUOUS
-                                 else "error",
-                                 error_class=type(e).__name__, peer_id=it["email"]))
-            print("  ! %s: %s" % (it["email"], str(e)[:60]))
-            continue
+                a.send_next_try_at = None
+                if not is_followup:
+                    a.sent_at = utcnow()
+                a.last_outbound_at = utcnow()
+                a.transition(Status.FOLLOWED_UP if is_followup else Status.AWAITING_REPLY)
+                if is_followup:
+                    # Напоминание уже отправлено — второго не планируем: два
+                    # «напоминаю о себе» подряд читаются как спам.
+                    a.followup_sent_at = utcnow()
+                    a.followup_due_at = None
+                else:
+                    a.followup_due_at = (datetime.now(timezone.utc)
+                                         .replace(tzinfo=None) + timedelta(days=5))
+                sess.add(SendLog(application_id=it["app_id"], result="ok",
+                                 peer_id=it["email"]))
+                # Message-ID сохраняем: по нему потом находится ответ рекрутёра
+                # через In-Reply-To/References — привязка, переживающая ответ с
+                # другого адреса.
+                mid = msg.get("Message-ID", "")
+                outbound = sess.scalar(select(Message).where(
+                    Message.application_id == it["app_id"],
+                    Message.direction == "out",
+                    Message.email_message_id == mid).limit(1))
+                if outbound is None:
+                    outbound = Message(application_id=it["app_id"], direction="out",
+                                        body=text, email_message_id=mid)
+                    sess.add(outbound)
+                outbound.body = text
+                outbound.sent_at = utcnow()
+                outbound.is_auto = True
+                outbound.email_from = s.smtp_user
+                outbound.email_subject = subj
+                a = sess.get(Application, it["app_id"])
+                refs = list(a.email_thread_refs or [])
+                if mid and mid not in refs:
+                    refs.append(mid)
+                a.email_thread_refs = refs[-10:]
+                if it.get("employer_id"):
+                    emp = sess.get(Employer, it["employer_id"])
+                    if emp:
+                        emp.last_contacted_at = utcnow()
+                        emp.total_messages_sent += 1
+            from . import archive
+            archive.record(it["app_id"], "email", it["email"], text,
+                           job_title=it.get("title", ""),
+                           company=it.get("company", ""), score=it.get("score", 0),
+                           cv_path=it.get("cv_path", ""), kind="cold")
+            ok += 1
+            print("  [%d/%d] %s — отправлено" % (i + 1, len(batch), it["email"]))
+            if i < len(batch) - 1:
+                time.sleep(rng.uniform(60, 180))
 
-        with session_scope() as sess:
-            a = sess.get(Application, it["app_id"])
-            a.transition(Status.SENT)
-            a.sending_lease_until = None
-            a.send_next_try_at = None
-            if not is_followup:
-                a.sent_at = utcnow()
-            a.last_outbound_at = utcnow()
-            a.transition(Status.FOLLOWED_UP if is_followup else Status.AWAITING_REPLY)
-            if is_followup:
-                # Напоминание уже отправлено — второго не планируем: два
-                # «напоминаю о себе» подряд читаются как спам.
-                a.followup_sent_at = utcnow()
-                a.followup_due_at = None
-            else:
-                a.followup_due_at = (datetime.now(timezone.utc)
-                                     .replace(tzinfo=None) + timedelta(days=5))
-            sess.add(SendLog(application_id=it["app_id"], result="ok",
-                             peer_id=it["email"]))
-            # Message-ID сохраняем: по нему потом находится ответ рекрутёра
-            # через In-Reply-To/References — привязка, переживающая ответ с
-            # другого адреса.
-            mid = msg.get("Message-ID", "")
-            outbound = sess.scalar(select(Message).where(
-                Message.application_id == it["app_id"],
-                Message.direction == "out",
-                Message.email_message_id == mid).limit(1))
-            if outbound is None:
-                outbound = Message(application_id=it["app_id"], direction="out",
-                                    body=text, email_message_id=mid)
-                sess.add(outbound)
-            outbound.body = text
-            outbound.sent_at = utcnow()
-            outbound.is_auto = True
-            outbound.email_from = s.smtp_user
-            outbound.email_subject = subj
-            a = sess.get(Application, it["app_id"])
-            refs = list(a.email_thread_refs or [])
-            if mid and mid not in refs:
-                refs.append(mid)
-            a.email_thread_refs = refs[-10:]
-            if it.get("employer_id"):
-                emp = sess.get(Employer, it["employer_id"])
-                if emp:
-                    emp.last_contacted_at = utcnow()
-                    emp.total_messages_sent += 1
-        from . import archive
-        archive.record(it["app_id"], "email", it["email"], text,
-                       job_title=it.get("title", ""),
-                       company=it.get("company", ""), score=it.get("score", 0),
-                       cv_path=it.get("cv_path", ""), kind="cold")
-        ok += 1
-        print("  [%d/%d] %s — отправлено" % (i + 1, len(batch), it["email"]))
-        if i < len(batch) - 1:
-            time.sleep(rng.uniform(60, 180))
-
-    if server:
-        server.quit()
-    print("\nИтог: отправлено %d из %d" % (ok, len(batch)))
-    return 0
+        print("\nИтог: отправлено %d из %d" % (ok, len(batch)))
+        return 1 if errors else 0
 
 
 def main() -> int:

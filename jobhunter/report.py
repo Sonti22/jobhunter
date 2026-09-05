@@ -25,7 +25,6 @@ from .models import (
     Job,
     Message,
     OwnerRequest,
-    SendLog,
     Status,
     TelegramChannelStat,
 )
@@ -79,15 +78,9 @@ def quota() -> dict:
         # Почта в q.sent_count не входит (квота с разгоном — только про
         # Telegram-аккаунт), поэтому считаем её отдельно: экран «отправлено
         # 0/30» при двух ушедших письмах читается как «система стоит».
-        day_start = (datetime.now(timezone.utc).replace(tzinfo=None)
-                     .replace(hour=0, minute=0, second=0, microsecond=0))
-        email_sent = sess.scalar(
-            select(func.count(SendLog.id))
-            .where(SendLog.result == "ok",
-                   SendLog.attempted_at >= day_start,
-                   SendLog.peer_id.contains("@"),
-                   ~SendLog.peer_id.startswith("@"))) or 0
-        return {"sent": q.sent_count, "cap": st.quota_ceiling,
+        email_sent = policy.email_sent_today(sess)
+        return {"sent": q.sent_count,
+                "cap": min(q.planned_cap or st.quota_ceiling, st.quota_ceiling),
                 "email_sent": email_sent,
                 "email_cap": get_settings().email_daily_limit,
                 "clean_days": st.consecutive_clean_days,

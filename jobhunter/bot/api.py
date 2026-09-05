@@ -16,6 +16,7 @@
 """
 from __future__ import annotations
 
+import json
 import logging
 import time
 
@@ -55,7 +56,8 @@ def _client() -> httpx.Client:
         trust_env=False)
 
 
-def call(method: str, _http: httpx.Client | None = None, **params):
+def call(method: str, _http: httpx.Client | None = None, _files: dict | None = None,
+         **params):
     """Вызов метода Bot API. Возвращает result или бросает исключение."""
     token = get_settings().telegram_bot_token
     if not token:
@@ -79,8 +81,12 @@ def call(method: str, _http: httpx.Client | None = None, **params):
         rate_retries = 0
         while attempt < MAX_RETRIES:
             try:
-                r = (http.post(url, json=params, timeout=req_timeout)
-                     if req_timeout else http.post(url, json=params))
+                request = ({"data": {k: json.dumps(v) if isinstance(v, (dict, list, bool))
+                                      else str(v) for k, v in params.items() if v is not None},
+                            "files": _files} if _files else {"json": params})
+                if req_timeout:
+                    request["timeout"] = req_timeout
+                r = http.post(url, **request)
             except httpx.RemoteProtocolError:
                 # Сервер закрыл keep-alive из пула — норма протокола, а
                 # не сбой. Раньше лечилось сном 2 с (43 раза за вечер =
@@ -166,7 +172,7 @@ def get_updates(offset: int, http=None, timeout: int = POLL_TIMEOUT) -> list:
 
 def send_message(chat_id: int, text: str, markup: dict | None = None,
                  http=None) -> dict:
-    params = {"chat_id": chat_id, "text": text[:4096],
+    params: dict = {"chat_id": chat_id, "text": text[:4096],
               "disable_web_page_preview": True}
     if markup:
         params["reply_markup"] = markup
@@ -175,7 +181,7 @@ def send_message(chat_id: int, text: str, markup: dict | None = None,
 
 def edit_message_text(chat_id: int, message_id: int, text: str,
                       markup: dict | None = None, http=None) -> dict:
-    params = {"chat_id": chat_id, "message_id": message_id,
+    params: dict = {"chat_id": chat_id, "message_id": message_id,
               "text": text[:4096], "disable_web_page_preview": True}
     if markup is not None:
         params["reply_markup"] = markup
@@ -186,6 +192,23 @@ def edit_message_text(chat_id: int, message_id: int, text: str,
         if "not modified" in str(e):
             return {}
         raise
+
+
+def send_document(chat_id: int, filename: str, content: bytes, caption: str = "",
+                  http=None) -> dict:
+    """PDF upload to the configured owner only; never to a recruiter or group.
+
+    Immutable bytes let the bounded HTTP retries resend a complete multipart
+    body, not a file stream left at EOF by a failed attempt.
+    https://core.telegram.org/bots/api#senddocument
+    """
+    if chat_id not in get_settings().bot_owner_ids:
+        raise PermissionError("резюме можно отправлять только владельцу в личный чат")
+    if (not content.startswith(b"%PDF-") or len(content) > 10 * 1024 * 1024
+            or not filename.lower().endswith(".pdf") or "/" in filename or "\\" in filename):
+        raise ValueError("некорректный PDF-файл")
+    return call("sendDocument", _http=http, chat_id=chat_id, caption=caption[:1024],
+                _read_timeout=30, _files={"document": (filename, content, "application/pdf")}) or {}
 
 
 def answer_callback_query(cb_id: str, text: str = "", alert: bool = False,

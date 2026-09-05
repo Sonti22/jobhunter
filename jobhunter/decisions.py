@@ -32,6 +32,10 @@ from .models import Application, Message, OwnerRequest, Status, utcnow
 log = logging.getLogger("decisions")
 
 MAX_ATTEMPTS = 3
+LEASE_MINUTES = 10
+# Persisted before external effects. After a hard crash, require delivery
+# review instead of blindly retrying a potentially accepted reply.
+DELIVERY_UNCONFIRMED = "delivery_unconfirmed: проверь доставку перед повтором"
 # Решения, которые требуют отправки рекрутёру. skip закрывает карточку без
 # единого сообщения, поэтому исполнять его нечем.
 NEEDS_SEND = {"ok", "time", "no", "send", "say"}
@@ -62,6 +66,7 @@ def pending(limit: int = 10) -> list:
             .where(OwnerRequest.decision != "",
                    OwnerRequest.decision != "expired",
                    OwnerRequest.applied_at.is_(None),
+                   OwnerRequest.apply_error != DELIVERY_UNCONFIRMED,
                    ((OwnerRequest.next_try_at.is_(None)) |
                     (OwnerRequest.next_try_at <= utcnow())),
                    OwnerRequest.attempts < MAX_ATTEMPTS)
@@ -73,12 +78,17 @@ def pending(limit: int = 10) -> list:
 def _lease(req_id: int) -> dict | None:
     """Взять карточку в работу. None — уже исполнена или исчерпаны попытки."""
     with session_scope() as sess:
+        now = utcnow()
         res = sess.execute(
             update(OwnerRequest)
             .where(OwnerRequest.id == req_id,
                    OwnerRequest.applied_at.is_(None),
+                   OwnerRequest.decision.notin_(["", "expired"]),
+                   OwnerRequest.apply_error != DELIVERY_UNCONFIRMED,
+                   ((OwnerRequest.next_try_at.is_(None)) | (OwnerRequest.next_try_at <= now)),
                    OwnerRequest.attempts < MAX_ATTEMPTS)
-            .values(attempts=OwnerRequest.attempts + 1))
+            .values(attempts=OwnerRequest.attempts + 1,
+                    next_try_at=now + timedelta(minutes=LEASE_MINUTES)))
         if res.rowcount != 1:
             return None
         r = sess.get(OwnerRequest, req_id)
@@ -90,6 +100,15 @@ def _lease(req_id: int) -> dict | None:
                 "owner_chat_id": r.owner_chat_id,
                 "answered_at": r.answered_at,
                 "attempts": r.attempts}
+
+
+def _begin_dispatch(req_id: int) -> bool:
+    with session_scope() as sess:
+        result = sess.execute(update(OwnerRequest).where(
+            OwnerRequest.id == req_id, OwnerRequest.applied_at.is_(None),
+            OwnerRequest.apply_error != DELIVERY_UNCONFIRMED,
+        ).values(apply_error=DELIVERY_UNCONFIRMED))
+        return result.rowcount == 1
 
 
 def finish(req_id: int, ok: bool, note: str, error: str = "") -> None:
@@ -145,6 +164,10 @@ async def apply_one(client, req_id: int, dry: bool = False) -> str:
     from .owner import _confirm_text
     from .schedule import book
 
+    if dry:
+        # Preview must not claim a request, confirm a calendar event or
+        # mark a real decision applied.
+        return "dry"
     lease = _lease(req_id)
     if lease is None:
         return "уже исполнено"
@@ -174,9 +197,25 @@ async def apply_one(client, req_id: int, dry: bool = False) -> str:
         finish(req_id, True, "заявка закрыта: отказ")
         return "заявка закрыта (отказ)"
 
+    if decision in NEEDS_SEND:
+        from .convo.send import reply_target_problem
+        with session_scope() as sess:
+            problem = reply_target_problem(sess, sess.get(Application, app_id))
+        if problem:
+            finish(req_id, False, "решение не исполнено: " + problem, "skipped:" + problem)
+            return "skipped:" + problem
+
     if decision in NEEDS_SEND and _already_answered(app_id, lease["answered_at"]):
         finish(req_id, True, "ответ уже был отправлен ранее")
         return "дубль предотвращён"
+
+    if decision in NEEDS_SEND:
+        from .convo.send import can_reply
+        with session_scope() as sess:
+            allowed, why = can_reply(sess)
+        if not allowed:
+            finish(req_id, False, "ожидает разрешения отправки", "stop:" + why)
+            return "stop:" + why
 
     # ── подтверждение времени интервью ──
     if decision in ("ok", "time"):
@@ -200,6 +239,8 @@ async def apply_one(client, req_id: int, dry: bool = False) -> str:
         if chosen.tzinfo is None:
             chosen = chosen.replace(tzinfo=timezone.utc)
 
+        if not _begin_dispatch(req_id):
+            return "доставка требует проверки"
         note = book.confirm(app_id, chosen, tz_name)
         text = _confirm_text(chosen, tz_name, note.get("meet_link", ""))
         res = "dry" if dry else await send_reply(client, app_id, text,
@@ -214,6 +255,8 @@ async def apply_one(client, req_id: int, dry: bool = False) -> str:
     if decision == "no":
         text = ("Спасибо! К сожалению, в это время не получится. "
                 "Подскажите, какие ещё варианты возможны — подстроюсь.")
+        if not _begin_dispatch(req_id):
+            return "доставка требует проверки"
         res = "dry" if dry else await send_reply(client, app_id, text,
                                                  is_auto=False, dry=dry)
         ok = res in ("ok", "dry")
@@ -227,6 +270,8 @@ async def apply_one(client, req_id: int, dry: bool = False) -> str:
         if not text.strip():
             finish(req_id, False, "пустой текст ответа", "empty_text")
             return "пустой текст"
+        if not _begin_dispatch(req_id):
+            return "доставка требует проверки"
         res = "dry" if dry else await send_reply(client, app_id, text,
                                                  is_auto=False, dry=dry)
         ok = res in ("ok", "dry")
@@ -249,6 +294,9 @@ async def run(limit: int = 10, dry: bool = False) -> dict:
     stats = {"taken": len(ids), "done": 0, "failed": 0}
     if not ids:
         return stats
+
+    if dry:
+        return dict(stats, dry_run=True)
 
     s = get_settings()
     from pathlib import Path

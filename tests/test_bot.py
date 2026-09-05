@@ -235,8 +235,13 @@ def test_pending_excludes_applied(db, card):
 
 def test_lease_caps_attempts(db, card):
     from jobhunter import decisions
+    from jobhunter.models import OwnerRequest
     decisions.claim(card["req_id"], "skip", by="bot:1")
-    got = [decisions._lease(card["req_id"]) for _ in range(4)]
+    got = []
+    for _ in range(4):
+        got.append(decisions._lease(card["req_id"]))
+        with db.session_scope() as sess:
+            sess.get(OwnerRequest, card["req_id"]).next_try_at = None
     assert sum(1 for g in got if g) == decisions.MAX_ATTEMPTS
 
 

@@ -14,6 +14,7 @@ jobs:
           python-version: "3.12"
           cache: pip
       - run: python -m pip install -r requirements-dev.txt
+      - run: python -m jobhunter.repo_safety
       - run: python -m compileall -q jobhunter tests
       - run: ruff check jobhunter tests
       # В проекте есть старые интеграционные модули с динамическими SDK.
@@ -25,5 +26,9 @@ jobs:
           jobhunter/bot/state.py jobhunter/outreach/sender.py
           jobhunter/outreach/mailer.py jobhunter/ingest/base.py
           jobhunter/report.py jobhunter/web/server.py
+          jobhunter/backup.py jobhunter/locking.py jobhunter/scheduled.py
+          jobhunter/repo_safety.py jobhunter/decisions.py jobhunter/dashboard.py
+          jobhunter/manual_telegram.py jobhunter/outreach/eligibility.py
+          jobhunter/bot/api.py jobhunter/bot/outbox.py
       - run: pytest --cov=jobhunter --cov-report=term-missing --cov-fail-under=50
       - run: pip-audit -r requirements.txt

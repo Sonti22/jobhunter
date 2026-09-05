@@ -403,6 +403,8 @@ async def apply_command(client, cmd: dict, dry: bool = False) -> str:
         return HELP
     if name == "status":
         return status_text()
+    if dry and name in ("stop", "go"):
+        return "dry: стоп-кран не изменён"
     if name == "stop":
         set_kill_switch(True, "команда в Избранном")
         return "Стоп-кран включён: отправка остановлена. Снять — /go"
@@ -453,6 +455,9 @@ async def apply_command(client, cmd: dict, dry: bool = False) -> str:
 
     if not req_id:
         return "#%d: нет открытой карточки на решение." % app_id
+
+    if dry:
+        return "#%d: dry — решение не записано и не исполнено" % app_id
 
     # Единственная точка постановки решения — атомарный claim. Если владелец
     # уже нажал кнопку в боте, команда в «Избранном» не должна отправить

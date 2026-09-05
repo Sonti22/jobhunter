@@ -1,0 +1,292 @@
+[
+  {
+    "topic": "classic_ml",
+    "title": "Machine learning in Python with scikit-learn — Inria MOOC",
+    "url": "https://inria.github.io/scikit-learn-mooc/index.html",
+    "kind": "video_course",
+    "language": "EN",
+    "what_to_watch": "Введение в fit/predict, линейные модели, preprocessing, cross-validation и оценка модели; выполнять упражнения по своей классификации.",
+    "verification": "05.09.2026: Официальный курс Inria; страница явно ссылается на видеоплейлист Inria Learning Lab.",
+    "access": "Материалы и YouTube бесплатно; квизы на FUN-MOOC требуют регистрации."
+  },
+  {
+    "topic": "classic_ml",
+    "title": "Cross-validation: evaluating estimator performance",
+    "url": "https://scikit-learn.org/stable/modules/cross_validation",
+    "kind": "docs",
+    "language": "EN",
+    "what_to_watch": "Train/validation/test, leakage, stratified и group/time split; выбрать разбиение по устройству бизнес-данных.",
+    "verification": "05.09.2026: Прочитана официальная документация scikit-learn.",
+    "access": "Бесплатно, без регистрации"
+  },
+  {
+    "topic": "statistics",
+    "title": "SciPy bootstrap",
+    "url": "https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.bootstrap.html",
+    "kind": "docs",
+    "language": "EN",
+    "what_to_watch": "Доверительные интервалы и воспроизводимый bootstrap; единица пересэмплирования должна соответствовать независимому наблюдению.",
+    "verification": "05.09.2026: Открыта официальная справочная страница SciPy.",
+    "access": "Бесплатно, без регистрации"
+  },
+  {
+    "topic": "llm_tokens",
+    "title": "Hugging Face LLM Course — Tokenizers",
+    "url": "https://huggingface.co/learn/llm-course/en/chapter2/4",
+    "kind": "video_course",
+    "language": "EN",
+    "what_to_watch": "Встроенные видео Tokenizers, Word-based, Character-based, Subword tokenization и Encoding. Сравнить токенизацию русского текста и реквизитов.",
+    "verification": "05.09.2026: Открыта официальная страница; присутствуют пять встроенных видеоплееров и схемы.",
+    "access": "Бесплатно, просмотр без регистрации."
+  },
+  {
+    "topic": "structured_output",
+    "title": "Getting Structured LLM Output — DotTxt / DeepLearning.AI",
+    "url": "https://www.deeplearning.ai/courses/getting-structured-llm-output",
+    "kind": "video_course",
+    "language": "EN",
+    "what_to_watch": "Introduction to Structured Output Generation; Retry-based Structured Output; Structured Generation with Outlines. Сопоставить схему JSON и бизнес-валидаторы.",
+    "verification": "05.09.2026: Проверены официальная индексированная страница и syllabus: 7 видео; прямое чтение web.open получило 403. Видео не воспроизводились.",
+    "access": "Регистрация; условия доступа и PRO меняются. На странице курса проверить бесплатный просмотр/audit; API и облачные ресурсы могут оплачиваться отдельно."
+  },
+  {
+    "topic": "structured_output",
+    "title": "Pydantic Models",
+    "url": "https://pydantic.dev/docs/validation/latest/concepts/models/",
+    "kind": "docs",
+    "language": "EN",
+    "what_to_watch": "Модели данных, вложенные поля, ошибки валидации; различать валидную схему и верное бизнес-значение.",
+    "verification": "05.09.2026: Открыта официальная документация; прежний docs.pydantic.dev перенаправляет сюда.",
+    "access": "Бесплатно, без регистрации"
+  },
+  {
+    "topic": "tools",
+    "title": "LangChain Tools",
+    "url": "https://docs.langchain.com/oss/python/langchain/tools",
+    "kind": "docs",
+    "language": "EN",
+    "what_to_watch": "Определение инструмента, схема аргументов, runtime/context; бизнес-права и идемпотентность контролировать вне решения LLM.",
+    "verification": "05.09.2026: Открыта официальная документация.",
+    "access": "Бесплатно, без регистрации"
+  },
+  {
+    "topic": "rag",
+    "title": "Building and Evaluating Advanced RAG — LlamaIndex / DeepLearning.AI",
+    "url": "https://www.deeplearning.ai/courses/building-evaluating-advanced-rag",
+    "kind": "video_course",
+    "language": "EN",
+    "what_to_watch": "Advanced RAG Pipeline; RAG Triad; Sentence-window retrieval. Auto-merging retrieval — после базовой измеренной системы.",
+    "verification": "05.09.2026: Проверена официальная страница с syllabus: 6 видеолекций и 4 примера кода; инструктор Jerry Liu — сооснователь LlamaIndex.",
+    "access": "Регистрация; условия доступа и PRO меняются. На странице курса проверить бесплатный просмотр/audit; API и облачные ресурсы могут оплачиваться отдельно."
+  },
+  {
+    "topic": "rag",
+    "title": "LlamaIndex — Introduction to RAG",
+    "url": "https://developers.llamaindex.ai/python/framework/understanding/rag/",
+    "kind": "docs",
+    "language": "EN",
+    "what_to_watch": "Загрузка, индексирование, retrieval, synthesis и evaluation; нарисовать путь вопроса и данных.",
+    "verification": "05.09.2026: Открыта официальная страница через редирект старого docs.llamaindex.ai.",
+    "access": "Бесплатно, без регистрации"
+  },
+  {
+    "topic": "retrieval",
+    "title": "Qdrant Essentials",
+    "url": "https://qdrant.tech/course/essentials/",
+    "kind": "video_course",
+    "language": "EN",
+    "what_to_watch": "Дни 1–3: embeddings/chunking/индекс и hybrid; затем multi-vector reranking и финальная оценка retrieval. Не требуется проходить всю облачную часть.",
+    "verification": "05.09.2026: Официальная страница Qdrant прямо обозначает video-first lessons; syllabus проверен.",
+    "access": "Страницы курса доступны бесплатно; облачная практика требует аккаунта, возможны платные ресурсы."
+  },
+  {
+    "topic": "retrieval",
+    "title": "Qdrant Hybrid Search with Reranking",
+    "url": "https://qdrant.tech/documentation/tutorials-basics/reranking-hybrid-search/",
+    "kind": "docs",
+    "language": "EN",
+    "what_to_watch": "Dense+sparse retrieval, объединение кандидатов, reranking; сравнить Recall@k/MRR/latency с baseline.",
+    "verification": "05.09.2026: Проверен официальный tutorial Qdrant; есть схема retrieval/reranking.",
+    "access": "Бесплатно, без регистрации"
+  },
+  {
+    "topic": "pgvector",
+    "title": "Vector search with Next.js — Supabase video guide",
+    "url": "https://supabase.com/docs/guides/ai/examples/nextjs-vector-search",
+    "kind": "video_course",
+    "language": "EN",
+    "what_to_watch": "Встроенный разбор хранения embeddings в Postgres и поиска. Извлечь архитектуру и SQL; переписать backend на Python, Next.js необязателен.",
+    "verification": "05.09.2026: Официальная документация Supabase содержит встроенный video guide и описание содержания.",
+    "access": "Просмотр бесплатный; примеры используют облако и API, их стоимость отдельно."
+  },
+  {
+    "topic": "pgvector",
+    "title": "pgvector — официальный README",
+    "url": "https://github.com/pgvector/pgvector",
+    "kind": "docs",
+    "language": "EN",
+    "what_to_watch": "Exact search, HNSW/IVFFlat, фильтры и recall, индексы; сравнить с Qdrant на одном наборе запросов.",
+    "verification": "05.09.2026: Открыт официальный репозиторий pgvector.",
+    "access": "Бесплатно, без регистрации"
+  },
+  {
+    "topic": "evals",
+    "title": "Evaluating AI Agents — Arize AI / DeepLearning.AI",
+    "url": "https://www.deeplearning.ai/courses/evaluating-ai-agents",
+    "kind": "video_course",
+    "language": "EN",
+    "what_to_watch": "Tracing agents; router/skill evaluations; trajectory evaluations; Improving your LLM-as-a-judge. Применить также к своему RAG и tool-calling.",
+    "verification": "05.09.2026: Проверена официальная индексированная страница и syllabus: 15 видео; direct web.open short-courses URL вернул 403.",
+    "access": "Регистрация; условия доступа и PRO меняются. На странице курса проверить бесплатный просмотр/audit; API и облачные ресурсы могут оплачиваться отдельно."
+  },
+  {
+    "topic": "agents",
+    "title": "Foundation: Introduction to LangGraph — Python",
+    "url": "https://academy.langchain.com/courses/intro-to-langgraph",
+    "kind": "video_course",
+    "language": "EN",
+    "what_to_watch": "Модули 1–3: graph/state, memory, streaming, human-in-the-loop; затем persistence и deploy по необходимости.",
+    "verification": "05.09.2026: Официальная LangChain Academy: проверены программа, отметка Free, 55 lessons и 6 часов видео.",
+    "access": "Курс бесплатный; регистрация для прохождения, внешние API/сервисы отдельно."
+  },
+  {
+    "topic": "agents",
+    "title": "LangGraph Overview",
+    "url": "https://docs.langchain.com/oss/python/langgraph/overview",
+    "kind": "docs",
+    "language": "EN",
+    "what_to_watch": "Durable execution, state, interrupt/approval и восстановление; отличать workflow от автономного агента.",
+    "verification": "05.09.2026: Открыта официальная документация LangChain.",
+    "access": "Бесплатно, без регистрации"
+  },
+  {
+    "topic": "ocr",
+    "title": "Document AI: From OCR to Agentic Doc Extraction — LandingAI / DeepLearning.AI",
+    "url": "https://www.deeplearning.ai/courses/document-ai-from-ocr-to-agentic-doc-extraction",
+    "kind": "video_course",
+    "language": "EN",
+    "what_to_watch": "Document Processing Basics; Lab 1 OCR; Lab 2 PaddleOCR; Layout Detection and Reading Order. ADE/AWS оставить факультативом.",
+    "verification": "05.09.2026: Официальная страница и syllabus проверены: 15 видео, включая отдельную Lab 2 по PaddleOCR.",
+    "access": "Регистрация; условия доступа и PRO меняются. На странице курса проверить бесплатный просмотр/audit; API и облачные ресурсы могут оплачиваться отдельно."
+  },
+  {
+    "topic": "ocr",
+    "title": "PaddleOCR — General OCR Pipeline Usage Tutorial",
+    "url": "https://www.paddleocr.ai/main/en/version3.x/pipeline_usage/OCR.html",
+    "kind": "docs",
+    "language": "EN",
+    "what_to_watch": "Выбор движка/языковой модели, ориентация, detection/recognition, сохранение координат и JSON. Проверять поддержку кириллицы у выбранной модели.",
+    "verification": "05.09.2026: Проверен официальный usage tutorial; документация main меняется, совместимые версии фиксировать в проекте.",
+    "access": "Бесплатно, без регистрации"
+  },
+  {
+    "topic": "ocr",
+    "title": "Tesseract — Improving the quality of the output",
+    "url": "https://tesseract-ocr.github.io/tessdoc/ImproveQuality.html",
+    "kind": "docs",
+    "language": "EN",
+    "what_to_watch": "DPI, бинаризация, шум, наклон, границы, page segmentation. Сравнить результат до и после preprocessing.",
+    "verification": "05.09.2026: Открыта официальная документация Tesseract.",
+    "access": "Бесплатно, без регистрации"
+  },
+  {
+    "topic": "local_inference",
+    "title": "Fast & Efficient LLM Inference with vLLM — Red Hat / DeepLearning.AI",
+    "url": "https://www.deeplearning.ai/courses/fast-and-efficient-llm-inference-with-vllm",
+    "kind": "video_course",
+    "language": "EN",
+    "what_to_watch": "Inference & Memory Fundamentals; Serving LLMs Efficiently I/II; Benchmarking and Evaluation. Quantization — после замера baseline.",
+    "verification": "05.09.2026: Подтверждены официальная страница курса (9 видео) и публикация vllm.ai от 03.06.2026; web.open страницы курса вернул 403.",
+    "access": "Регистрация; условия доступа и PRO меняются. На странице курса проверить бесплатный просмотр/audit; API и облачные ресурсы могут оплачиваться отдельно."
+  },
+  {
+    "topic": "local_inference",
+    "title": "vLLM Quickstart",
+    "url": "https://docs.vllm.ai/en/latest/getting_started/quickstart/",
+    "kind": "docs",
+    "language": "EN",
+    "what_to_watch": "Совместимое оборудование, offline inference и online serving; лимиты памяти, нагрузка и метрики проверять на своём стенде.",
+    "verification": "05.09.2026: Открыта официальная документация vLLM.",
+    "access": "Документация бесплатно; GPU и вычисления могут быть платными."
+  },
+  {
+    "topic": "pytorch",
+    "title": "Introduction to PyTorch — официальный видеоряд",
+    "url": "https://docs.pytorch.org/tutorials/beginner/introyt/introyt1_tutorial.html",
+    "kind": "video_course",
+    "language": "EN",
+    "what_to_watch": "Tensors, autograd, model, datasets и training loop; повторить небольшой цикл обучения.",
+    "verification": "05.09.2026: Официальная страница PyTorch и видео официального канала проверены; исходное вводное видео 2021 года — API сверять с текущими docs.",
+    "access": "Бесплатно, без регистрации"
+  },
+  {
+    "topic": "pytorch",
+    "title": "Introduction to PyTorch — видео PyTorch",
+    "url": "https://www.youtube.com/watch?v=IC0_FRiX-sw",
+    "kind": "video",
+    "language": "EN",
+    "what_to_watch": "Полный вводный обзор: тензоры, градиенты, модель, загрузка данных, цикл обучения.",
+    "verification": "05.09.2026: Проверены YouTube-страница и автор PyTorch; дата публикации 16.04.2021. Видео не воспроизводилось.",
+    "access": "Бесплатно, без регистрации"
+  },
+  {
+    "topic": "lora",
+    "title": "Hugging Face PEFT — LoRA",
+    "url": "https://huggingface.co/docs/peft/main/en/conceptual_guides/lora",
+    "kind": "docs",
+    "language": "EN",
+    "what_to_watch": "Низкоранговые адаптеры, trainable parameters, параметры LoRA; сравнить качество до/после на неизменном тесте.",
+    "verification": "05.09.2026: Открыта официальная документация PEFT.",
+    "access": "Бесплатно, без регистрации"
+  },
+  {
+    "topic": "lora",
+    "title": "Fine-tuning LLMs with PEFT and LoRA — Sam Witteveen",
+    "url": "https://www.youtube.com/watch?v=Us5ZFp16PaU",
+    "kind": "video",
+    "language": "EN",
+    "what_to_watch": "Объяснение PEFT/LoRA и разбор собственного ноутбука автора. Использовать для принципа; API 2023 года сверять с актуальным PEFT.",
+    "verification": "05.09.2026: Проверены авторская YouTube-страница и описание; опубликовано 24.04.2023. Это авторский разбор, не официальный курс HF.",
+    "access": "Бесплатно, без регистрации"
+  },
+  {
+    "topic": "kubernetes",
+    "title": "Introduction to Kubernetes (LFS158) — Linux Foundation",
+    "url": "https://training.linuxfoundation.org/training/introduction-to-kubernetes/",
+    "kind": "video_course",
+    "language": "EN",
+    "what_to_watch": "Architecture; building blocks; Services; deploying an app; volumes; ConfigMaps/Secrets; Ingress. Проходить после Docker/CI/мониторинга.",
+    "verification": "05.09.2026: Официальная страница проверена: курс $0, 15–20 часов материалов, видео-демонстрации, labs, 90 дней доступа.",
+    "access": "Курс $0, нужна регистрация; заявлено 90 дней доступа. Облачный кластер оплачивается отдельно."
+  },
+  {
+    "topic": "kubernetes",
+    "title": "Learn Kubernetes Basics",
+    "url": "https://kubernetes.io/docs/tutorials/kubernetes-basics/",
+    "kind": "docs",
+    "language": "EN",
+    "what_to_watch": "Deploy, expose, scale, update и rollback учебного сервиса.",
+    "verification": "05.09.2026: Открыта официальная документация Kubernetes.",
+    "access": "Бесплатно, без регистрации"
+  },
+  {
+    "topic": "airflow",
+    "title": "Orchestrating Workflows for GenAI Applications — Astronomer / DeepLearning.AI",
+    "url": "https://www.deeplearning.ai/courses/orchestrating-workflows-for-genai-applications",
+    "kind": "video_course",
+    "language": "EN",
+    "what_to_watch": "From Notebook To Pipeline; Building a Simple Pipeline; ingest/embed DAG; scheduling, mapping, retry/backfill. Airflow изучать для пакетной оркестрации.",
+    "verification": "05.09.2026: Проверены официальная индексированная страница и syllabus: 11 видео; в курсе Airflow 3.0; web.open вернул 403.",
+    "access": "Регистрация; условия доступа и PRO меняются. На странице курса проверить бесплатный просмотр/audit; API и облачные ресурсы могут оплачиваться отдельно."
+  },
+  {
+    "topic": "airflow",
+    "title": "Apache Airflow Tutorials",
+    "url": "https://airflow.apache.org/docs/apache-airflow/stable/tutorial/index.html",
+    "kind": "docs",
+    "language": "EN",
+    "what_to_watch": "Базовый DAG/TaskFlow и работа с событиями/расписанием; повторные запуски и backfill на тестовых данных.",
+    "verification": "05.09.2026: Открыт официальный индекс практических tutorials Apache Airflow.",
+    "access": "Бесплатно, без регистрации"
+  }
+]
