@@ -751,15 +751,15 @@ def blacklist_toggle(employer_id: int, on: str = Form("1")):
 def manual_telegram_page(note: str = "", track: ManualTrack | None = None):
     from .. import manual_telegram as manual_tg
     from ..feedback import REASONS
-    track = track or manual_tg.selected_track(_web_owner_id())
-    data = manual_tg.listing(track=track)
+    chosen: str = track or manual_tg.selected_track(_web_owner_id())
+    data = manual_tg.listing(track=chosen)
     body = "<h2>Telegram — отправлю сам</h2><p>%s</p>" % _h(manual_tg.WARNING)
     if note:
         body += "<p role='status'>%s</p>" % _h(note)
     tracks = {"all": "Все основные", "backend": "Backend", "ml": "AI / ML",
               "architect": "Архитектор", "additional": "Другие направления"}
     options = "".join("<option value='%s'%s>%s</option>" % (
-        key, " selected" if key == track else "", label) for key, label in tracks.items())
+        key, " selected" if key == chosen else "", label) for key, label in tracks.items())
     body += ("<form method='post' action='/manual-telegram/track'>"
              "<label>Направление <select name='track'>%s</select></label> "
              "<button class='btn ghost sm'>Сохранить направление</button></form>"

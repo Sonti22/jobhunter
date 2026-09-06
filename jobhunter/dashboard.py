@@ -130,11 +130,11 @@ def attention(limit: int = 200, offset: int = 0) -> dict:
     offset, limit = max(0, offset), max(1, min(limit, 2000))
     now = _now()
     with session_scope() as sess:
-        requests = {}
+        requests: dict[int, list] = {}
         for req in sess.scalars(select(OwnerRequest).order_by(OwnerRequest.id.desc())):
             if req.application_id:
                 requests.setdefault(req.application_id, []).append(req)
-        messages = {}
+        messages: dict[int, list] = {}
         for msg in sess.scalars(select(Message).order_by(Message.id.desc())):
             messages.setdefault(msg.application_id, []).append(msg)
         candidate_ids = set(requests) | set(messages)
