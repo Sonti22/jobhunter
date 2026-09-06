@@ -194,6 +194,10 @@ async def apply_one(client, req_id: int, dry: bool = False) -> str:
             if app is not None and app.status != Status.REJECTED_BY_EMPLOYER.value:
                 app.advance(Status.REJECTED_BY_EMPLOYER,
                             reason="отказ, подтверждён владельцем")
+            if app is not None:
+                from .results import record_event
+                record_event(sess, app_id, "rejected", "owner", f"request:{req_id}:rejected",
+                             details={"request_id": req_id, "evidence": "owner_confirmed_rejection"})
         finish(req_id, True, "заявка закрыта: отказ")
         return "заявка закрыта (отказ)"
 

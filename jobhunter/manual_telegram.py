@@ -18,16 +18,19 @@ from sqlalchemy import select
 from . import notify
 from .config import ROOT, get_settings
 from .db import session_scope
-from .models import Application, Employer, Job, Status, utcnow
+from .models import Application, Employer, Job, OwnerPreference, Status, utcnow
 from .outreach import eligibility
 
 PREFIX = "manual_tg_"
 READY, SENT, SKIPPED, FAILED = (PREFIX + s for s in ("ready", "sent", "skipped", "failed"))
 BATCH_SIZE = 5
-WARNING = ("Ты отправляешь сам; бот рекрутёру ничего не отправит. "
-           "Ограничения Telegram действуют и при ручной отправке. "
-           "Если отправка не проходит, не повторяй её подряд; выбери «Не получилось». "
-           "«Я отправил» нажимай только после фактической отправки.")
+TRACKS = {"all": "Лучшие из трёх", "backend": "Backend", "ml": "AI / ML",
+          "architect": "Tech Lead / Архитектор", "additional": "Дополнительные"}
+WARNING = ("Отправляешь ты сам, бот рекрутёру ничего не шлёт. "
+           "Карточка = PDF: кнопкой открой чат с готовым письмом → отправь → "
+           "перешли этот PDF → нажми «✅ Отправил». Ошибся — «↩️ Вернуть» "
+           "работает %d минут." % 15)
+UNDO_MINUTES = 15
 
 
 def _handle(job) -> str:
@@ -36,6 +39,43 @@ def _handle(job) -> str:
 
 def _packet(app) -> dict:
     return dict((app.apply_packet_json or {}).get("manual_telegram") or {})
+
+
+def _owner_id(chat_id=None) -> int:
+    return chat_id if chat_id is not None else next(iter(sorted(get_settings().bot_owner_ids)), 0)
+
+
+def _selected_track(sess, chat_id=None) -> str:
+    pref = sess.get(OwnerPreference, _owner_id(chat_id))
+    return pref.outreach_track if pref and pref.outreach_track in TRACKS else "all"
+
+
+def selected_track(chat_id=None) -> str:
+    with session_scope() as sess:
+        return _selected_track(sess, chat_id)
+
+
+def set_track(chat_id: int, track: str) -> None:
+    if chat_id not in get_settings().bot_owner_ids:
+        raise PermissionError("Подборка доступна только владельцу")
+    if track not in TRACKS:
+        raise ValueError("Неизвестное направление")
+    with session_scope() as sess:
+        sess.connection().exec_driver_sql("BEGIN IMMEDIATE")
+        pref = sess.get(OwnerPreference, chat_id)
+        if pref is None:
+            pref = OwnerPreference(owner_id=chat_id)
+            sess.add(pref)
+        pref.outreach_track = track
+
+
+def _in_track(assessment: dict, track: str) -> bool:
+    family = assessment.get("track", "unknown")
+    if track == "all":
+        return family in ("backend", "ml", "architect")
+    if track == "additional":
+        return family not in ("backend", "ml", "architect")
+    return family == track
 
 
 def _problem(app, job, employer) -> str:
@@ -60,57 +100,87 @@ def _problem(app, job, employer) -> str:
 
 
 def _row(sess, app, job) -> dict:
+    from .match.explain import assessment_for
     employer = sess.get(Employer, app.employer_id) if app.employer_id else None
     packet = _packet(app)
+    assessment = assessment_for(app, job)
     return dict(id=app.id, title=packet.get("title", job.title),
                 company=packet.get("company", job.company_name), score=app.score,
                 handle=packet.get("handle", _handle(job)), text=packet.get("text", ""),
                 vacancy_url=packet.get("vacancy_url", ""), cv_path=app.cv_path,
-                outcome=app.outcome, problem=_problem(app, job, employer))
+                outcome=app.outcome, problem=_problem(app, job, employer),
+                track=assessment.get("track", "unknown"), assessment=assessment)
 
 
-def listing() -> dict:
+def listing(track: str = "all") -> dict:
+    if track not in TRACKS:
+        raise ValueError("Неизвестное направление")
     with session_scope() as sess:
         pairs = sess.execute(select(Application, Job).join(Job).where(
             Application.outcome.startswith(PREFIX)).order_by(Application.id.desc())).all()
         counts = Counter(a.outcome for a, _ in pairs)
         rows = [_row(sess, a, j) for a, j in pairs if a.outcome == READY]
+        for row in rows:
+            row["matches_filter"] = _in_track(row["assessment"], track)
     return dict(items=rows, ready=len(rows), sent=counts[SENT],
-                skipped=counts[SKIPPED], failed=counts[FAILED])
+                skipped=counts[SKIPPED], failed=counts[FAILED], track=track,
+                tracks=TRACKS, note="Выданные карточки сохраняются при смене фильтра.")
 
 
 def keyboard(row: dict) -> dict:
+    """Три ряда вместо шести: открыть чат / отправил-пропустить / детали.
+
+    Раньше на карточке было девять кнопок и второй диалог «точно отправил?»;
+    владелец выдал четыре карточки и бросил. «Ник отдельно», «Получить
+    резюме», «Направления», «Не получилось» ушли: ник есть в ссылке, PDF —
+    само сообщение, отказ от отправки — «Пропустить».
+    """
     aid = row["id"]
     rows = []
     if not row["problem"]:
         # Official username deep link opens a draft, never sends it.
         # https://core.telegram.org/api/links#public-username-links
         draft = "https://t.me/" + row["handle"] + "?" + urlencode({"text": row["text"]})
-        rows.append([{"text": "Открыть @%s с текстом" % row["handle"], "url": draft}])
-        rows.append([{"text": "Текст отдельно", "callback_data": f"t:{aid}:text"},
-                     {"text": "Ник отдельно", "callback_data": f"t:{aid}:handle"}])
-        rows.append([{"text": "📎 Получить резюме", "callback_data": f"t:{aid}:cv"}])
+        rows.append([{"text": "📨 Открыть чат @%s с письмом" % row["handle"], "url": draft}])
+        rows.append([{"text": "✅ Отправил", "callback_data": f"t:{aid}:sent"},
+                     {"text": "⏭ Пропустить", "callback_data": f"t:{aid}:skip"}])
+        rows.append([{"text": "📝 Текст письма", "callback_data": f"t:{aid}:text"},
+                     {"text": "ℹ️ Почему подходит", "callback_data": f"t:{aid}:why"}])
+    else:
+        rows.append([{"text": "⏭ Пропустить", "callback_data": f"t:{aid}:skip"},
+                     {"text": "ℹ️ Почему подходит", "callback_data": f"t:{aid}:why"}])
     if row["vacancy_url"]:
         rows.append([{"text": "Исходная вакансия", "url": row["vacancy_url"]}])
-    rows += [[{"text": "✅ Всё отправил → следующий", "callback_data": f"t:{aid}:confirm"}],
-             [{"text": "Не подходит", "callback_data": f"t:{aid}:skip"},
-              {"text": "Не получилось", "callback_data": f"t:{aid}:failed"}]]
+    return {"inline_keyboard": rows}
+
+
+def after_mark_keyboard(aid: int, undo: bool) -> dict:
+    rows = []
+    if undo:
+        rows.append([{"text": "↩️ Вернуть", "callback_data": f"t:{aid}:undo"}])
+    rows.append([{"text": "➡️ Следующий", "callback_data": "t:0:next"}])
     return {"inline_keyboard": rows}
 
 
 def card(row: dict) -> str:
-    body = (f"🖐 Ручная отправка #{row['id']}\n{row['title'][:160]}\n"
-            f"{row['company'][:100]} · соответствие {row['score']:.0f}\n"
-            f"Контакт: @{row['handle']}\n\n")
-    body += ("⚠️ НЕ ОТПРАВЛЯЙ: " + row["problem"] if row["problem"] else row["text"])
-    if row["cv_path"]:
-        body += "\n\nРезюме — PDF-файлом здесь в чате; повторно: «📎 Получить резюме»."
-    return body + ("\n\n1. Открой чат с текстом и отправь его сам."
-                   "\n2. При необходимости приложи PDF."
-                   "\n3. Вернись сюда: «✅ Всё отправил → следующий».")
+    """Подпись к PDF: умещается в лимит caption (1024), без инструкций на
+    каждой карточке — они один раз в /outreach."""
+    body = (f"🖐 #{row['id']} · {row['title'][:120]}\n"
+            f"{row['company'][:80]} · соответствие {row['score']:.0f}\n"
+            f"@{row['handle']}")
+    if row["problem"]:
+        return (body + "\n\n⚠️ НЕ ОТПРАВЛЯЙ: " + row["problem"][:300])[:1000]
+    tail = "\n\n📨 → ✉️ → 📎 переслать этот PDF → ✅"
+    # Письмо — прямо в подписи, пока влезает в лимит caption: владелец
+    # видит, что уйдёт, без лишнего тапа. Длинное — по кнопке «📝 Текст».
+    letter = (row.get("text") or "").strip()
+    if letter and len(body) + len(letter) + len(tail) + 2 <= 1000:
+        return body + "\n\n" + letter + tail
+    return (body + "\n\n📝 письмо — кнопкой ниже" + tail)[:1000]
 
 
-def issue(limit: int = BATCH_SIZE, *, deliver: bool = True, sess=None) -> dict:
+def issue(limit: int = BATCH_SIZE, *, deliver: bool = True, sess=None,
+          track: str | None = None) -> dict:
     """Reserve at most five items. Repeated requests keep the current batch."""
     limit = min(BATCH_SIZE, max(0, limit))
     own_session = sess is None
@@ -120,6 +190,10 @@ def issue(limit: int = BATCH_SIZE, *, deliver: bool = True, sess=None) -> dict:
         active = sess.scalar(select(Application.id).where(Application.outcome == READY).limit(1))
         if active or not limit:
             return {"issued": 0, "reason": "Сначала отметь текущие карточки: /outreach"}
+        from .match.explain import assessment_for
+        track = _selected_track(sess) if track is None else track
+        if track not in TRACKS:
+            raise ValueError("Неизвестное направление")
         pairs = sess.execute(select(Application, Job).join(Job).where(
             Application.status == Status.APPROVED.value,
             Job.contact_kind == "user_handle", Application.outcome == "")
@@ -130,6 +204,8 @@ def issue(limit: int = BATCH_SIZE, *, deliver: bool = True, sess=None) -> dict:
             | Application.outcome.startswith(PREFIX))).all() if j.contact_kind == "user_handle"}
         chosen = []
         for app, job in pairs:
+            if not _in_track(assessment_for(app, job), track):
+                continue
             employer = sess.get(Employer, app.employer_id) if app.employer_id else None
             if _handle(job) in used or _problem(app, job, employer):
                 continue
@@ -156,6 +232,32 @@ def issue(limit: int = BATCH_SIZE, *, deliver: bool = True, sess=None) -> dict:
                 "reason": "Карточки подготовлены" if chosen else "Нет новых подходящих откликов"}
 
 
+def explain_card(app_id: int) -> str:
+    from .match.explain import assessment_for
+    with session_scope() as sess:
+        app = sess.get(Application, app_id)
+        if not app:
+            return "Заявка не найдена"
+        job = sess.get(Job, app.job_id)
+        data = assessment_for(app, job)
+        lines = [f"Почему подходит #{app_id} · {job.title[:160]}",
+                 "Направление: " + TRACKS.get(data.get("track"), "Не определено"),
+                 f"Версия правил: {data.get('version', 'неизвестно')}",
+                 "Оценка соответствия — не вероятность оффера."]
+        for item in data.get("matched", [])[:8]:
+            evidence = ", ".join(item.get("evidence_ids", [])) or "нет подтверждающей записи"
+            lines.append(f"✓ {item.get('skill', '?')}: {evidence}")
+        for label, key in (("Обязательно", "required"), ("Желательно", "desired"),
+                           ("Пробелы", "gaps"), ("Неизвестно", "unknowns"),
+                           ("Нужна проверка", "review_reasons")):
+            values = data.get(key) or []
+            if values:
+                lines.append(label + ": " + "; ".join(str(x) for x in values)[:650])
+        if data.get("vacancy_url"):
+            lines.append("Вакансия: " + data["vacancy_url"])
+        return "\n".join(lines)[:3900]
+
+
 def get_card(app_id: int) -> dict | None:
     with session_scope() as sess:
         app = sess.get(Application, app_id)
@@ -164,11 +266,15 @@ def get_card(app_id: int) -> dict | None:
         return _row(sess, app, sess.get(Job, app.job_id))
 
 
-def mark(app_id: int, action: str, *, next_chat_id: int | None = None) -> tuple[bool, str]:
+def mark(app_id: int, action: str, *, next_chat_id: int | None = None,
+         reason: str = "unspecified") -> tuple[bool, str]:
     if action not in ("sent", "skip", "failed"):
         return False, "Неизвестная отметка"
     if next_chat_id is not None and next_chat_id not in get_settings().bot_owner_ids:
         return False, "Работай с ручной очередью в личном чате бота"
+    from . import feedback
+    if action == "skip" and reason not in feedback.REASONS:
+        return False, "Неизвестная причина пропуска"
     with session_scope() as sess:
         sess.connection().exec_driver_sql("BEGIN IMMEDIATE")
         app = sess.get(Application, app_id)
@@ -200,6 +306,8 @@ def mark(app_id: int, action: str, *, next_chat_id: int | None = None) -> tuple[
             employer.total_messages_sent = (employer.total_messages_sent or 0) + 1
             note = "Записано с твоих слов: отправлено вручную. Бот повторно не отправит."
         else:
+            if action == "skip":
+                feedback.record(sess, app_id, reason, _owner_id(next_chat_id))
             app.outcome = SKIPPED if action == "skip" else FAILED
             if app.status == Status.APPROVED.value and not app.sent_at and not app.send_attempts:
                 app.transition(Status.WITHDRAWN, reason="Ручная отправка: " + action)
@@ -213,10 +321,44 @@ def mark(app_id: int, action: str, *, next_chat_id: int | None = None) -> tuple[
         return True, note
 
 
+def unmark(app_id: int, chat_id: int | None = None) -> tuple[bool, str]:
+    """Откатить «✅ Отправил», нажатое по ошибке, — в течение UNDO_MINUTES.
+
+    Замена второму диалогу «точно отправил?»: один тап вместо двух, а
+    ошибка исправляется одним тапом обратно. Откат невозможен, если
+    рекрутёр уже ответил — тогда отправка была настоящей.
+    """
+    if chat_id is not None and chat_id not in get_settings().bot_owner_ids:
+        return False, "Работай с ручной очередью в личном чате бота"
+    with session_scope() as sess:
+        sess.connection().exec_driver_sql("BEGIN IMMEDIATE")
+        app = sess.get(Application, app_id)
+        if not app or app.outcome != SENT or app.send_channel != "telegram_manual":
+            return False, "Эту отметку вернуть нельзя"
+        if app.first_reply_at or app.last_inbound_at:
+            return False, "Рекрутёр уже ответил — отправка была настоящей"
+        sent_at = app.sent_at.replace(tzinfo=None) if app.sent_at else None
+        now = utcnow().replace(tzinfo=None)
+        if not sent_at or (now - sent_at).total_seconds() > UNDO_MINUTES * 60:
+            return False, "Прошло больше %d минут — отметка закреплена" % UNDO_MINUTES
+        # Граф не ведёт из AWAITING_REPLY назад в APPROVED: это откат
+        # отметки владельца, а не переход конвейера — пишем напрямую.
+        app.status = Status.APPROVED.value
+        app.outcome = READY
+        app.sent_at = app.applied_at = app.last_outbound_at = None
+        app.send_channel = ""
+        employer = sess.get(Employer, app.employer_id) if app.employer_id else None
+        if employer:
+            employer.total_messages_sent = max(0, (employer.total_messages_sent or 0) - 1)
+            employer.last_contacted_at = None
+        return True, "Отметка снята — карточка снова в работе"
+
+
 def _queue_current(sess, chat_id: int, request_key: str = "") -> int | None:
-    issue(limit=1, deliver=False, sess=sess)
-    app = sess.scalar(select(Application).where(Application.outcome == READY)
-                      .order_by(Application.score.desc(), Application.id.desc()).limit(1))
+    issue(limit=1, deliver=False, sess=sess, track=_selected_track(sess, chat_id))
+    app = sess.scalar(select(Application).join(Job).where(Application.outcome == READY)
+                      .order_by(Application.score.desc(), Job.posted_at.desc(),
+                                Application.id.desc()).limit(1))
     if not app:
         notify.push("manual_tg_empty", "Подходящие новые отклики закончились. "
                     "Позже нажми /outreach — перепроверю очередь.", chat_id=chat_id,
@@ -225,10 +367,11 @@ def _queue_current(sess, chat_id: int, request_key: str = "") -> int | None:
     # A distinct /outreach request can show the current item again. The
     # automatic continuation has a stable key, so double taps never multiply it.
     suffix = (":" + hashlib.sha256(request_key.encode()).hexdigest()[:16]) if request_key else ""
+    # Одно сообщение на отклик: outbox доставит карточку как PDF с подписью
+    # и кнопками. Отдельной строки «документ» больше нет — она удваивала
+    # каждый отклик в чате.
     notify.push("manual_tg_step", f"Ручной отклик #{app.id}", chat_id=chat_id,
                 markup={"app_id": app.id}, dedup=f"manual_tg_step:{chat_id}:{app.id}{suffix}", sess=sess)
-    notify.push("manual_tg_document", f"Резюме для отклика #{app.id}", chat_id=chat_id,
-                markup={"app_id": app.id}, dedup=f"manual_tg_document:{chat_id}:{app.id}{suffix}", sess=sess)
     return app.id
 
 

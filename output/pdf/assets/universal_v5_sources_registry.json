@@ -1,0 +1,1532 @@
+{
+  "A01": {
+    "topic": "classic_ml",
+    "title": "Machine learning in Python with scikit-learn — Inria MOOC",
+    "url": "https://inria.github.io/scikit-learn-mooc/index.html",
+    "kind": "video_course",
+    "language": "EN",
+    "what_to_watch": "Введение в fit/predict, линейные модели, preprocessing, cross-validation и оценка модели; выполнять упражнения по своей классификации.",
+    "verification": "05.09.2026: Официальный курс Inria; страница явно ссылается на видеоплейлист Inria Learning Lab.",
+    "access": "Материалы и YouTube бесплатно; квизы на FUN-MOOC требуют регистрации."
+  },
+  "A02": {
+    "topic": "classic_ml",
+    "title": "Cross-validation: evaluating estimator performance",
+    "url": "https://scikit-learn.org/stable/modules/cross_validation",
+    "kind": "docs",
+    "language": "EN",
+    "what_to_watch": "Train/validation/test, leakage, stratified и group/time split; выбрать разбиение по устройству бизнес-данных.",
+    "verification": "05.09.2026: Прочитана официальная документация scikit-learn.",
+    "access": "Бесплатно, без регистрации"
+  },
+  "A03": {
+    "topic": "statistics",
+    "title": "SciPy bootstrap",
+    "url": "https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.bootstrap.html",
+    "kind": "docs",
+    "language": "EN",
+    "what_to_watch": "Доверительные интервалы и воспроизводимый bootstrap; единица пересэмплирования должна соответствовать независимому наблюдению.",
+    "verification": "05.09.2026: Открыта официальная справочная страница SciPy.",
+    "access": "Бесплатно, без регистрации"
+  },
+  "A04": {
+    "topic": "llm_tokens",
+    "title": "Hugging Face LLM Course — Tokenizers",
+    "url": "https://huggingface.co/learn/llm-course/en/chapter2/4",
+    "kind": "video_course",
+    "language": "EN",
+    "what_to_watch": "Встроенные видео Tokenizers, Word-based, Character-based, Subword tokenization и Encoding. Сравнить токенизацию русского текста и реквизитов.",
+    "verification": "05.09.2026: Открыта официальная страница; присутствуют пять встроенных видеоплееров и схемы.",
+    "access": "Бесплатно, просмотр без регистрации."
+  },
+  "A05": {
+    "topic": "structured_output",
+    "title": "Getting Structured LLM Output — DotTxt / DeepLearning.AI",
+    "url": "https://www.deeplearning.ai/courses/getting-structured-llm-output",
+    "kind": "video_course",
+    "language": "EN",
+    "what_to_watch": "Introduction to Structured Output Generation; Retry-based Structured Output; Structured Generation with Outlines. Сопоставить схему JSON и бизнес-валидаторы.",
+    "verification": "05.09.2026: Проверены официальная индексированная страница и syllabus: 7 видео; прямое чтение web.open получило 403. Видео не воспроизводились.",
+    "access": "Регистрация; условия доступа и PRO меняются. На странице курса проверить бесплатный просмотр/audit; API и облачные ресурсы могут оплачиваться отдельно."
+  },
+  "A06": {
+    "topic": "structured_output",
+    "title": "Pydantic Models",
+    "url": "https://pydantic.dev/docs/validation/latest/concepts/models/",
+    "kind": "docs",
+    "language": "EN",
+    "what_to_watch": "Модели данных, вложенные поля, ошибки валидации; различать валидную схему и верное бизнес-значение.",
+    "verification": "05.09.2026: Открыта официальная документация; прежний docs.pydantic.dev перенаправляет сюда.",
+    "access": "Бесплатно, без регистрации"
+  },
+  "A07": {
+    "topic": "tools",
+    "title": "LangChain Tools",
+    "url": "https://docs.langchain.com/oss/python/langchain/tools",
+    "kind": "docs",
+    "language": "EN",
+    "what_to_watch": "Определение инструмента, схема аргументов, runtime/context; бизнес-права и идемпотентность контролировать вне решения LLM.",
+    "verification": "05.09.2026: Открыта официальная документация.",
+    "access": "Бесплатно, без регистрации"
+  },
+  "A08": {
+    "topic": "rag",
+    "title": "Building and Evaluating Advanced RAG — LlamaIndex / DeepLearning.AI",
+    "url": "https://www.deeplearning.ai/courses/building-evaluating-advanced-rag",
+    "kind": "video_course",
+    "language": "EN",
+    "what_to_watch": "Advanced RAG Pipeline; RAG Triad; Sentence-window retrieval. Auto-merging retrieval — после базовой измеренной системы.",
+    "verification": "05.09.2026: Проверена официальная страница с syllabus: 6 видеолекций и 4 примера кода; инструктор Jerry Liu — сооснователь LlamaIndex.",
+    "access": "Регистрация; условия доступа и PRO меняются. На странице курса проверить бесплатный просмотр/audit; API и облачные ресурсы могут оплачиваться отдельно."
+  },
+  "A09": {
+    "topic": "rag",
+    "title": "LlamaIndex — Introduction to RAG",
+    "url": "https://developers.llamaindex.ai/python/framework/understanding/rag/",
+    "kind": "docs",
+    "language": "EN",
+    "what_to_watch": "Загрузка, индексирование, retrieval, synthesis и evaluation; нарисовать путь вопроса и данных.",
+    "verification": "05.09.2026: Открыта официальная страница через редирект старого docs.llamaindex.ai.",
+    "access": "Бесплатно, без регистрации"
+  },
+  "A10": {
+    "topic": "retrieval",
+    "title": "Qdrant Essentials",
+    "url": "https://qdrant.tech/course/essentials/",
+    "kind": "video_course",
+    "language": "EN",
+    "what_to_watch": "Дни 1–3: embeddings/chunking/индекс и hybrid; затем multi-vector reranking и финальная оценка retrieval. Не требуется проходить всю облачную часть.",
+    "verification": "05.09.2026: Официальная страница Qdrant прямо обозначает video-first lessons; syllabus проверен.",
+    "access": "Страницы курса доступны бесплатно; облачная практика требует аккаунта, возможны платные ресурсы."
+  },
+  "A11": {
+    "topic": "retrieval",
+    "title": "Qdrant Hybrid Search with Reranking",
+    "url": "https://qdrant.tech/documentation/tutorials-basics/reranking-hybrid-search/",
+    "kind": "docs",
+    "language": "EN",
+    "what_to_watch": "Dense+sparse retrieval, объединение кандидатов, reranking; сравнить Recall@k/MRR/latency с baseline.",
+    "verification": "05.09.2026: Проверен официальный tutorial Qdrant; есть схема retrieval/reranking.",
+    "access": "Бесплатно, без регистрации"
+  },
+  "A12": {
+    "topic": "pgvector",
+    "title": "Vector search with Next.js — Supabase video guide",
+    "url": "https://supabase.com/docs/guides/ai/examples/nextjs-vector-search",
+    "kind": "video_course",
+    "language": "EN",
+    "what_to_watch": "Встроенный разбор хранения embeddings в Postgres и поиска. Извлечь архитектуру и SQL; переписать backend на Python, Next.js необязателен.",
+    "verification": "05.09.2026: Официальная документация Supabase содержит встроенный video guide и описание содержания.",
+    "access": "Просмотр бесплатный; примеры используют облако и API, их стоимость отдельно."
+  },
+  "A13": {
+    "topic": "pgvector",
+    "title": "pgvector — официальный README",
+    "url": "https://github.com/pgvector/pgvector",
+    "kind": "docs",
+    "language": "EN",
+    "what_to_watch": "Exact search, HNSW/IVFFlat, фильтры и recall, индексы; сравнить с Qdrant на одном наборе запросов.",
+    "verification": "05.09.2026: Открыт официальный репозиторий pgvector.",
+    "access": "Бесплатно, без регистрации"
+  },
+  "A14": {
+    "topic": "evals",
+    "title": "Evaluating AI Agents — Arize AI / DeepLearning.AI",
+    "url": "https://www.deeplearning.ai/courses/evaluating-ai-agents",
+    "kind": "video_course",
+    "language": "EN",
+    "what_to_watch": "Tracing agents; router/skill evaluations; trajectory evaluations; Improving your LLM-as-a-judge. Применить также к своему RAG и tool-calling.",
+    "verification": "05.09.2026: Проверена официальная индексированная страница и syllabus: 15 видео; direct web.open short-courses URL вернул 403.",
+    "access": "Регистрация; условия доступа и PRO меняются. На странице курса проверить бесплатный просмотр/audit; API и облачные ресурсы могут оплачиваться отдельно."
+  },
+  "A15": {
+    "topic": "agents",
+    "title": "Foundation: Introduction to LangGraph — Python",
+    "url": "https://academy.langchain.com/courses/intro-to-langgraph",
+    "kind": "video_course",
+    "language": "EN",
+    "what_to_watch": "Модули 1–3: graph/state, memory, streaming, human-in-the-loop; затем persistence и deploy по необходимости.",
+    "verification": "05.09.2026: Официальная LangChain Academy: проверены программа, отметка Free, 55 lessons и 6 часов видео.",
+    "access": "Курс бесплатный; регистрация для прохождения, внешние API/сервисы отдельно."
+  },
+  "A16": {
+    "topic": "agents",
+    "title": "LangGraph Overview",
+    "url": "https://docs.langchain.com/oss/python/langgraph/overview",
+    "kind": "docs",
+    "language": "EN",
+    "what_to_watch": "Durable execution, state, interrupt/approval и восстановление; отличать workflow от автономного агента.",
+    "verification": "05.09.2026: Открыта официальная документация LangChain.",
+    "access": "Бесплатно, без регистрации"
+  },
+  "A17": {
+    "topic": "ocr",
+    "title": "Document AI: From OCR to Agentic Doc Extraction — LandingAI / DeepLearning.AI",
+    "url": "https://www.deeplearning.ai/courses/document-ai-from-ocr-to-agentic-doc-extraction",
+    "kind": "video_course",
+    "language": "EN",
+    "what_to_watch": "Document Processing Basics; Lab 1 OCR; Lab 2 PaddleOCR; Layout Detection and Reading Order. ADE/AWS оставить факультативом.",
+    "verification": "05.09.2026: Официальная страница и syllabus проверены: 15 видео, включая отдельную Lab 2 по PaddleOCR.",
+    "access": "Регистрация; условия доступа и PRO меняются. На странице курса проверить бесплатный просмотр/audit; API и облачные ресурсы могут оплачиваться отдельно."
+  },
+  "A18": {
+    "topic": "ocr",
+    "title": "PaddleOCR — General OCR Pipeline Usage Tutorial",
+    "url": "https://www.paddleocr.ai/main/en/version3.x/pipeline_usage/OCR.html",
+    "kind": "docs",
+    "language": "EN",
+    "what_to_watch": "Выбор движка/языковой модели, ориентация, detection/recognition, сохранение координат и JSON. Проверять поддержку кириллицы у выбранной модели.",
+    "verification": "05.09.2026: Проверен официальный usage tutorial; документация main меняется, совместимые версии фиксировать в проекте.",
+    "access": "Бесплатно, без регистрации"
+  },
+  "A19": {
+    "topic": "ocr",
+    "title": "Tesseract — Improving the quality of the output",
+    "url": "https://tesseract-ocr.github.io/tessdoc/ImproveQuality.html",
+    "kind": "docs",
+    "language": "EN",
+    "what_to_watch": "DPI, бинаризация, шум, наклон, границы, page segmentation. Сравнить результат до и после preprocessing.",
+    "verification": "05.09.2026: Открыта официальная документация Tesseract.",
+    "access": "Бесплатно, без регистрации"
+  },
+  "A20": {
+    "topic": "local_inference",
+    "title": "Fast & Efficient LLM Inference with vLLM — Red Hat / DeepLearning.AI",
+    "url": "https://www.deeplearning.ai/courses/fast-and-efficient-llm-inference-with-vllm",
+    "kind": "video_course",
+    "language": "EN",
+    "what_to_watch": "Inference & Memory Fundamentals; Serving LLMs Efficiently I/II; Benchmarking and Evaluation. Quantization — после замера baseline.",
+    "verification": "05.09.2026: Подтверждены официальная страница курса (9 видео) и публикация vllm.ai от 03.06.2026; web.open страницы курса вернул 403.",
+    "access": "Регистрация; условия доступа и PRO меняются. На странице курса проверить бесплатный просмотр/audit; API и облачные ресурсы могут оплачиваться отдельно."
+  },
+  "A21": {
+    "topic": "local_inference",
+    "title": "vLLM Quickstart",
+    "url": "https://docs.vllm.ai/en/latest/getting_started/quickstart/",
+    "kind": "docs",
+    "language": "EN",
+    "what_to_watch": "Совместимое оборудование, offline inference и online serving; лимиты памяти, нагрузка и метрики проверять на своём стенде.",
+    "verification": "05.09.2026: Открыта официальная документация vLLM.",
+    "access": "Документация бесплатно; GPU и вычисления могут быть платными."
+  },
+  "A22": {
+    "topic": "pytorch",
+    "title": "Introduction to PyTorch — официальный видеоряд",
+    "url": "https://docs.pytorch.org/tutorials/beginner/introyt/introyt1_tutorial.html",
+    "kind": "video_course",
+    "language": "EN",
+    "what_to_watch": "Tensors, autograd, model, datasets и training loop; повторить небольшой цикл обучения.",
+    "verification": "05.09.2026: Официальная страница PyTorch и видео официального канала проверены; исходное вводное видео 2021 года — API сверять с текущими docs.",
+    "access": "Бесплатно, без регистрации"
+  },
+  "A23": {
+    "topic": "pytorch",
+    "title": "Introduction to PyTorch — видео PyTorch",
+    "url": "https://www.youtube.com/watch?v=IC0_FRiX-sw",
+    "kind": "video",
+    "language": "EN",
+    "what_to_watch": "Полный вводный обзор: тензоры, градиенты, модель, загрузка данных, цикл обучения.",
+    "verification": "05.09.2026: Проверены YouTube-страница и автор PyTorch; дата публикации 16.04.2021. Видео не воспроизводилось.",
+    "access": "Бесплатно, без регистрации"
+  },
+  "A24": {
+    "topic": "lora",
+    "title": "Hugging Face PEFT — LoRA",
+    "url": "https://huggingface.co/docs/peft/main/en/conceptual_guides/lora",
+    "kind": "docs",
+    "language": "EN",
+    "what_to_watch": "Низкоранговые адаптеры, trainable parameters, параметры LoRA; сравнить качество до/после на неизменном тесте.",
+    "verification": "05.09.2026: Открыта официальная документация PEFT.",
+    "access": "Бесплатно, без регистрации"
+  },
+  "A25": {
+    "topic": "lora",
+    "title": "Fine-tuning LLMs with PEFT and LoRA — Sam Witteveen",
+    "url": "https://www.youtube.com/watch?v=Us5ZFp16PaU",
+    "kind": "video",
+    "language": "EN",
+    "what_to_watch": "Объяснение PEFT/LoRA и разбор собственного ноутбука автора. Использовать для принципа; API 2023 года сверять с актуальным PEFT.",
+    "verification": "05.09.2026: Проверены авторская YouTube-страница и описание; опубликовано 24.04.2023. Это авторский разбор, не официальный курс HF.",
+    "access": "Бесплатно, без регистрации"
+  },
+  "A26": {
+    "topic": "kubernetes",
+    "title": "Introduction to Kubernetes (LFS158) — Linux Foundation",
+    "url": "https://training.linuxfoundation.org/training/introduction-to-kubernetes/",
+    "kind": "video_course",
+    "language": "EN",
+    "what_to_watch": "Architecture; building blocks; Services; deploying an app; volumes; ConfigMaps/Secrets; Ingress. Проходить после Docker/CI/мониторинга.",
+    "verification": "05.09.2026: Официальная страница проверена: курс $0, 15–20 часов материалов, видео-демонстрации, labs, 90 дней доступа.",
+    "access": "Курс $0, нужна регистрация; заявлено 90 дней доступа. Облачный кластер оплачивается отдельно."
+  },
+  "A27": {
+    "topic": "kubernetes",
+    "title": "Learn Kubernetes Basics",
+    "url": "https://kubernetes.io/docs/tutorials/kubernetes-basics/",
+    "kind": "docs",
+    "language": "EN",
+    "what_to_watch": "Deploy, expose, scale, update и rollback учебного сервиса.",
+    "verification": "05.09.2026: Открыта официальная документация Kubernetes.",
+    "access": "Бесплатно, без регистрации"
+  },
+  "A28": {
+    "topic": "airflow",
+    "title": "Orchestrating Workflows for GenAI Applications — Astronomer / DeepLearning.AI",
+    "url": "https://www.deeplearning.ai/courses/orchestrating-workflows-for-genai-applications",
+    "kind": "video_course",
+    "language": "EN",
+    "what_to_watch": "From Notebook To Pipeline; Building a Simple Pipeline; ingest/embed DAG; scheduling, mapping, retry/backfill. Airflow изучать для пакетной оркестрации.",
+    "verification": "05.09.2026: Проверены официальная индексированная страница и syllabus: 11 видео; в курсе Airflow 3.0; web.open вернул 403.",
+    "access": "Регистрация; условия доступа и PRO меняются. На странице курса проверить бесплатный просмотр/audit; API и облачные ресурсы могут оплачиваться отдельно."
+  },
+  "A29": {
+    "topic": "airflow",
+    "title": "Apache Airflow Tutorials",
+    "url": "https://airflow.apache.org/docs/apache-airflow/stable/tutorial/index.html",
+    "kind": "docs",
+    "language": "EN",
+    "what_to_watch": "Базовый DAG/TaskFlow и работа с событиями/расписанием; повторные запуски и backfill на тестовых данных.",
+    "verification": "05.09.2026: Открыт официальный индекс практических tutorials Apache Airflow.",
+    "access": "Бесплатно, без регистрации"
+  },
+  "B01": {
+    "id": "B01",
+    "topic": "Python",
+    "title": "The Python Tutorial",
+    "url": "https://docs.python.org/3/tutorial/",
+    "kind": "documentation",
+    "language": "EN",
+    "what_to_watch": "Главы 4–9 и 12: функции, коллекции, модули, исключения, классы, окружения. Затем генераторы и контекстные менеджеры.",
+    "verification": "Открыта официальная документация Python; подтверждены оглавление и примеры.",
+    "access": "Бесплатное чтение",
+    "checked_on": "2026-09-05"
+  },
+  "B02": {
+    "id": "B02",
+    "topic": "FastAPI",
+    "title": "FastAPI: Tutorial — User Guide",
+    "url": "https://fastapi.tiangolo.com/tutorial/",
+    "kind": "documentation",
+    "language": "EN; есть RU-перевод",
+    "what_to_watch": "Request Body, Response Model, Dependencies, Handling Errors, Testing; написать API загрузки документа.",
+    "verification": "Открыт официальный tutorial; есть пошаговые разделы и запускаемые примеры. Доступен переключатель на русский.",
+    "access": "Бесплатное чтение",
+    "checked_on": "2026-09-05"
+  },
+  "B03": {
+    "id": "B03",
+    "topic": "Async / concurrency",
+    "title": "FastAPI: Concurrency and async / await",
+    "url": "https://fastapi.tiangolo.com/async/",
+    "kind": "documentation",
+    "language": "EN; есть RU-перевод",
+    "what_to_watch": "Когда выбирать def/async def, чем конкурентность отличается от параллелизма; I/O-bound и CPU-bound задачи.",
+    "verification": "Открыт официальный материал с объяснением async/await и иллюстрациями.",
+    "access": "Бесплатное чтение",
+    "checked_on": "2026-09-05"
+  },
+  "B04": {
+    "id": "B04",
+    "topic": "SQL / PostgreSQL",
+    "title": "PostgreSQL: Tutorial",
+    "url": "https://www.postgresql.org/docs/current/tutorial.html",
+    "kind": "documentation",
+    "language": "EN",
+    "what_to_watch": "SQL, связи таблиц, агрегирование и продвинутые возможности; применить к tenants, documents, jobs.",
+    "verification": "Открыта официальная страница Part I Tutorial.",
+    "access": "Бесплатное чтение",
+    "checked_on": "2026-09-05"
+  },
+  "B05": {
+    "id": "B05",
+    "topic": "Transactions",
+    "title": "PostgreSQL: Transactions",
+    "url": "https://www.postgresql.org/docs/current/tutorial-transactions.html",
+    "kind": "documentation",
+    "language": "EN",
+    "what_to_watch": "BEGIN/COMMIT/ROLLBACK, атомарность и savepoints; транзакция создания бизнес-объекта и outbox.",
+    "verification": "Открыта официальная глава 3.4 Transactions.",
+    "access": "Бесплатное чтение",
+    "checked_on": "2026-09-05"
+  },
+  "B06": {
+    "id": "B06",
+    "topic": "Testing",
+    "title": "pytest: How to use fixtures",
+    "url": "https://docs.pytest.org/en/stable/how-to/fixtures.html",
+    "kind": "documentation",
+    "language": "EN",
+    "what_to_watch": "Фикстуры, область действия, teardown; изолированные тесты API, БД и worker.",
+    "verification": "Открыта официальная документация pytest с примерами fixtures.",
+    "access": "Бесплатное чтение",
+    "checked_on": "2026-09-05"
+  },
+  "B07": {
+    "id": "B07",
+    "topic": "CI/CD",
+    "title": "Understanding GitHub Actions",
+    "url": "https://docs.github.com/en/actions/get-started/understand-github-actions",
+    "kind": "documentation",
+    "language": "EN",
+    "what_to_watch": "Workflow, event, job, step, runner; собрать pipeline lint → tests → image.",
+    "verification": "Открыта официальная статья GitHub Docs.",
+    "access": "Бесплатное чтение",
+    "checked_on": "2026-09-05"
+  },
+  "B08": {
+    "id": "B08",
+    "topic": "Docker",
+    "title": "Docker: Get started",
+    "url": "https://docs.docker.com/get-started/",
+    "kind": "documentation",
+    "language": "EN",
+    "what_to_watch": "Образ, контейнер, Dockerfile, volumes, сети и Compose; воспроизводимый локальный стенд.",
+    "verification": "Открыты официальные Get started и Introduction.",
+    "access": "Бесплатное чтение",
+    "checked_on": "2026-09-05"
+  },
+  "B09": {
+    "id": "B09",
+    "topic": "Celery / background jobs",
+    "title": "Celery: Tasks",
+    "url": "https://docs.celeryq.dev/en/stable/userguide/tasks.html",
+    "kind": "documentation",
+    "language": "EN",
+    "what_to_watch": "Идемпотентность, acks_late, retry, тайм-ауты и состояния; поведение при повторной доставке.",
+    "verification": "Открыта официальная глава Tasks с примерами.",
+    "access": "Бесплатное чтение",
+    "checked_on": "2026-09-05"
+  },
+  "B10": {
+    "id": "B10",
+    "topic": "RabbitMQ / delivery",
+    "title": "Consumer Acknowledgements and Publisher Confirms",
+    "url": "https://www.rabbitmq.com/docs/confirms",
+    "kind": "documentation",
+    "language": "EN",
+    "what_to_watch": "Разделять подтверждение публикации и подтверждение обработки; requeue, prefetch и redelivery.",
+    "verification": "Открыта официальная документация RabbitMQ.",
+    "access": "Бесплатное чтение",
+    "checked_on": "2026-09-05"
+  },
+  "B11": {
+    "id": "B11",
+    "topic": "Idempotency / retries",
+    "title": "Making retries safe with idempotent APIs",
+    "url": "https://aws.amazon.com/builders-library/making-retries-safe-with-idempotent-APIs/",
+    "kind": "documentation",
+    "language": "EN",
+    "what_to_watch": "Client request ID, повтор запроса, поздняя доставка и одинаковый ключ с другими параметрами.",
+    "verification": "Открыта статья AWS Builders’ Library; материал разработчиков AWS.",
+    "access": "Бесплатное чтение",
+    "checked_on": "2026-09-05"
+  },
+  "B12": {
+    "id": "B12",
+    "topic": "OpenTelemetry",
+    "title": "OpenTelemetry Python: Getting Started by Example",
+    "url": "https://opentelemetry.io/docs/languages/python/getting-started/",
+    "kind": "documentation",
+    "language": "EN",
+    "what_to_watch": "Инструментирование Python, traces, metrics и экспорт; провести trace через API и worker.",
+    "verification": "Открыта официальная Python-инструкция OpenTelemetry.",
+    "access": "Бесплатное чтение",
+    "checked_on": "2026-09-05"
+  },
+  "B13": {
+    "id": "B13",
+    "topic": "Prometheus",
+    "title": "Getting started with Prometheus",
+    "url": "https://prometheus.io/docs/tutorials/getting_started/",
+    "kind": "documentation",
+    "language": "EN",
+    "what_to_watch": "Запуск сервера, scrape targets, запросы; измерять ошибки, длительность и очередь.",
+    "verification": "Открыт официальный tutorial Prometheus.",
+    "access": "Бесплатное чтение",
+    "checked_on": "2026-09-05"
+  },
+  "B14": {
+    "id": "B14",
+    "topic": "API security",
+    "title": "OWASP Top 10 API Security Risks — 2023",
+    "url": "https://owasp.org/API-Security/editions/2023/en/0x11-t10/",
+    "kind": "documentation",
+    "language": "EN",
+    "what_to_watch": "Доступ к объектам и полям, аутентификация, расход ресурсов, SSRF и доверие внешним API.",
+    "verification": "Открыта официальная страница редакции 2023; не объявляется самой новой без отдельной проверки.",
+    "access": "Бесплатное чтение",
+    "checked_on": "2026-09-05"
+  },
+  "B15": {
+    "id": "B15",
+    "topic": "Authorization / tenant isolation",
+    "title": "OWASP Authorization Cheat Sheet",
+    "url": "https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html",
+    "kind": "documentation",
+    "language": "EN",
+    "what_to_watch": "Deny by default, проверка каждого запроса, least privilege; отрицательные тесты между tenants.",
+    "verification": "Открыта официальная шпаргалка OWASP.",
+    "access": "Бесплатное чтение",
+    "checked_on": "2026-09-05"
+  },
+  "B16": {
+    "id": "B16",
+    "topic": "System design / C4",
+    "title": "C4 model: Diagrams",
+    "url": "https://c4model.com/diagrams",
+    "kind": "documentation",
+    "language": "EN",
+    "what_to_watch": "Context и Container сначала; затем Dynamic и Deployment для опасных/асинхронных сценариев.",
+    "verification": "Открыта официальная страница автора C4 Simon Brown; доступны примеры диаграмм.",
+    "access": "Бесплатное чтение",
+    "checked_on": "2026-09-05"
+  },
+  "B17": {
+    "id": "B17",
+    "topic": "SLO / reliability",
+    "title": "Google SRE Workbook: Implementing SLOs",
+    "url": "https://sre.google/workbook/implementing-slos/",
+    "kind": "documentation",
+    "language": "EN",
+    "what_to_watch": "Пользовательские SLI, SLO, error budget и согласование целей; выбрать метрики своего сервиса.",
+    "verification": "Открыта глава бесплатной книги Google SRE.",
+    "access": "Бесплатное чтение",
+    "checked_on": "2026-09-05"
+  },
+  "B18": {
+    "id": "B18",
+    "topic": "Leadership / code review",
+    "title": "GitLab: Code Review Guidelines",
+    "url": "https://handbook.gitlab.com/handbook/engineering/workflow/code-review/",
+    "kind": "documentation",
+    "language": "EN",
+    "what_to_watch": "Роли reviewer/maintainer, обратная связь, передача ревью; провести реальный review небольшого компонента.",
+    "verification": "Открыта официальная страница GitLab Handbook.",
+    "access": "Бесплатное чтение",
+    "checked_on": "2026-09-05"
+  },
+  "B19": {
+    "id": "BV01",
+    "topic": "Python",
+    "title": "CS50P — Week 0: Functions",
+    "url": "https://cs50.harvard.edu/python/weeks/0/",
+    "kind": "video",
+    "language": "EN",
+    "what_to_watch": "Функции, аргументы, возвращаемые значения, области видимости. При слабой базе далее пройти главы 1–4, 6 и 8.",
+    "verification": "Открыта страница Harvard с конкретной лекцией, CS50 Video Player, YouTube, субтитрами, транскриптом и кодом.",
+    "access": "Лекция бесплатна; платный сертификат не нужен",
+    "checked_on": "2026-09-05"
+  },
+  "B20": {
+    "id": "BV02",
+    "topic": "Testing",
+    "title": "CS50P — Week 5: Unit Tests",
+    "url": "https://cs50.harvard.edu/python/weeks/5/",
+    "kind": "video",
+    "language": "EN",
+    "what_to_watch": "assert, pytest и разбиение тестов. После просмотра написать тесты ошибок, а не только happy path.",
+    "verification": "Открыта страница лекции Harvard: встроенный player, YouTube, transcript, subtitles и short pytest.",
+    "access": "Лекция бесплатна; платный сертификат не нужен",
+    "checked_on": "2026-09-05"
+  },
+  "B21": {
+    "id": "BV03",
+    "topic": "SQL / PostgreSQL",
+    "title": "CS50 SQL — Week 0: Querying",
+    "url": "https://cs50.harvard.edu/sql/weeks/0/",
+    "kind": "video",
+    "language": "EN",
+    "what_to_watch": "SELECT, фильтры, NULL, агрегации; затем в курсе Relating, Designing и Optimizing. Курс стартует на SQLite; практику плана перенести в PostgreSQL.",
+    "verification": "Открыта страница Harvard с конкретной лекцией, плеером, кодом, слайдами и транскриптом.",
+    "access": "Лекция бесплатна; платный сертификат не нужен",
+    "checked_on": "2026-09-05"
+  },
+  "B22": {
+    "id": "BV04",
+    "topic": "Git",
+    "title": "MIT Missing Semester — Version Control (Git)",
+    "url": "https://missing.csail.mit.edu/2020/version-control/",
+    "kind": "video",
+    "language": "EN",
+    "what_to_watch": "Модель коммитов, ветки, merge и разрешение конфликтов; повторить упражнения из конспекта.",
+    "verification": "Открыта страница MIT с YouTube iframe, конспектом и упражнениями.",
+    "access": "Бесплатный просмотр; воспроизведение не проверялось",
+    "checked_on": "2026-09-05"
+  },
+  "B23": {
+    "id": "BV05",
+    "topic": "FastAPI / deployment",
+    "title": "Deploy FastAPI to the cloud — Sebastián Ramírez, PyCon Italia 2025",
+    "url": "https://2025.pycon.it/en/event/deploy-fastapi-to-the-cloud",
+    "kind": "video",
+    "language": "EN",
+    "what_to_watch": "Создание приложения с нуля и развёртывание. Сопоставить демонстрацию с собственным Docker/VM стендом.",
+    "verification": "Открыта страница организатора конференции: автор — создатель FastAPI, English, описание и ссылка Recording на YouTube. Воспроизведение не проверено.",
+    "access": "Запись открыта; показанный облачный сервис может требовать аккаунт и оплаты",
+    "checked_on": "2026-09-05"
+  },
+  "B24": {
+    "id": "BV06",
+    "topic": "Docker / integration tests",
+    "title": "Docker Intro and Overview — Michael Irwin",
+    "url": "https://www.docker.com/resources/docker-intro-and-overview-on-demand-training/",
+    "kind": "video",
+    "language": "EN",
+    "what_to_watch": "По оглавлению: 1:34 Container 101; 12:30 Container-supported development; 23:05 integration testing; 29:57 App containerization; 32:18 GitHub Actions.",
+    "verification": "Открыта официальная on-demand страница Docker с полным transcript и указанными таймкодами.",
+    "access": "Материал доступен без оплаты; отдельные сервисы Docker могут быть платными",
+    "checked_on": "2026-09-05"
+  },
+  "B25": {
+    "id": "BV07",
+    "topic": "GitHub Actions / CI",
+    "title": "How to use GitHub Actions | GitHub for Beginners",
+    "url": "https://www.youtube.com/watch?v=BQrohJ3PT7I",
+    "kind": "video",
+    "language": "EN",
+    "what_to_watch": "00:30 основные понятия, 02:31 первый workflow, 06:16 проверка workflow. Затем заменить учебную автоматизацию на pytest и сборку образа.",
+    "verification": "Поиск вернул конкретное видео официального верифицированного канала GitHub, опубликовано 16.03.2026; описание и главы прочитаны.",
+    "access": "Бесплатный просмотр; воспроизведение не проверялось",
+    "checked_on": "2026-09-05"
+  },
+  "B26": {
+    "id": "BV08",
+    "topic": "RabbitMQ / resilience",
+    "title": "TGIR S01E06 — How to run a reliable RabbitMQ on K8S",
+    "url": "https://github.com/rabbitmq/tgir/blob/master/s01/e06/README.md",
+    "kind": "video",
+    "language": "EN",
+    "what_to_watch": "Сценарии потери части и всех узлов, клиентское восстановление, availability при обновлении. Смотреть как демонстрацию сбоев, команды сверять с текущей документацией.",
+    "verification": "Открыт официальный репозиторий RabbitMQ: дата 30.09.2020, автор Gerhard Lazu и конкретная ссылка https://www.youtube.com/watch?v=I02oKJlOnR4. Авторы предупреждают: пример не является руководством для production K8s.",
+    "access": "Бесплатно. Архивная запись 2020 года; не копировать старую конфигурацию как актуальную",
+    "checked_on": "2026-09-05"
+  },
+  "B27": {
+    "id": "BV09",
+    "topic": "OpenTelemetry / observability",
+    "title": "What is OpenTelemetry? — OTel for beginners",
+    "url": "https://opentelemetry.io/docs/what-is-opentelemetry/",
+    "kind": "video",
+    "language": "EN",
+    "what_to_watch": "Зачем нужны traces, metrics, logs; SDK и Collector; чем инструментация отличается от хранилища телеметрии.",
+    "verification": "Открыта официальная страница OpenTelemetry с встроенным YouTube video и ссылкой на OTel for beginners.",
+    "access": "Бесплатный просмотр; воспроизведение не проверялось",
+    "checked_on": "2026-09-05"
+  },
+  "B28": {
+    "id": "BV10",
+    "topic": "Prometheus",
+    "title": "Introduction to the Prometheus Monitoring System | Key Concepts and Features — PromLabs",
+    "url": "https://www.youtube.com/watch?v=STVMGrYIlfg",
+    "kind": "video",
+    "language": "EN",
+    "what_to_watch": "Введение в модель мониторинга Prometheus; после просмотра собрать scrape и простой PromQL-запрос.",
+    "verification": "Официальный сайт PromLabs содержит это точное название и встроенный YouTube URL с ID STVMGrYIlfg. Сам YouTube ограничил автоматическую загрузку; воспроизведение не подтверждено.",
+    "access": "Открытое видео; коммерческие курсы PromLabs покупать не требуется",
+    "checked_on": "2026-09-05"
+  },
+  "B29": {
+    "id": "BV11",
+    "topic": "API security / OWASP",
+    "title": "OWASP API Security Project — Past, Present and Future, Global AppSec Lisbon 2024",
+    "url": "https://owasp.org/www-project-api-security/",
+    "kind": "video",
+    "language": "EN",
+    "what_to_watch": "На странице открыть запись от 28.06.2024; связать API-риски с ACL, лимитами и внешними интеграциями своего проекта.",
+    "verification": "Открыта официальная страница OWASP, где размещены точное название доклада и ссылка YouTube.",
+    "access": "Бесплатный просмотр; воспроизведение не проверялось",
+    "checked_on": "2026-09-05"
+  },
+  "B30": {
+    "id": "BV12",
+    "topic": "System design / C4",
+    "title": "Visualising software architecture with the C4 model — Simon Brown",
+    "url": "https://c4model.com/",
+    "kind": "video",
+    "language": "EN",
+    "what_to_watch": "Контекст, контейнеры, компоненты и уровень детализации для разной аудитории; нарисовать две схемы своего проекта.",
+    "verification": "Открыт официальный сайт автора: встроенная запись Agile on the Beach 2019, название и имя Simon Brown.",
+    "access": "Бесплатный просмотр; воспроизведение не проверялось",
+    "checked_on": "2026-09-05"
+  },
+  "B31": {
+    "id": "BV13",
+    "topic": "Discovery / customer interviews",
+    "title": "How To Talk To Users | Startup School — Gustaf Alströmer",
+    "url": "https://www.youtube.com/watch?v=z1iF1c8w5Lg",
+    "kind": "video",
+    "language": "EN",
+    "what_to_watch": "03:23 кого интервьюировать; 05:58 интервью; 09:42 уточняющие вопросы; 14:37 проверка прототипа. Перевести выводы в scope и критерии пилота.",
+    "verification": "Найдена страница конкретного видео верифицированного канала Y Combinator, 01.12.2022; прочитаны описание и главы. Официальный блог YC также перечисляет эту запись.",
+    "access": "Бесплатный просмотр; воспроизведение не проверялось",
+    "checked_on": "2026-09-05"
+  },
+  "B32": {
+    "id": "BV14",
+    "topic": "Leadership / team communication",
+    "title": "GitLab — Building High Performing Teams: conversation with Jeb Hurley",
+    "url": "https://handbook.gitlab.com/handbook/leadership/#building-high-performing-teams",
+    "kind": "video",
+    "language": "EN",
+    "what_to_watch": "Обсуждение доверия, продуктивности и взаимодействия в распределённой команде; связать с делегированием и обратной связью.",
+    "verification": "Открыт GitLab Handbook: раздел Building High Performing Teams с описанием беседы и встроенным YouTube video. Воспроизведение не проверено.",
+    "access": "Бесплатный просмотр; воспроизведение не проверялось",
+    "checked_on": "2026-09-05"
+  },
+  "N01": {
+    "title": "Anthropic: Demystifying evals for AI agents",
+    "url": "https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents",
+    "kind": "documentation",
+    "language": "EN",
+    "access": "Бесплатно, без регистрации",
+    "note": "Разделить задачу, повторный прогон, проверяющий механизм, трассу и фактическое конечное состояние. Связать испытание с проверкой записи в CRM; прогонять важные случаи из чистого состояния и калибровать LLM-судью по человеку.",
+    "source_page": [
+      22,
+      41
+    ],
+    "target_modules": [
+      "11",
+      "13",
+      "23"
+    ],
+    "verification": "06.09.2026: открыта официальная статья Anthropic от 09.01.2026; проверены разделы о структуре eval, исходах в среде, повторных прогонах и калибровке."
+  },
+  "N02": {
+    "title": "LangGraph: Interrupts",
+    "url": "https://docs.langchain.com/oss/python/langgraph/interrupts",
+    "kind": "documentation",
+    "language": "EN",
+    "access": "Бесплатно, без регистрации",
+    "note": "Остановка перед подтверждением, возобновление и повторное выполнение узла. Изучить требования к сериализации и идемпотентности действий до interrupt. Наличие checkpoint не даёт гарантии однократного внешнего эффекта.",
+    "source_page": [
+      29
+    ],
+    "target_modules": [
+      "13",
+      "14"
+    ],
+    "verification": "06.09.2026: открыта официальная документация LangChain; проверен раздел Side effects called before interrupt must be idempotent и описание повторного запуска узлов."
+  },
+  "N03": {
+    "title": "Chris Richardson: Transactional Outbox",
+    "url": "https://microservices.io/patterns/data/transactional-outbox.html",
+    "kind": "documentation",
+    "language": "EN",
+    "access": "Статья бесплатно; предлагаемые на странице книги и курсы отдельно",
+    "note": "Сохранить бизнес-изменение и событие одной транзакцией, отправлять отдельным relay. Воспроизвести падение после отправки до отметки sent; повтор требует идемпотентного потребителя и сверки внешнего эффекта.",
+    "source_page": [
+      30
+    ],
+    "target_modules": [
+      "03",
+      "14"
+    ],
+    "verification": "06.09.2026: открыта авторская страница паттерна; прочитаны Solution и Result context, включая возможность повторной публикации relay."
+  },
+  "N04": {
+    "title": "OWASP: LLM Prompt Injection Prevention Cheat Sheet",
+    "url": "https://cheatsheetseries.owasp.org/cheatsheets/LLM_Prompt_Injection_Prevention_Cheat_Sheet.html",
+    "kind": "documentation",
+    "language": "EN",
+    "access": "Бесплатно, без регистрации",
+    "note": "Превратить угрозы из вопроса, PDF и результата инструмента в отрицательные испытания. Права, допустимые аргументы и минимальные разрешения проверяет приложение; текстовые фильтры и дополнительная модель — отдельные слои защиты.",
+    "source_page": [
+      35
+    ],
+    "target_modules": [
+      "07",
+      "13",
+      "19"
+    ],
+    "verification": "06.09.2026: открыта официальная памятка OWASP; проверены косвенные инъекции, Agent-Specific Defenses, Least Privilege и ограничения guardrail LLM."
+  },
+  "N05": {
+    "title": "OWASP: File Upload Cheat Sheet",
+    "url": "https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html",
+    "kind": "documentation",
+    "language": "EN",
+    "access": "Бесплатно, без регистрации",
+    "note": "Проверять тип и размер загружаемого документа, безопасное имя, права пользователя, место хранения и лимиты обработки. Content-Type клиента не считать доказательством формата. Добавить проверку тяжёлых и повреждённых файлов.",
+    "source_page": [
+      35
+    ],
+    "target_modules": [
+      "02",
+      "12",
+      "19"
+    ],
+    "verification": "06.09.2026: открыта официальная памятка OWASP; прочитаны File Upload Protection и ограничения доверия к Content-Type."
+  },
+  "N06": {
+    "title": "Prometheus: Understanding metric types",
+    "url": "https://prometheus.io/docs/tutorials/understanding_metric_types/",
+    "kind": "documentation",
+    "language": "EN",
+    "access": "Бесплатно, без регистрации",
+    "note": "Разобрать counter для событий, gauge для текущей очереди и histogram для задержек. Объяснить, как оценка p95 зависит от корзин; не усреднять перцентили разных экземпляров сервиса.",
+    "source_page": [
+      34
+    ],
+    "target_modules": [
+      "20",
+      "21"
+    ],
+    "verification": "06.09.2026: открыта официальная документация Prometheus; проверены определения четырёх типов, histogram buckets и histogram_quantile."
+  },
+  "N07": {
+    "title": "Qdrant: Filtering",
+    "url": "https://qdrant.tech/documentation/search/filtering/",
+    "kind": "documentation",
+    "language": "EN",
+    "access": "Бесплатно, без регистрации",
+    "note": "Сформировать условия по tenant и разрешённым документам на сервере, проверить must/should/must_not и вложенные поля. Повторить вопросы по запрещённым документам и после отзыва доступа; сопоставить ограничения с качеством поиска.",
+    "source_page": [
+      21,
+      51
+    ],
+    "target_modules": [
+      "10",
+      "19",
+      "Д3"
+    ],
+    "verification": "06.09.2026: открыта официальная документация Qdrant; проверены логика must и примеры вложенных фильтров. Применение фильтров как части контроля доступа — проектное задание, а не гарантия защиты самой библиотеки."
+  },
+  "N08": {
+    "title": "Google Engineering Practices: How to do a code review",
+    "url": "https://google.github.io/eng-practices/review/reviewer/",
+    "kind": "documentation",
+    "language": "EN",
+    "access": "Бесплатно, без регистрации",
+    "note": "Провести review переданной другому разработчику задачи: оценить изменение по критериям, дать конкретную обратную связь и записать разрешение одного разногласия. Использовать как опору для командной части финального испытания.",
+    "source_page": [
+      40,
+      42
+    ],
+    "target_modules": [
+      "22",
+      "24"
+    ],
+    "verification": "06.09.2026: открыта официальная страница Google Engineering Practices с руководством для reviewer."
+  },
+  "N09": {
+    "title": "Google SRE: Handling Overload",
+    "url": "https://sre.google/sre-book/handling-overload/",
+    "kind": "documentation",
+    "language": "EN",
+    "access": "Бесплатно, без регистрации; глава книги",
+    "note": "Разобрать квоты клиентов, ранний отказ, ограничение запросов на стороне клиента и приоритеты при перегрузке. На стенде показать, что избыточный поток одного клиента не блокирует полезные запросы остальных.",
+    "source_page": [
+      37
+    ],
+    "target_modules": [
+      "14",
+      "21"
+    ],
+    "verification": "06.09.2026: открыта глава на официальном сайте Google SRE; прочитаны Client-Side Throttling и Criticality. Приведённые в книге названия сервисов и масштабы — исторические примеры, не требования к учебному стенду."
+  },
+  "N10": {
+    "title": "n8n: Beginner course — официальный видеокурс",
+    "url": "https://www.youtube.com/playlist?list=PLlET0GsrLUL59YbxstZE71WszP3pVnZfI",
+    "kind": "video",
+    "language": "EN",
+    "access": "Видеоплейлист YouTube; просмотр бесплатный, доступность платформы зависит от сети. Сервис n8n и хостинг имеют отдельные условия.",
+    "note": "Выбрать уроки APIs and Webhooks, Error handling, Debugging и Collaboration под задачу интеграции. Для курса есть официальная страница с перечнем уроков; повторный просмотр не добавляет часы к уже закрытому модулю.",
+    "source_page": [
+      28
+    ],
+    "target_modules": [
+      "16"
+    ],
+    "verification": "06.09.2026: точный плейлист подтверждён ссылкой Beginner из официального репозитория https://github.com/n8n-io/n8n-docs/blob/main/docs/video-courses.md; открыта страница плейлиста. Видео целиком не просматривались."
+  },
+  "N11": {
+    "title": "Langfuse / Tom Yeh: Beginner’s Guide to RAG Evaluation with Langfuse and Ragas",
+    "url": "https://langfuse.com/guides/videos/beginners-guide-to-rag-evaluation",
+    "kind": "video",
+    "language": "EN",
+    "access": "Открытая страница с видеоплеером и конспектом; сервисы и API для практики имеют отдельные условия",
+    "note": "Из каталога Langfuse в пользовательском плане выбран конкретный вебинар. Смотреть разбор компонентов RAG, трасс и метрик; затем вручную проверить пять своих случаев и сравнить автоматические оценки с рубрикой.",
+    "source_page": [
+      22,
+      34
+    ],
+    "target_modules": [
+      "11",
+      "20"
+    ],
+    "verification": "06.09.2026: перешли с указанного в PDF официального каталога https://langfuse.com/guides/videos на конкретный материал; проверены название, спикер, видеоплеер и конспект. Видео целиком не просматривалось."
+  },
+  "N12": {
+    "title": "LangGraph: Workflows and agents",
+    "url": "https://docs.langchain.com/oss/python/langgraph/workflows-agents",
+    "kind": "documentation",
+    "language": "EN",
+    "access": "Бесплатно, без регистрации",
+    "note": "Сравнить заранее заданный workflow и выбор шагов моделью. Построить минимальный граф и объяснить цену его состояния, повторов и отладки. Усложнять процесс только при подтверждённой пользе.",
+    "source_page": [
+      29,
+      51
+    ],
+    "target_modules": [
+      "13",
+      "Д2"
+    ],
+    "verification": "06.09.2026: открыта официальная документация LangChain с паттернами workflows и agents; использовать с установленной версией SDK."
+  },
+  "N13": {
+    "title": "PaddleOCR: PP-StructureV3 Pipeline Usage Tutorial",
+    "url": "https://www.paddleocr.ai/latest/en/version3.x/pipeline_usage/PP-StructureV3.html",
+    "language": "EN",
+    "kind": "documentation",
+    "access": "Открытая страница; запуск моделей и инфраструктура отдельно.",
+    "verification": "Открыта официальная документация 06.09.2026: layout, таблицы, порядок чтения, настройка модулей."
+  },
+  "N14": {
+    "title": "PostgreSQL: Full Text Search",
+    "url": "https://www.postgresql.org/docs/current/textsearch.html",
+    "language": "EN",
+    "kind": "documentation",
+    "access": "Открытая страница; запуск моделей и инфраструктура отдельно.",
+    "verification": "Открыта официальная документация 06.09.2026: состав полнотекстового поиска и раздел ранжирования."
+  },
+  "N15": {
+    "title": "Qdrant: Indexing",
+    "url": "https://qdrant.tech/documentation/manage-data/indexing/",
+    "language": "EN",
+    "kind": "documentation",
+    "access": "Открытая страница; запуск моделей и инфраструктура отдельно.",
+    "verification": "Открыта официальная документация 06.09.2026; прежний concepts URL перенаправляет на manage-data/indexing."
+  },
+  "N16": {
+    "title": "MERA: русскоязычный бенчмарк",
+    "url": "https://mera.a-ai.ru/ru/text",
+    "language": "RU",
+    "kind": "documentation",
+    "access": "Открытая страница; запуск моделей и инфраструктура отдельно.",
+    "verification": "Открыта официальная страница 06.09.2026. Бенчмарк применяется для отбора кандидатов; решение требует собственного eval."
+  },
+  "R01": {
+    "topic": "Битрикс24 REST и webhooks",
+    "title": "Входящие и исходящие вебхуки",
+    "url": "https://apidocs.bitrix24.ru/local-integrations/local-webhooks.html",
+    "kind": "doc",
+    "language": "ru",
+    "what_to_watch": "Входящий и исходящий webhook, права и секреты; реализовать тестовый read-only вызов и входящий обработчик.",
+    "verification": "Проверено 05.09.2026: официальная документация; страница и тематический текст доступны.",
+    "access": "Открыто, без оплаты; практические запросы требуют собственного тестового аккаунта/ключа."
+  },
+  "R02": {
+    "topic": "Битрикс24 архитектура API",
+    "title": "REST API Битрикс24",
+    "url": "https://apidocs.bitrix24.ru/",
+    "kind": "doc",
+    "language": "ru",
+    "what_to_watch": "Различия REST/REST 3.0, scope, лимиты, batch, пагинация; точные методы брать из текущего справочника.",
+    "verification": "Проверено 05.09.2026: официальная документация; страница и тематический текст доступны.",
+    "access": "Открыто, без оплаты; практические запросы требуют собственного тестового аккаунта/ключа."
+  },
+  "R03": {
+    "topic": "Битрикс24 передача человеку",
+    "title": "Передать диалог другому оператору или в другую линию",
+    "url": "https://apidocs.bitrix24.ru/api-reference/imopenlines/openlines/operators/imopenlines-operator-transfer",
+    "kind": "doc",
+    "language": "ru",
+    "what_to_watch": "Метод imopenlines.operator.transfer: права на диалог, параметры и ошибки; привязать к состоянию handoff.",
+    "verification": "Проверено 05.09.2026: официальная документация; страница и тематический текст доступны.",
+    "access": "Открыто, без оплаты; практические запросы требуют собственного тестового аккаунта/ключа."
+  },
+  "R04": {
+    "topic": "amoCRM API",
+    "title": "API Reference amoCRM",
+    "url": "https://www.amocrm.ru/developers/content/crm_platform/api-reference",
+    "kind": "doc",
+    "language": "ru",
+    "what_to_watch": "Сделки, контакты, связи, поля, вебхуки и беседы; выбрать одну сущность и контракт адаптера.",
+    "verification": "Проверено 05.09.2026: официальная документация; страница и тематический текст доступны.",
+    "access": "Открыто, без оплаты; практические запросы требуют собственного тестового аккаунта/ключа."
+  },
+  "R05": {
+    "topic": "amoCRM OAuth",
+    "title": "OAuth: пример по шагам",
+    "url": "https://www.amocrm.ru/developers/content/oauth/step-by-step",
+    "kind": "doc",
+    "language": "ru",
+    "what_to_watch": "Authorization code, access/refresh token, отключение интеграции и ошибки; реализовать безопасное обновление токена.",
+    "verification": "Проверено 05.09.2026: официальная документация; страница и тематический текст доступны.",
+    "access": "Открыто, без оплаты; практические запросы требуют собственного тестового аккаунта/ключа."
+  },
+  "R06": {
+    "topic": "amoCRM webhooks",
+    "title": "Webhooks amoCRM",
+    "url": "https://new.amocrm.ru/developers/content/crm_platform/webhooks-format",
+    "kind": "doc",
+    "language": "ru",
+    "what_to_watch": "Формат x-www-form-urlencoded, события и ограничения; не предполагать, что webhook содержит полную сущность.",
+    "verification": "Проверено 05.09.2026: официальная документация; страница и тематический текст доступны.",
+    "access": "Открыто, без оплаты; практические запросы требуют собственного тестового аккаунта/ключа."
+  },
+  "R07": {
+    "topic": "1С OData",
+    "title": "REST интерфейс платформы 1С:Предприятие",
+    "url": "https://v8.1c.ru/platforma/rest-interfeys/",
+    "kind": "doc",
+    "language": "ru",
+    "what_to_watch": "Автоматический OData 3.0, публикация, метаданные, чтение/запись; сравнить с отдельным HTTP-сервисом.",
+    "verification": "Проверено 05.09.2026: официальная документация; страница и тематический текст доступны.",
+    "access": "Открытая документация; практику выполнять в учебной базе 1С."
+  },
+  "R08": {
+    "topic": "1С HTTP-сервисы",
+    "title": "HTTP-сервисы платформы 1С:Предприятие",
+    "url": "https://v8.1c.ru/platforma/http-servisy/",
+    "kind": "doc",
+    "language": "ru",
+    "what_to_watch": "Ресурсы, шаблоны URL и собственный контракт обмена; предусмотреть аутентификацию и аудит.",
+    "verification": "Проверено 05.09.2026: официальная документация; страница и тематический текст доступны.",
+    "access": "Открытая документация; практику выполнять в учебной базе 1С."
+  },
+  "R09": {
+    "topic": "МойСклад API",
+    "title": "МойСклад для разработчиков",
+    "url": "https://dev.moysklad.ru/",
+    "kind": "doc",
+    "language": "ru",
+    "what_to_watch": "Выбрать JSON API и перейти в текущий справочник; проверить работу с контрагентами, документами и остатками.",
+    "verification": "Проверено 05.09.2026: официальная документация; страница и тематический текст доступны.",
+    "access": "Открыто, без оплаты; практические запросы требуют собственного тестового аккаунта/ключа."
+  },
+  "R10": {
+    "topic": "МойСклад API практика",
+    "title": "JSON API Workbook",
+    "url": "https://dev.moysklad.ru/workbook/",
+    "kind": "doc",
+    "language": "ru",
+    "what_to_watch": "Перейти к JSON API Workbook; разобрать один законченный обмен и сверить методы с актуальным API.",
+    "verification": "Проверено 05.09.2026: официальная документация; страница и тематический текст доступны.",
+    "access": "Открыто, без оплаты; практические запросы требуют собственного тестового аккаунта/ключа."
+  },
+  "R11": {
+    "topic": "Telegram bot",
+    "title": "Telegram Bot API",
+    "url": "https://core.telegram.org/bots/api",
+    "kind": "doc",
+    "language": "en",
+    "what_to_watch": "Update, getUpdates/setWebhook, secret_token, отправка сообщений и документов; дедупликация по update_id.",
+    "verification": "Проверено 05.09.2026: официальная документация; страница и тематический текст доступны.",
+    "access": "Открытая документация; нужен отдельный учебный бот."
+  },
+  "R13": {
+    "topic": "GigaChat API",
+    "title": "Авторизация GigaChat API",
+    "url": "https://developers.sber.ru/docs/ru/gigachat/api/reference/rest/gigachat-api",
+    "kind": "doc",
+    "language": "ru",
+    "what_to_watch": "Актуальный адрес API, токен и авторизация; не копировать старые endpoints из видео без сверки.",
+    "verification": "Проверено 05.09.2026: официальная документация; страница и тематический текст доступны.",
+    "access": "Открыто, без оплаты; практические запросы требуют собственного тестового аккаунта/ключа."
+  },
+  "R14": {
+    "topic": "GigaChat документы и function calling",
+    "title": "Руководства GigaChat API",
+    "url": "https://developers.sber.ru/docs/ru/gigachat/guides/main",
+    "kind": "doc",
+    "language": "ru",
+    "what_to_watch": "Структурированные данные, функции, файлы, embeddings, квоты и история моделей.",
+    "verification": "Проверено 05.09.2026: официальная документация; страница и тематический текст доступны.",
+    "access": "Открыто, без оплаты; практические запросы требуют собственного тестового аккаунта/ключа."
+  },
+  "R15": {
+    "topic": "Данные и логирование LLM",
+    "title": "Отключить логирование запросов в Yandex AI Studio",
+    "url": "https://aistudio.yandex.ru/ru/docs/ai-studio/operations/disable-logging",
+    "kind": "doc",
+    "language": "ru",
+    "what_to_watch": "Настройка логирования; явно описать судьбу промптов, вложений и ответов в архитектуре проекта.",
+    "verification": "Проверено 05.09.2026: официальная документация; страница и тематический текст доступны.",
+    "access": "Открыто, без оплаты; практические запросы требуют собственного тестового аккаунта/ключа."
+  },
+  "R16": {
+    "topic": "152-ФЗ и ответственность",
+    "title": "Федеральный закон от 27.07.2006 № 152-ФЗ «О персональных данных»",
+    "url": "https://government.ru/docs/all/98196/",
+    "kind": "doc",
+    "language": "ru",
+    "what_to_watch": "Цель/основание обработки, обязанности оператора, защита и прекращение обработки. Перед пилотом сверить применимую действующую редакцию и изменения.",
+    "verification": "Проверено 05.09.2026: официальный ресурс правительства и текст закона присутствуют в веб-индексе; прямое чтение страницы инструментом нестабильно. Это учебный первоисточник, не заключение о соответствии.",
+    "access": "Открытый официальный текст."
+  },
+  "R17": {
+    "topic": "Приватность и облако",
+    "title": "Приватность данных в Yandex Cloud",
+    "url": "https://yandex.cloud/ru/security/data-privacy",
+    "kind": "doc",
+    "language": "ru",
+    "what_to_watch": "Модель обработки и размещение данных; не приравнивать сертификацию провайдера к соответствию своего приложения.",
+    "verification": "Проверено 05.09.2026: официальная документация; страница и тематический текст доступны.",
+    "access": "Открыто."
+  },
+  "R18": {
+    "topic": "Tenant isolation",
+    "title": "PostgreSQL: Row Security Policies",
+    "url": "https://www.postgresql.org/docs/current/ddl-rowsecurity.html",
+    "kind": "doc",
+    "language": "en",
+    "what_to_watch": "RLS, роли и обходы; проверить, что реальная роль приложения не читает чужие строки.",
+    "verification": "Проверено 05.09.2026: официальная документация; страница и тематический текст доступны.",
+    "access": "Открыто."
+  },
+  "R19": {
+    "topic": "n8n data retention",
+    "title": "n8n: Manage execution data — официальный исходник документации",
+    "url": "https://github.com/n8n-io/n8n-docs/blob/main/docs/deploy/host-n8n/configure-n8n/scaling/manage-execution-data.md",
+    "kind": "doc",
+    "language": "en",
+    "what_to_watch": "Какие execution data сохраняются, pruning, исключения и удаление файлов; проверить на собственной версии.",
+    "verification": "Проверено 05.09.2026: официальная документация; страница и тематический текст доступны.",
+    "access": "Открытый официальный репозиторий; сайт документации меняет маршруты."
+  },
+  "R20": {
+    "topic": "Битрикс24 REST практика",
+    "title": "B24PHPSdk, Быстрый старт — REST API, эпизод 1",
+    "url": "https://apidocs.bitrix24.ru/meetups.html",
+    "kind": "video",
+    "language": "ru",
+    "what_to_watch": "На странице выбрать запись от 21.10.2024: входящие вебхуки и batch. Примеры PHP; воспроизвести HTTP-контракт на Python.",
+    "verification": "Проверено 05.09.2026: название, тема и ссылка на запись подтверждены на официальной странице; воспроизведение целиком не проверялось.",
+    "access": "Открытая запись на странице; тот же каталог используется для других перечисленных записей."
+  },
+  "R21": {
+    "topic": "Битрикс24 доставка событий",
+    "title": "Bitrix Talks Tech. Разбор механизма событий REST API",
+    "url": "https://apidocs.bitrix24.ru/meetups.html",
+    "kind": "video",
+    "language": "ru",
+    "what_to_watch": "Выбрать запись от 28.04.2022: почему события не отправляются/не доставляются. Сверить текущие ограничения в docs.",
+    "verification": "Проверено 05.09.2026: название, тема и ссылка на запись подтверждены на официальной странице; воспроизведение целиком не проверялось.",
+    "access": "Открытая запись; общий официальный каталог."
+  },
+  "R22": {
+    "topic": "Битрикс24 и 1С синхронизация",
+    "title": "Преимущества оффлайн-событий, или как их правильно использовать",
+    "url": "https://apidocs.bitrix24.ru/meetups.html",
+    "kind": "video",
+    "language": "ru",
+    "what_to_watch": "Выбрать запись от 21.05.2021: оффлайн-события и пример синхронизации с 1С. Применять принципы, API сверять с текущей документацией.",
+    "verification": "Проверено 05.09.2026: название, тема и ссылка на запись подтверждены на официальной странице; воспроизведение целиком не проверялось.",
+    "access": "Открытая запись; общий официальный каталог."
+  },
+  "R23": {
+    "topic": "1С HTTP/OData интеграции",
+    "title": "Механизмы интеграции платформы 1С:Предприятие: HTTP и SOAP — базовый уровень",
+    "url": "https://uc1.1c.ru/course/mehanizmy-integratsii-platformy-1s-predpriyatie-protokoly-http-i-soap-bazovyj-uroven/",
+    "kind": "video",
+    "language": "ru",
+    "what_to_watch": "Модули HTTP-сервисы, публикация базы, отправка/приём запросов и автоматический REST-интерфейс. Опциональная углублённая ветка.",
+    "verification": "Проверено 05.09.2026: название, тема и ссылка на запись подтверждены на официальной странице; воспроизведение целиком не проверялось.",
+    "access": "Платный видеокурс официального Учебного центра № 1; регистрация и покупка. Бесплатная альтернатива — две страницы docs 1С и учебная практика."
+  },
+  "R24": {
+    "topic": "GigaChat Python",
+    "title": "Начало работы с GigaChat API на Python",
+    "url": "https://developers.sber.ru/docs/ru/gigachat/api/video-tutorials",
+    "kind": "video",
+    "language": "ru",
+    "what_to_watch": "Выбрать одноимённый урок: окружение, авторизация, первый вызов. Актуальные URL/SDK сверить со справкой API.",
+    "verification": "Проверено 05.09.2026: название, тема и ссылка на запись подтверждены на официальной странице; воспроизведение целиком не проверялось.",
+    "access": "Открытая запись Rutube внутри официальной страницы; каталог также содержит следующий урок."
+  },
+  "R25": {
+    "topic": "GigaChat Telegram",
+    "title": "Интеграция GigaChat API с Telegram-ботом",
+    "url": "https://developers.sber.ru/docs/ru/gigachat/api/video-tutorials",
+    "kind": "video",
+    "language": "ru",
+    "what_to_watch": "Выбрать одноимённый урок с GigaChain. После урока самостоятельно добавить webhook-дедупликацию и передачу человеку.",
+    "verification": "Проверено 05.09.2026: название, тема и ссылка на запись подтверждены на официальной странице; воспроизведение целиком не проверялось.",
+    "access": "Открытая запись Rutube внутри официальной страницы."
+  },
+  "R26": {
+    "topic": "n8n и российский LLM",
+    "title": "Как интегрировать Yandex AI Studio с n8n",
+    "url": "https://rutube.ru/video/5517f5ada1de4623d5f43a4aac627280/",
+    "kind": "video",
+    "language": "ru",
+    "what_to_watch": "Короткое how-to подключения провайдера; затем реализовать свой webhook → проверка → API сценарий.",
+    "verification": "Проверено 05.09.2026: название, тема и ссылка на запись подтверждены на официальной странице; воспроизведение целиком не проверялось.",
+    "access": "Открыто; запись официального канала Yandex Cloud, связана из документации."
+  },
+  "R27": {
+    "topic": "Web chat",
+    "title": "Как интегрировать Yandex AI Studio с Open WebUI",
+    "url": "https://rutube.ru/video/2608f8dea34af9c05d8c67ecbc483a37/",
+    "kind": "video",
+    "language": "ru",
+    "what_to_watch": "Подключение чат-интерфейса к провайдеру. Отдельно спроектировать корпоративную авторизацию и передачу оператору.",
+    "verification": "Проверено 05.09.2026: название, тема и ссылка на запись подтверждены на официальной странице; воспроизведение целиком не проверялось.",
+    "access": "Открыто; официальный канал Yandex Cloud."
+  },
+  "R28": {
+    "topic": "LLM security",
+    "title": "Как устроена безопасность Yandex AI Studio",
+    "url": "https://rutube.ru/video/b78838ae91685dd9de68b91aad5ed361/",
+    "kind": "video",
+    "language": "ru",
+    "what_to_watch": "Посмотреть весь короткий обзор; составить схему движения данных и список настроек своего проекта.",
+    "verification": "Проверено 05.09.2026: название, тема и ссылка на запись подтверждены на официальной странице; воспроизведение целиком не проверялось.",
+    "access": "Открыто; официальный канал Yandex Cloud."
+  },
+  "R29": {
+    "topic": "Telegram RAG function calling",
+    "title": "Создание Telegram-бота на базе LLM с RAG и Function Calling",
+    "url": "https://www.youtube.com/live/gQEpthYWN38",
+    "kind": "video",
+    "language": "ru",
+    "what_to_watch": "Связка чат-бота, поиска по знаниям и вызова функций; в своей практике ограничить инструменты и добавить handoff.",
+    "verification": "Проверено 05.09.2026: название, тема и ссылка на запись подтверждены на официальной странице; воспроизведение целиком не проверялось.",
+    "access": "Открытая запись YouTube; ссылка подтверждена каталогом публичных материалов Yandex AI Studio. Доступность зависит от сети."
+  },
+  "R30": {
+    "topic": "OCR/VLM документы",
+    "title": "Как собрать агента на Workflows для обработки документов с OCR и VLM",
+    "url": "https://yandex.cloud/ru/ai-studio-series/2025",
+    "kind": "video",
+    "language": "ru",
+    "what_to_watch": "Выбрать одноимённую запись Александра Пилевского в программе. Сравнить извлечение OCR/VLM и правила проверки результата.",
+    "verification": "Проверено 05.09.2026: название, тема и ссылка на запись подтверждены на официальной странице; воспроизведение целиком не проверялось.",
+    "access": "Открытая страница с записями; прямое воспроизведение не проверялось."
+  },
+  "R31": {
+    "topic": "Production AI и UI",
+    "title": "Как создать и развернуть AI-агента: с нуля до продакшена",
+    "url": "https://yandex.cloud/ru/ai-studio-series/2025",
+    "kind": "video",
+    "language": "ru",
+    "what_to_watch": "Выбрать запись Дмитрия Рыбалко и Виктора Кузенного: развёртывание, интерфейс, MCP/A2A. Проверять применимость к простому собственному сервису.",
+    "verification": "Проверено 05.09.2026: название, тема и ссылка на запись подтверждены на официальной странице; воспроизведение целиком не проверялось.",
+    "access": "Открытая страница с записями; та же серия, другой вебинар."
+  },
+  "X01": {
+    "title": "Django: Writing your first app",
+    "url": "https://docs.djangoproject.com/en/stable/intro/tutorial01/",
+    "kind": "docs",
+    "language": "EN",
+    "what_to_watch": "Проект, приложение, views, URL, модели и миграции.",
+    "access": "Открытый материал; вычисления и внешние сервисы могут оплачиваться отдельно.",
+    "verification": "Открыта первичная страница 06.09.2026. Видео, если присутствует, не просмотрено целиком."
+  },
+  "X02": {
+    "title": "Flask: Tutorial",
+    "url": "https://flask.palletsprojects.com/en/stable/tutorial/",
+    "kind": "docs",
+    "language": "EN",
+    "what_to_watch": "Application factory, request, templates, данные и тестирование.",
+    "access": "Открытый материал; вычисления и внешние сервисы могут оплачиваться отдельно.",
+    "verification": "Открыта первичная страница 06.09.2026. Видео, если присутствует, не просмотрено целиком."
+  },
+  "X03": {
+    "title": "CS50x: Flask",
+    "url": "https://cs50.harvard.edu/x/weeks/9/",
+    "kind": "video",
+    "language": "EN",
+    "what_to_watch": "Лекция Harvard о Flask, HTTP, формах и сессиях.",
+    "access": "Бесплатная лекция с плеером, кодом и транскриптом.",
+    "verification": "Открыта первичная страница 06.09.2026. Видео, если присутствует, не просмотрено целиком."
+  },
+  "X04": {
+    "title": "Milvus: Quickstart",
+    "url": "https://milvus.io/docs/quickstart.md",
+    "kind": "docs",
+    "language": "EN",
+    "what_to_watch": "Коллекция, схема, вставка, поиск и фильтры.",
+    "access": "Открытый материал; вычисления и внешние сервисы могут оплачиваться отдельно.",
+    "verification": "Открыта первичная страница 06.09.2026. Видео, если присутствует, не просмотрено целиком."
+  },
+  "X05": {
+    "title": "Ollama: Quickstart",
+    "url": "https://docs.ollama.com/quickstart",
+    "kind": "docs",
+    "language": "EN",
+    "what_to_watch": "Локальный запуск и API; проверять выбранную модель и оборудование.",
+    "access": "Открытый материал; вычисления и внешние сервисы могут оплачиваться отдельно.",
+    "verification": "Открыта первичная страница 06.09.2026. Видео, если присутствует, не просмотрено целиком."
+  },
+  "X06": {
+    "title": "Ollama: Structured Outputs",
+    "url": "https://docs.ollama.com/capabilities/structured-outputs",
+    "kind": "docs",
+    "language": "EN",
+    "what_to_watch": "Схема ответа и поддержка structured output.",
+    "access": "Открытый материал; вычисления и внешние сервисы могут оплачиваться отдельно.",
+    "verification": "Открыта первичная страница 06.09.2026. Видео, если присутствует, не просмотрено целиком."
+  },
+  "X08": {
+    "title": "SQLAlchemy: Unified Tutorial",
+    "url": "https://docs.sqlalchemy.org/en/20/tutorial/",
+    "kind": "docs",
+    "language": "EN",
+    "what_to_watch": "Core/ORM, соединения, запросы, отношения и транзакции.",
+    "access": "Открытый материал; вычисления и внешние сервисы могут оплачиваться отдельно.",
+    "verification": "Открыта первичная страница 06.09.2026. Видео, если присутствует, не просмотрено целиком."
+  },
+  "X09": {
+    "title": "Alembic: Tutorial",
+    "url": "https://alembic.sqlalchemy.org/en/latest/tutorial.html",
+    "kind": "docs",
+    "language": "EN",
+    "what_to_watch": "Миграции схемы, окружение, revision, upgrade и downgrade.",
+    "access": "Открытый материал; вычисления и внешние сервисы могут оплачиваться отдельно.",
+    "verification": "Открыта первичная страница 06.09.2026. Видео, если присутствует, не просмотрено целиком."
+  },
+  "X10": {
+    "title": "Langfuse: Replace Vibes With Evals",
+    "url": "https://langfuse.com/guides/videos/replace-vibes-with-evals",
+    "kind": "video",
+    "language": "EN",
+    "what_to_watch": "Trace, error analysis, dataset, scoring и сравнение вариантов.",
+    "access": "Открытая страница с видеоплеером; сервис и API имеют отдельные условия.",
+    "verification": "Открыта первичная страница 06.09.2026. Видео, если присутствует, не просмотрено целиком."
+  },
+  "X11": {
+    "title": "Langfuse: Evaluation of LLM Applications",
+    "url": "https://langfuse.com/docs/evaluation/overview",
+    "kind": "docs",
+    "language": "EN",
+    "what_to_watch": "Code/human/LLM evaluation, datasets и experiments.",
+    "access": "Открытый материал; вычисления и внешние сервисы могут оплачиваться отдельно.",
+    "verification": "Открыта первичная страница 06.09.2026. Видео, если присутствует, не просмотрено целиком."
+  },
+  "X12": {
+    "title": "Ollama: Streaming",
+    "url": "https://docs.ollama.com/api/streaming",
+    "kind": "docs",
+    "language": "EN",
+    "what_to_watch": "Формат потокового ответа и обработка частей результата.",
+    "access": "Открытый материал; вычисления и внешние сервисы могут оплачиваться отдельно.",
+    "verification": "Открыта первичная страница 06.09.2026. Видео, если присутствует, не просмотрено целиком."
+  },
+  "X13": {
+    "title": "Ollama: Tool calling",
+    "url": "https://docs.ollama.com/capabilities/tool-calling",
+    "kind": "docs",
+    "language": "EN",
+    "what_to_watch": "Описание инструментов, вызов и передача фактического результата.",
+    "access": "Открытый материал; вычисления и внешние сервисы могут оплачиваться отдельно.",
+    "verification": "Открыта первичная страница 06.09.2026. Видео, если присутствует, не просмотрено целиком."
+  },
+  "X14": {
+    "title": "MDN: Overview of HTTP",
+    "url": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Overview",
+    "kind": "docs",
+    "language": "EN",
+    "what_to_watch": "Клиент, сервер, запросы, ответы, соединения и состояние.",
+    "access": "Открытый материал; вычисления и внешние сервисы могут оплачиваться отдельно.",
+    "verification": "Открыта первичная страница 06.09.2026. Видео, если присутствует, не просмотрено целиком."
+  },
+  "X15": {
+    "title": "Pro Git: русское издание",
+    "url": "https://git-scm.com/book/ru/v2",
+    "kind": "docs",
+    "language": "RU",
+    "what_to_watch": "Коммиты, ветки, merge, история и восстановление.",
+    "access": "Открытый материал; вычисления и внешние сервисы могут оплачиваться отдельно.",
+    "verification": "Открыта первичная страница 06.09.2026. Видео, если присутствует, не просмотрено целиком."
+  },
+  "X16": {
+    "title": "CS50W: Django",
+    "url": "https://cs50.harvard.edu/web/weeks/3/",
+    "kind": "video",
+    "language": "EN",
+    "what_to_watch": "HTTP, Django, routes, templates, forms и sessions.",
+    "access": "Бесплатная лекция Harvard с плеером, исходниками и транскриптом.",
+    "verification": "Открыта первичная страница 06.09.2026. Видео, если присутствует, не просмотрено целиком."
+  },
+  "X17": {
+    "title": "3Blue1Brown: Transformers, the tech behind LLMs",
+    "url": "https://www.3blue1brown.com/lessons/gpt/",
+    "kind": "video",
+    "language": "EN",
+    "what_to_watch": "Токены, векторы, attention/MLP и предсказание следующего токена.",
+    "access": "Открытая авторская видеолекция и иллюстрированный конспект, 2024; принципы сохраняют учебную ценность.",
+    "verification": "Открыта первичная страница 06.09.2026. Видео, если присутствует, не просмотрено целиком."
+  },
+  "X18": {
+    "title": "3Blue1Brown: Attention in transformers",
+    "url": "https://www.3blue1brown.com/lessons/attention/",
+    "kind": "video",
+    "language": "EN",
+    "what_to_watch": "Attention, контекст и матрицы Q/K/V.",
+    "access": "Открытая авторская видеолекция и конспект, 2024.",
+    "verification": "Открыта первичная страница 06.09.2026. Видео, если присутствует, не просмотрено целиком."
+  },
+  "X19": {
+    "title": "Milvus: MCP + Milvus",
+    "url": "https://milvus.io/docs/milvus_and_mcp.md",
+    "kind": "video_course",
+    "language": "EN",
+    "what_to_watch": "Встроенное видео о подключении MCP, коллекциях и поиске; базовый Quickstart изучается отдельно.",
+    "access": "Открытый материал; вычисления и внешние сервисы могут оплачиваться отдельно.",
+    "verification": "Открыта первичная страница 06.09.2026. Видео, если присутствует, не просмотрено целиком."
+  },
+  "X20": {
+    "title": "n8n: Learning paths",
+    "url": "https://github.com/n8n-io/n8n-docs/blob/main/docs/get-started/learning-paths.md",
+    "kind": "docs",
+    "language": "EN",
+    "what_to_watch": "Официальный маршрут обучения; практические API и переход к Academy.",
+    "access": "Открытый материал; вычисления и внешние сервисы могут оплачиваться отдельно.",
+    "verification": "Проверена официальная индексированная страница 06.09.2026; старые video-courses URL меняются."
+  },
+  "X21": {
+    "title": "n8n Academy: Essentials, Integrations, In Practice",
+    "url": "https://learn.n8n.io/",
+    "kind": "course",
+    "language": "EN",
+    "what_to_watch": "QS101, N8N101-103: workflows, API, AI и проверки.",
+    "access": "Бесплатные интерактивные курсы; нужна регистрация. Не обозначаются как полностью видеокурсы.",
+    "verification": "Открыта первичная страница 06.09.2026. Видео, если присутствует, не просмотрено целиком."
+  },
+  "X22": {
+    "title": "LangChain: Overview",
+    "url": "https://docs.langchain.com/oss/python/langchain/overview",
+    "kind": "docs",
+    "language": "EN",
+    "what_to_watch": "Модели, инструменты и архитектура прикладного агента.",
+    "access": "Открытый материал; вычисления и внешние сервисы могут оплачиваться отдельно.",
+    "verification": "Открыта первичная страница 06.09.2026. Видео, если присутствует, не просмотрено целиком."
+  },
+  "X23": {
+    "title": "ФНС: приказ ЕД-7-14/559@, структура ИНН и КПП",
+    "url": "https://storage.consultant.ru/site20/202510/09/fns_091025_559.pdf",
+    "kind": "docs",
+    "language": "RU",
+    "what_to_watch": "Приложение: структура ИНН и КПП; у КПП нет контрольного разряда.",
+    "access": "PDF первичного приказа ФНС на сайте КонсультантПлюс; бесплатное чтение.",
+    "verification": "Открыта 8-страничная PDF-копия приказа; структура проверена при разборе исходного плана 05.09.2026."
+  },
+  "X24": {
+    "title": "ФНС: Налог на добавленную стоимость",
+    "url": "https://www.nalog.gov.ru/rn77/taxation/taxes/nds/",
+    "kind": "docs",
+    "language": "RU",
+    "what_to_watch": "База и расчёт НДС; актуальные ставки и особенности сверять на дату операции.",
+    "access": "Открытый материал; вычисления и внешние сервисы могут оплачиваться отдельно.",
+    "verification": "Открыта первичная страница 06.09.2026. Видео, если присутствует, не просмотрено целиком."
+  },
+  "X25": {
+    "title": "PyTorch: Learn the Basics",
+    "url": "https://docs.pytorch.org/tutorials/beginner/basics/intro.html",
+    "kind": "docs",
+    "language": "EN",
+    "what_to_watch": "Tensors, DataLoader, модель, autograd, optimization и сохранение.",
+    "access": "Открытый материал; вычисления и внешние сервисы могут оплачиваться отдельно.",
+    "verification": "Открыта первичная страница 06.09.2026. Видео, если присутствует, не просмотрено целиком."
+  },
+  "X27": {
+    "title": "Python: Coroutines and tasks",
+    "url": "https://docs.python.org/3/library/asyncio-task.html",
+    "kind": "docs",
+    "language": "EN",
+    "what_to_watch": "Task, ожидание, тайм-аут, отмена и управление группой задач.",
+    "access": "Открытый материал; вычисления и внешние сервисы могут оплачиваться отдельно.",
+    "verification": "Открыта первичная страница 06.09.2026. Видео, если присутствует, не просмотрено целиком."
+  },
+  "X28": {
+    "title": "PostgreSQL: Using EXPLAIN",
+    "url": "https://www.postgresql.org/docs/current/using-explain.html",
+    "kind": "docs",
+    "language": "EN",
+    "what_to_watch": "План исполнения, оценки, фактические затраты и индексы.",
+    "access": "Открытый материал; вычисления и внешние сервисы могут оплачиваться отдельно.",
+    "verification": "Открыта первичная страница 06.09.2026. Видео, если присутствует, не просмотрено целиком."
+  },
+  "X29": {
+    "title": "PostgreSQL: Backup and Restore",
+    "url": "https://www.postgresql.org/docs/current/backup.html",
+    "kind": "docs",
+    "language": "EN",
+    "what_to_watch": "SQL dump, файловая копия и непрерывное архивирование; выбрать подходящий способ.",
+    "access": "Открытый материал; вычисления и внешние сервисы могут оплачиваться отдельно.",
+    "verification": "Открыта первичная страница 06.09.2026. Видео, если присутствует, не просмотрено целиком."
+  },
+  "X30": {
+    "title": "OWASP GenAI: Prompt Injection",
+    "url": "https://genai.owasp.org/llmrisk/llm01-prompt-injection/",
+    "kind": "docs",
+    "language": "EN",
+    "what_to_watch": "Прямые и косвенные инструкции из недоверенного содержимого; границы контролей.",
+    "access": "Открытый материал; вычисления и внешние сервисы могут оплачиваться отдельно.",
+    "verification": "Открыта первичная страница 06.09.2026. Видео, если присутствует, не просмотрено целиком."
+  },
+  "X31": {
+    "title": "Architectural Decision Records",
+    "url": "https://adr.github.io/",
+    "kind": "docs",
+    "language": "EN",
+    "what_to_watch": "Структура ADR, решения и альтернативы.",
+    "access": "Открытый материал; вычисления и внешние сервисы могут оплачиваться отдельно.",
+    "verification": "Открыта первичная страница 06.09.2026. Видео, если присутствует, не просмотрено целиком."
+  },
+  "X32": {
+    "title": "LangChain: RAG From Scratch",
+    "url": "https://github.com/langchain-ai/rag-from-scratch",
+    "kind": "video_course",
+    "language": "EN",
+    "what_to_watch": "Серия видео и ноутбуков: indexing, retrieval, generation, query transforms и routing.",
+    "access": "Открытый официальный репозиторий с видеоссылками; старые API сверять с текущими docs.",
+    "verification": "Открыта первичная страница 06.09.2026. Видео, если присутствует, не просмотрено целиком."
+  },
+  "X33": {
+    "title": "Артём Шумейко: курс SQLAlchemy",
+    "url": "https://www.youtube.com/playlist?list=PLeLN0qH0-mCXARD_K-USF2wHctxzEVp40",
+    "kind": "video_course",
+    "language": "RU",
+    "what_to_watch": "Подключение, модели, запросы, связи и миграции; сначала понимать обычный SQL.",
+    "access": "Открытый авторский плейлист; старые импорты сверять с текущей документацией.",
+    "verification": "06.09.2026: точный URL плейлиста и репозиторий подтверждены в официальном канале автора t.me/s/artemshumeiko?before=30; YouTube отдаёт ограниченное представление страницы."
+  },
+  "X34": {
+    "title": "Артём Шумейко: курс FastAPI",
+    "url": "https://rutube.ru/plst/717901/",
+    "kind": "video_course",
+    "language": "RU",
+    "what_to_watch": "REST, Pydantic, Depends, БД, авторизация, файлы, архитектура и Docker.",
+    "access": "Открытый авторский плейлист на RUTUBE; версии библиотек сверять с документацией.",
+    "verification": "06.09.2026: подтверждены автор, название и список 12 видео в индексированной странице RUTUBE. Полное воспроизведение не проверялось."
+  },
+  "X35": {
+    "title": "NeuralNine: Professional Task Queues in Python",
+    "url": "https://www.youtube.com/watch?v=0gtdUkEzzn4",
+    "kind": "video",
+    "language": "EN",
+    "what_to_watch": "Celery, RabbitMQ, Redis: worker, отправка заданий и результаты.",
+    "access": "Открытый авторский разбор, 2025. Гарантии доставки и настройки брать из текущих Celery/RabbitMQ docs.",
+    "verification": "06.09.2026: открыт точный YouTube URL с соответствующим названием; содержимое страницы ограничено. Материал также указан в исходном плане."
+  },
+  "X36": {
+    "title": "Артём Шумейко: Python - конкурентность",
+    "url": "https://rutube.ru/video/f944bdec38c1a7b279b419d070c93e4e/",
+    "kind": "video",
+    "language": "RU",
+    "what_to_watch": "Конкурентность, async и работа с I/O; повторить ограниченные параллельные запросы.",
+    "access": "Открытая авторская запись от 11.06.2026.",
+    "verification": "06.09.2026: открыта страница конкретного видео через канал автора; название и публикация подтверждены."
+  },
+  "X37": {
+    "title": "Артём Шумейко: вопросы по HTTP с разбором",
+    "url": "https://rutube.ru/video/9b02bbef791d8821e271478c72c4c7cb/",
+    "kind": "video",
+    "language": "RU",
+    "what_to_watch": "HTTP-вопросы для интервью; сопоставить с собственными запросами и MDN.",
+    "access": "Открытая авторская запись от 20.07.2026.",
+    "verification": "06.09.2026: открыта страница конкретного видео через канал автора; название и публикация подтверждены."
+  },
+  "X38": {
+    "title": "МойСклад: вебинар по API для разработчиков (архив)",
+    "url": "https://www.youtube.com/watch?v=k2o-IFe0L9s",
+    "kind": "video",
+    "language": "RU",
+    "what_to_watch": "Общая модель JSON API и webhooks. Запись 14.03.2017 про API 1.1; текущие методы и адреса брать только из docs JSON API 1.2.",
+    "access": "Открытая архивная запись; смотреть для устройства интеграций, не копировать старый API.",
+    "verification": "06.09.2026: ссылка и содержание записи подтверждены публикацией официального канала МоегоСклада: telegram.me/s/moysklad?before=48. Полное воспроизведение не проверялось."
+  }
+}

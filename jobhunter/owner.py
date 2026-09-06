@@ -141,6 +141,12 @@ def _to_bot(req: OwnerRequest, sess) -> None:
     должен быть обязателен для работы автопилота.
     """
     from . import notify
+    from .taskhub import prepare_manual_request
+    if req.application_id and "incoming_message_ids" not in (req.payload_json or {}):
+        req.payload_json = dict(req.payload_json or {}, incoming_message_ids=list(sess.scalars(
+            select(Message.id).where(Message.application_id == req.application_id,
+                                     Message.direction == "in"))))
+    prepare_manual_request(sess, req)
     if get_settings().owner_channel not in ("bot", "both"):
         return
     try:

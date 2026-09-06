@@ -1,0 +1,170 @@
+{
+  "audit": {
+    "checked_at": "2026-09-06",
+    "source_pdf": "C:/Users/User/Desktop/AI_ML_Architect_План_v4_СуренCLODE.pdf",
+    "source_pdf_pages": 53,
+    "uri_annotations": 200,
+    "unique_source_pdf_urls": 134,
+    "existing_registry_entries": 127,
+    "existing_registry_unique_urls": 123,
+    "exact_overlap_urls": 38,
+    "urls_absent_from_existing_registry": 96,
+    "normalization": "Точные URL после удаления завершающего слеша. Разные пути к одной теме и зеркала не считались совпадениями.",
+    "selection": "12 дополнительных материалов: 10 документов и 2 видеоматериала. 11 точных ссылок взяты из PDF; один конкретный видеоматериал найден через официальный видеокаталог Langfuse, на который ссылается PDF. Проверены страницы и соответствие теме, видео целиком не просматривались.",
+    "deduplication_notes": [
+      "CS50P homepage и отдельные недели, Docker Introduction и Get Started, FastAPI RU async и EN async — другой адрес, но не новый учебный блок.",
+      "n8n learning paths в опубликованной документации и в GitHub — один материал; объединить, не считать двумя курсами.",
+      "Qdrant Essentials, hybrid search и отдельные видео курса использовать как точные уроки существующего курса, без добавления часов за повтор.",
+      "Колода вопросов и игровые испытания — учебная организация материала из пользовательского PDF, им не требуется отдельная технология или новый видеокурс. Ссылки ведут к соответствующим техническим темам."
+    ],
+    "not_selected": [
+      {
+        "url": "https://www.youtube.com/watch?v=JOGMn5nqCSM",
+        "reason": "Прямое открытие получило HTTP 429; независимое подтверждение точного названия по первичному источнику в этом проходе не найдено. Не помечать как проверенное и не объявлять несуществующим."
+      },
+      {
+        "url": "https://www.youtube.com/watch?v=hlgfW0IyREc",
+        "reason": "ID встречается во встраивании официального репозитория Langfuse, но прямой просмотр страницы ограничен throttling. В подборке выбран доступный официальный материал с видео и пояснениями по RAG evaluation."
+      }
+    ],
+    "content_corrections": [
+      "Стр. 49: вопрос о невозможности проведения документа через OData сформулирован неверно. Сохранить нашу исправленную формулировку: стандартный REST/OData 1С поддерживает проведение и отмену проведения; свой HTTP-сервис выбирают для конкретного бизнес-контракта и составных операций.",
+      "Стр. 35: отзыв согласия не всегда означает отсутствие всех иных законных оснований обработки. Сохранить оговорки нашего плана о сроках, основаниях и недопущении восстановления запрещённой обработки из бэкапа.",
+      "Фраза на стр. 48 «перечитывание — нет» слишком категорична. Заменить на практическое правило: сначала попытка ответа по памяти, затем проверка, обратная связь и повтор; не обещать универсальный научно оптимальный интервал."
+    ]
+  },
+  "sources": [
+    {
+      "title": "Anthropic: Demystifying evals for AI agents",
+      "url": "https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents",
+      "kind": "documentation",
+      "language": "EN",
+      "access": "Бесплатно, без регистрации",
+      "note": "Разделить задачу, повторный прогон, проверяющий механизм, трассу и фактическое конечное состояние. Связать испытание с проверкой записи в CRM; прогонять важные случаи из чистого состояния и калибровать LLM-судью по человеку.",
+      "source_page": [22, 41],
+      "target_modules": ["11", "13", "23"],
+      "verification": "06.09.2026: открыта официальная статья Anthropic от 09.01.2026; проверены разделы о структуре eval, исходах в среде, повторных прогонах и калибровке."
+    },
+    {
+      "title": "LangGraph: Interrupts",
+      "url": "https://docs.langchain.com/oss/python/langgraph/interrupts",
+      "kind": "documentation",
+      "language": "EN",
+      "access": "Бесплатно, без регистрации",
+      "note": "Остановка перед подтверждением, возобновление и повторное выполнение узла. Изучить требования к сериализации и идемпотентности действий до interrupt. Наличие checkpoint не даёт гарантии однократного внешнего эффекта.",
+      "source_page": [29],
+      "target_modules": ["13", "14"],
+      "verification": "06.09.2026: открыта официальная документация LangChain; проверен раздел Side effects called before interrupt must be idempotent и описание повторного запуска узлов."
+    },
+    {
+      "title": "Chris Richardson: Transactional Outbox",
+      "url": "https://microservices.io/patterns/data/transactional-outbox.html",
+      "kind": "documentation",
+      "language": "EN",
+      "access": "Статья бесплатно; предлагаемые на странице книги и курсы отдельно",
+      "note": "Сохранить бизнес-изменение и событие одной транзакцией, отправлять отдельным relay. Воспроизвести падение после отправки до отметки sent; повтор требует идемпотентного потребителя и сверки внешнего эффекта.",
+      "source_page": [30],
+      "target_modules": ["03", "14"],
+      "verification": "06.09.2026: открыта авторская страница паттерна; прочитаны Solution и Result context, включая возможность повторной публикации relay."
+    },
+    {
+      "title": "OWASP: LLM Prompt Injection Prevention Cheat Sheet",
+      "url": "https://cheatsheetseries.owasp.org/cheatsheets/LLM_Prompt_Injection_Prevention_Cheat_Sheet.html",
+      "kind": "documentation",
+      "language": "EN",
+      "access": "Бесплатно, без регистрации",
+      "note": "Превратить угрозы из вопроса, PDF и результата инструмента в отрицательные испытания. Права, допустимые аргументы и минимальные разрешения проверяет приложение; текстовые фильтры и дополнительная модель — отдельные слои защиты.",
+      "source_page": [35],
+      "target_modules": ["07", "13", "19"],
+      "verification": "06.09.2026: открыта официальная памятка OWASP; проверены косвенные инъекции, Agent-Specific Defenses, Least Privilege и ограничения guardrail LLM."
+    },
+    {
+      "title": "OWASP: File Upload Cheat Sheet",
+      "url": "https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html",
+      "kind": "documentation",
+      "language": "EN",
+      "access": "Бесплатно, без регистрации",
+      "note": "Проверять тип и размер загружаемого документа, безопасное имя, права пользователя, место хранения и лимиты обработки. Content-Type клиента не считать доказательством формата. Добавить проверку тяжёлых и повреждённых файлов.",
+      "source_page": [35],
+      "target_modules": ["02", "12", "19"],
+      "verification": "06.09.2026: открыта официальная памятка OWASP; прочитаны File Upload Protection и ограничения доверия к Content-Type."
+    },
+    {
+      "title": "Prometheus: Understanding metric types",
+      "url": "https://prometheus.io/docs/tutorials/understanding_metric_types/",
+      "kind": "documentation",
+      "language": "EN",
+      "access": "Бесплатно, без регистрации",
+      "note": "Разобрать counter для событий, gauge для текущей очереди и histogram для задержек. Объяснить, как оценка p95 зависит от корзин; не усреднять перцентили разных экземпляров сервиса.",
+      "source_page": [34],
+      "target_modules": ["20", "21"],
+      "verification": "06.09.2026: открыта официальная документация Prometheus; проверены определения четырёх типов, histogram buckets и histogram_quantile."
+    },
+    {
+      "title": "Qdrant: Filtering",
+      "url": "https://qdrant.tech/documentation/search/filtering/",
+      "kind": "documentation",
+      "language": "EN",
+      "access": "Бесплатно, без регистрации",
+      "note": "Сформировать условия по tenant и разрешённым документам на сервере, проверить must/should/must_not и вложенные поля. Повторить вопросы по запрещённым документам и после отзыва доступа; сопоставить ограничения с качеством поиска.",
+      "source_page": [21, 51],
+      "target_modules": ["10", "19", "Д3"],
+      "verification": "06.09.2026: открыта официальная документация Qdrant; проверены логика must и примеры вложенных фильтров. Применение фильтров как части контроля доступа — проектное задание, а не гарантия защиты самой библиотеки."
+    },
+    {
+      "title": "Google Engineering Practices: How to do a code review",
+      "url": "https://google.github.io/eng-practices/review/reviewer/",
+      "kind": "documentation",
+      "language": "EN",
+      "access": "Бесплатно, без регистрации",
+      "note": "Провести review переданной другому разработчику задачи: оценить изменение по критериям, дать конкретную обратную связь и записать разрешение одного разногласия. Использовать как опору для командной части финального испытания.",
+      "source_page": [40, 42],
+      "target_modules": ["22", "24"],
+      "verification": "06.09.2026: открыта официальная страница Google Engineering Practices с руководством для reviewer."
+    },
+    {
+      "title": "Google SRE: Handling Overload",
+      "url": "https://sre.google/sre-book/handling-overload/",
+      "kind": "documentation",
+      "language": "EN",
+      "access": "Бесплатно, без регистрации; глава книги",
+      "note": "Разобрать квоты клиентов, ранний отказ, ограничение запросов на стороне клиента и приоритеты при перегрузке. На стенде показать, что избыточный поток одного клиента не блокирует полезные запросы остальных.",
+      "source_page": [37],
+      "target_modules": ["14", "21"],
+      "verification": "06.09.2026: открыта глава на официальном сайте Google SRE; прочитаны Client-Side Throttling и Criticality. Приведённые в книге названия сервисов и масштабы — исторические примеры, не требования к учебному стенду."
+    },
+    {
+      "title": "n8n: Beginner course — официальный видеокурс",
+      "url": "https://www.youtube.com/playlist?list=PLlET0GsrLUL59YbxstZE71WszP3pVnZfI",
+      "kind": "video",
+      "language": "EN",
+      "access": "Видеоплейлист YouTube; просмотр бесплатный, доступность платформы зависит от сети. Сервис n8n и хостинг имеют отдельные условия.",
+      "note": "Выбрать уроки APIs and Webhooks, Error handling, Debugging и Collaboration под задачу интеграции. Для курса есть официальная страница с перечнем уроков; повторный просмотр не добавляет часы к уже закрытому модулю.",
+      "source_page": [28],
+      "target_modules": ["16"],
+      "verification": "06.09.2026: точный плейлист подтверждён ссылкой Beginner из официального репозитория https://github.com/n8n-io/n8n-docs/blob/main/docs/video-courses.md; открыта страница плейлиста. Видео целиком не просматривались."
+    },
+    {
+      "title": "Langfuse / Tom Yeh: Beginner’s Guide to RAG Evaluation with Langfuse and Ragas",
+      "url": "https://langfuse.com/guides/videos/beginners-guide-to-rag-evaluation",
+      "kind": "video",
+      "language": "EN",
+      "access": "Открытая страница с видеоплеером и конспектом; сервисы и API для практики имеют отдельные условия",
+      "note": "Из каталога Langfuse в пользовательском плане выбран конкретный вебинар. Смотреть разбор компонентов RAG, трасс и метрик; затем вручную проверить пять своих случаев и сравнить автоматические оценки с рубрикой.",
+      "source_page": [22, 34],
+      "target_modules": ["11", "20"],
+      "verification": "06.09.2026: перешли с указанного в PDF официального каталога https://langfuse.com/guides/videos на конкретный материал; проверены название, спикер, видеоплеер и конспект. Видео целиком не просматривалось."
+    },
+    {
+      "title": "LangGraph: Workflows and agents",
+      "url": "https://docs.langchain.com/oss/python/langgraph/workflows-agents",
+      "kind": "documentation",
+      "language": "EN",
+      "access": "Бесплатно, без регистрации",
+      "note": "Сравнить заранее заданный workflow и выбор шагов моделью. Построить минимальный граф и объяснить цену его состояния, повторов и отладки. Усложнять процесс только при подтверждённой пользе.",
+      "source_page": [29, 51],
+      "target_modules": ["13", "Д2"],
+      "verification": "06.09.2026: открыта официальная документация LangChain с паттернами workflows и agents; использовать с установленной версией SDK."
+    }
+  ]
+}

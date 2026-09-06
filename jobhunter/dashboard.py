@@ -65,10 +65,11 @@ def application_readiness(app, job, employer=None) -> dict:
             "retry_at": verdict.next_try_at}
 
 
-def sending(limit: int = 200) -> dict:
+def sending(limit: int = 200, offset: int = 0) -> dict:
     from .outreach import mailer, policy, sender
     from .report import quota
     s = get_settings()
+    offset, limit = max(0, offset), max(1, limit)
     schedule = next_attempts()
     q = quota()
     chosen = {i["app_id"] for i in sender.pick_batch(10000)}
@@ -117,75 +118,40 @@ def sending(limit: int = 200) -> dict:
                               next_attempt=schedule.get(state["channel"], {}).get("at")
                               if state["ready"] else None, **state))
         return {"total": len(items), "eligible": ready, "reasons": dict(reasons),
-                "schedule": schedule, "quota": q, "items": items[:max(1, min(limit, 2000))],
+                "schedule": schedule, "quota": q, "items": items[offset:offset + limit],
+                "offset": offset, "limit": limit, "has_more": offset + limit < len(items),
                 "last_success": {"at": last.attempted_at, "application_id": last.application_id}
                 if last else None}
 
 
-def attention(limit: int = 200) -> dict:
-    """Истёкшая карточка и неотправленное решение остаются видимыми."""
-    from .decisions import DELIVERY_UNCONFIRMED
+def attention(limit: int = 200, offset: int = 0) -> dict:
+    """All unresolved tasks, ordered by urgency then age, with a stable total."""
+    from . import taskhub
+    offset, limit = max(0, offset), max(1, min(limit, 2000))
     now = _now()
     with session_scope() as sess:
-        requests = sess.scalars(select(OwnerRequest).order_by(OwnerRequest.id.desc())).all()
-        unfinished = {m.application_id: m for m in sess.scalars(select(Message).where(
-            Message.direction == "in", Message.processing_pending.is_(True))).all()}
-        latest: dict[int, OwnerRequest] = {}
-        for req in requests:
+        requests = {}
+        for req in sess.scalars(select(OwnerRequest).order_by(OwnerRequest.id.desc())):
             if req.application_id:
-                latest.setdefault(req.application_id, req)
+                requests.setdefault(req.application_id, []).append(req)
+        messages = {}
+        for msg in sess.scalars(select(Message).order_by(Message.id.desc())):
+            messages.setdefault(msg.application_id, []).append(msg)
+        candidate_ids = set(requests) | set(messages)
         items = []
-        for app, job in sess.execute(select(Application, Job).join(Job).where(
-                Application.status.in_([Status.NEEDS_HUMAN.value, Status.REPLIED.value,
-                                       Status.SEND_FAILED_AMBIGUOUS.value,
-                                       Status.INTERVIEW_PROPOSED.value]) |
-                Application.id.in_([r.application_id for r in requests
-                                    if r.application_id and (r.apply_error or not r.decision)] +
-                                   list(unfinished)))).all():
-            req = latest.get(app.id)
-            if app.status in ATTENTION_CLOSED:
-                continue
-            if req and req.decision in ("skip", "close") and app.id not in unfinished:
-                continue
-            if req and req.apply_error == DELIVERY_UNCONFIRMED:
-                reason = "Доставка ответа не подтверждена; проверь диалог. Автоповтор запрещён"
-            elif req and req.apply_error:
-                reason = "Ответ не отправлен: " + req.apply_error
-            elif req and (req.decision == "expired" or
-                          (not req.decision and req.expires_at and req.expires_at <= now)):
-                reason = "Карточка истекла; диалог требует решения"
-            elif app.status == Status.SEND_FAILED_AMBIGUOUS.value:
-                reason = "Проверь доставку перед повторной отправкой"
-            elif app.id in unfinished:
-                reason = "Входящее сохранено, но его разбор не завершён"
-                if unfinished[app.id].processing_error:
-                    reason += ": " + unfinished[app.id].processing_error
-            elif req and req.decision and not req.applied_at:
-                reason = "Решение принято; ожидает отправки"
-            elif req and not req.decision:
-                reason = "Ожидает твоего решения"
-            elif app.status == Status.NEEDS_HUMAN.value:
-                reason = "Незавершённый диалог без открытой карточки"
-            elif app.status in (Status.REPLIED.value, Status.INTERVIEW_PROPOSED.value):
-                reason = "Ответ рекрутёра требует внимания"
-            else:
-                continue
-            last = sess.scalar(select(Message).where(Message.application_id == app.id,
-                                                      Message.direction == "in")
-                               .order_by(Message.id.desc()).limit(1))
-            waiting = app.last_inbound_at or (req.created_at if req else app.updated_at)
-            items.append({"id": app.id, "title": job.title or job.tag, "status": app.status,
-                          "reason": reason, "request_id": req.id if req else None,
-                          "can_open_card": app.status in (
-                              Status.NEEDS_HUMAN.value, Status.REPLIED.value, Status.IN_DIALOGUE.value,
-                              Status.SENT.value, Status.AWAITING_REPLY.value, Status.INTERVIEW_CONFIRMED.value,
-                              Status.INTERVIEW_PROPOSED.value) and not (
-                                  req and req.apply_error == DELIVERY_UNCONFIRMED),
-                          "waiting_hours": max(0, (now - waiting).total_seconds() / 3600)
-                          if waiting else None, "incoming": last.body if last else "",
-                          "draft": (req.payload_json or {}).get("draft", "") if req else ""})
-    items.sort(key=lambda x: x["waiting_hours"] or 0, reverse=True)
-    return {"total": len(items), "items": items[:max(1, min(limit, 2000))]}
+        for app, job in sess.execute(select(Application, Job).outerjoin(Job).where(
+                Application.status.notin_(ATTENTION_CLOSED),
+                Application.status.in_((Status.NEEDS_HUMAN.value, Status.REPLIED.value,
+                                       Status.INTERVIEW_PROPOSED.value, Status.SEND_FAILED_AMBIGUOUS.value,
+                                       Status.PENDING_APPROVAL.value)) |
+                Application.id.in_(candidate_ids))):
+            row = taskhub._detail(sess, app, job, requests.get(app.id, []),
+                                  messages.get(app.id, []), now)
+            if row["needs_attention"]:
+                items.append(row)
+    items.sort(key=lambda row: (row["priority"], -(row["waiting_hours"] or 0), row["id"]))
+    return {"total": len(items), "items": items[offset:offset + limit],
+            "offset": offset, "limit": limit, "has_more": offset + limit < len(items)}
 
 
 def reading() -> dict:
@@ -222,35 +188,9 @@ def reading() -> dict:
     return result
 
 
-def outcomes(days: int = 90) -> dict:
-    """Одна заявка — одна категория, с более поздними бизнес-результатами в приоритете."""
-    from .convo import classify as c
-    since = _now() - timedelta(days=days)
-    categories = Counter({k: 0 for k in ("no_reply", "interested", "cv_requested", "rejected",
-                                        "interview", "offer", "other_reply")})
-    with session_scope() as sess:
-        apps = sess.scalars(select(Application).where(Application.sent_at >= since)).all()
-        labels: dict[int, set] = {}
-        for app_id, label in sess.execute(select(Message.application_id, Message.classifier_label)
-                                          .where(Message.direction == "in",
-                                                 Message.application_id.in_([a.id for a in apps]))):
-            labels.setdefault(app_id, set()).add(label)
-        for app in apps:
-            seen = labels.get(app.id, set())
-            if app.status == Status.OFFER.value:
-                category = "offer"
-            elif app.status == Status.REJECTED_BY_EMPLOYER.value:
-                category = "rejected"
-            elif app.interview_at_utc:
-                category = "interview"
-            elif c.ASK_CALL in seen or c.SLOT_PROPOSED in seen or c.TECH_QUESTION in seen:
-                category = "interested"
-            elif c.ASK_CV in seen:
-                category = "cv_requested"
-            elif app.first_reply_at:
-                category = "other_reply"
-            else:
-                category = "no_reply"
-            categories[category] += 1
-    return {"days": days, "sent": len(apps), "categories": dict(categories),
-            "note": "Интерес — сигнал классификатора. Интервью и оффер — подтверждённые данные заявки."}
+def outcomes(days: int = 90, track: str = "all", offset: int = 0, limit: int = 50) -> dict:
+    """Shared results aggregation, retaining days/sent/categories/note for callers."""
+    from . import feedback, results
+    data = dict(results.aggregate(days=days, track=track, offset=offset, limit=limit))
+    data["feedback"] = feedback.summary()
+    return data

@@ -1,0 +1,53 @@
+{
+  "identity": {"name_en": "Fixture Candidate"},
+  "meta": {"timeline_start": "2019-01"},
+  "claims": {"total_years_software": 7},
+  "salary_expectation": "999999 RUB",
+  "skills": [
+    {"id":"python","canonical":"Python","aliases":[],"level":"expert","years":7,"evidence_ids":["exp_backend","exp_integration"]},
+    {"id":"fastapi","canonical":"FastAPI","aliases":[],"level":"expert","years":5,"evidence_ids":["exp_backend"]},
+    {"id":"django","canonical":"Django","aliases":[],"level":"expert","years":5,"evidence_ids":["exp_backend"]},
+    {"id":"sql","canonical":"SQL","aliases":[],"level":"expert","years":7,"evidence_ids":["exp_backend"]},
+    {"id":"postgresql","canonical":"PostgreSQL","aliases":["postgres"],"level":"expert","years":7,"evidence_ids":["exp_backend"]},
+    {"id":"docker","canonical":"Docker","aliases":[],"level":"expert","years":5,"evidence_ids":["exp_backend"]},
+    {"id":"kubernetes","canonical":"Kubernetes","aliases":["k8s"],"level":"working","years":2,"evidence_ids":["exp_backend"]},
+    {"id":"gitlab_ci","canonical":"GitLab CI","aliases":["ci/cd"],"level":"expert","years":5,"evidence_ids":["exp_backend"]},
+    {"id":"pytest","canonical":"PyTest","aliases":[],"level":"expert","years":5,"evidence_ids":["exp_backend"]},
+    {"id":"rest_api","canonical":"REST API","aliases":["rest"],"level":"expert","years":7,"evidence_ids":["exp_backend"]},
+    {"id":"microservices","canonical":"Микросервисы","aliases":["microservices"],"level":"expert","years":7,"evidence_ids":["exp_backend"]},
+    {"id":"ddd","canonical":"DDD","aliases":[],"level":"working","years":2,"evidence_ids":["exp_backend"]},
+    {"id":"aws","canonical":"AWS","aliases":[],"level":"familiar","years":1,"evidence_ids":["exp_backend"]},
+    {"id":"llm_stack","canonical":"LLM-инференс","aliases":["vllm","openai api","openai","langchain"],"level":"working","years":1,"evidence_ids":["exp_integration"]},
+    {"id":"opencv","canonical":"OpenCV","aliases":[],"level":"working","years":1,"evidence_ids":["exp_integration"]},
+    {"id":"yolov8","canonical":"Ultralytics YOLOv8","aliases":["yolo","yolov8"],"level":"working","years":1,"evidence_ids":["exp_integration"]},
+    {"id":"speech","canonical":"STT/TTS","aliases":["whisper","elevenlabs"],"level":"working","years":1,"evidence_ids":["exp_integration"]},
+    {"id":"cuda","canonical":"CUDA/TensorRT","aliases":["cuda","tensorrt"],"level":"familiar","years":1,"evidence_ids":["exp_integration"]},
+    {"id":"unproved","canonical":"UnprovedSDK","aliases":[],"level":"working","years":5,"evidence_ids":["missing_experience"]},
+    {"id":"none_skill","canonical":"NoneSDK","aliases":[],"level":"none","years":0,"evidence_ids":["exp_backend"]}
+  ],
+  "experience": [
+    {
+      "id":"exp_backend","company":"Fixture Backend","start":"2019-01","end":"2024-01",
+      "bullets":[
+        {"id":"b_backend","text_en":"Developed Python microservices using FastAPI, SQL, PostgreSQL and Docker.","skills":["python","fastapi","sql","postgresql","docker","microservices"]},
+        {"id":"b_architecture","text_en":"Designed service architecture using DDD.","skills":["ddd"]}
+      ]
+    },
+    {
+      "id":"exp_integration","company":"Fixture R&D integration","start":"2024-01","end":"2025-01","is_own_project":true,
+      "bullets":[
+        {"id":"b_inference","text_en":"Integrated vLLM and OpenAI API inference with Whisper and ElevenLabs.","skills":["python","llm_stack","speech"]},
+        {"id":"b_cv","text_en":"Integrated GPU CV inference with CUDA/TensorRT, OpenCV and YOLOv8.","skills":["cuda","opencv","yolov8"]}
+      ]
+    }
+  ],
+  "never_claim": [
+    {"id":"terraform","canonical":"Terraform","aliases":["pulumi"]},
+    {"id":"java","canonical":"Java","aliases":["spring boot"]},
+    {"id":"go","canonical":"Go","aliases":["golang"]},
+    {"id":"csharp","canonical":"C#","aliases":["csharp"]},
+    {"id":"dotnet","canonical":".NET","aliases":["dotnet"]},
+    {"id":"rust","canonical":"Rust","aliases":[]},
+    {"id":"aws_managed","canonical":"Lambda","aliases":["eks","ecs"]}
+  ]
+}

@@ -86,16 +86,20 @@ def parse_reply_to(text: str) -> int:
 
 @contextmanager
 def smtp_session():
-    """SMTP + STARTTLS + вход, всё под защитой.
+    """Защищённый SMTP: implicit TLS на 465, обязательный STARTTLS иначе.
 
-    Раньше эти три шага стояли голыми: обрыв на любом из них ронял весь
-    прогон автопилота, а не одно письмо.
+    Авторизация только после TLS с проверкой сертификата. Не переключаем
+    транспорт при ошибке: повторная попытка остаётся за отправителем.
     """
     s = get_settings()
     server = None
     try:
-        server = smtplib.SMTP(s.smtp_host, s.smtp_port, timeout=30)
-        server.starttls(context=ssl.create_default_context())
+        context = ssl.create_default_context()
+        if s.smtp_port == 465:
+            server = smtplib.SMTP_SSL(s.smtp_host, s.smtp_port, timeout=30, context=context)
+        else:
+            server = smtplib.SMTP(s.smtp_host, s.smtp_port, timeout=30)
+            server.starttls(context=context)
         server.login(s.smtp_user, s.smtp_app_password)
         yield server
     finally:
@@ -103,7 +107,12 @@ def smtp_session():
             try:
                 server.quit()
             except Exception:
-                pass
+                # QUIT сам может оборваться: всё равно освобождаем сокет,
+                # не подменяя исходную ошибку отправки ошибкой очистки.
+                try:
+                    server.close()
+                except Exception:
+                    pass
 
 
 def build_message(*, to: str, subject: str, body: str, cv_path: str = "",

@@ -42,7 +42,7 @@ def drain(http=None, limit: int = 20) -> int:
         # be presented as ready after the owner has already marked it or the
         # vacancy/contact has changed. Internal app_id metadata is not markup.
         manual_row = None
-        if row["kind"] in ("manual_tg_step", "manual_tg_document"):
+        if row["kind"] in ("manual_tg_step", "manual_tg_item", "manual_tg_document"):
             from .. import manual_telegram as manual_tg
             try:
                 app_id = int(row["markup"].get("app_id") or 0)
@@ -78,8 +78,29 @@ def drain(http=None, limit: int = 20) -> int:
                             caption=f"📎 Резюме для #{manual_row['id']} · @{manual_row['handle']}\n"
                                     "Прикрепи этот PDF в переписке, если отправляешь резюме.", http=http)
                     else:
-                        res = api.send_message(chat_id, manual_tg.card(manual_row),
-                                               manual_tg.keyboard(manual_row), http=http)
+                        # Карточка = PDF с подписью и кнопками, одно сообщение:
+                        # его же владелец пересылает рекрутёру. Нет PDF —
+                        # текстовая карточка с теми же кнопками.
+                        caption = manual_tg.card(manual_row)
+                        kb = manual_tg.keyboard(manual_row)
+                        doc = None
+                        if not manual_row["problem"]:
+                            try:
+                                doc = manual_tg.cv_document(manual_row["id"])
+                            except (ValueError, OSError) as e:
+                                # Карточка уходит текстом, но молча — нельзя:
+                                # владелец должен знать, что PDF к ней нет.
+                                notify.push("manual_tg_cv_error",
+                                            f"⚠️ К карточке #{manual_row['id']} не приложен PDF "
+                                            f"({str(e)[:80]}). Резюме отправь вручную из cv_base.",
+                                            chat_id=chat_id,
+                                            dedup=f"manual_tg_cv_error:{row['id']}:{chat_id}")
+                        if doc:
+                            res = api.send_document(chat_id, doc[0], doc[1],
+                                                    caption=caption, http=http,
+                                                    markup=kb)
+                        else:
+                            res = api.send_message(chat_id, caption, kb, http=http)
                     msg_id, chat_used = res.get("message_id"), chat_id
                 elif row["target_msg_id"]:
                     api.edit_message_text(chat_id, row["target_msg_id"],

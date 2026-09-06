@@ -181,6 +181,7 @@ class Settings(BaseSettings):
 
     # Email
     smtp_host: str = Field(default="smtp.gmail.com")
+    # 465 — TLS с момента подключения; остальные порты — обязательный STARTTLS.
     smtp_port: int = Field(default=587)
     smtp_user: str = Field(default="")
     smtp_app_password: str = Field(default="")

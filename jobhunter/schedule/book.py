@@ -57,6 +57,11 @@ def confirm(app_id: int, dt_utc: datetime, tz_name: str = "",
         app.interview_tz = tz_name
         app.interview_duration_min = duration
         app.updated_at = utcnow()
+        from ..results import record_event
+        record_event(sess, app_id, "interview_scheduled", "calendar",
+                     "booking:%d:%s" % (app_id, app.interview_at_utc.isoformat()),
+                     occurred_at=utcnow(), details={"interview_at_utc": app.interview_at_utc.isoformat(),
+                                                   "evidence": "owner_confirmed_booking"})
         from .. import notify
         notify.push("interview_set",
                     "🗓 Интервью назначено: %s\n%s — @%s"

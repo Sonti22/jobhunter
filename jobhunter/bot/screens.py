@@ -83,7 +83,11 @@ def _nav(active: str = "") -> list:
     q = report.quota()
     f = report.funnel()
     rows = [
+        [{"text": "✋ Нужно сделать", "callback_data": cb("s", "work_tasks_0")},
+         {"text": "🎯 Результаты", "callback_data": cb("s", "work_results_all_0")}],
         [{"text": "✍️ Отправлю сам — Telegram", "callback_data": "t:0:next"}],
+        [{"text": "Почему ждёт", "callback_data": cb("s", "work_sending_0")},
+         {"text": "Полнота чтения", "callback_data": cb("s", "work_reading")}],
         [{"text": "📊 Статистика", "callback_data": cb("s", "stats")},
          {"text": "🔻 Воронка", "callback_data": cb("s", "funnel")}],
         [{"text": "📤 Очередь %d" % f["counts"].get("PENDING_APPROVAL", 0),
@@ -121,14 +125,13 @@ def main() -> tuple:
 
     # 1. Что требует владельца — всегда первым.
     todo = []
-    if f["open_cards"]:
-        todo.append("✋ Ответить на %d %s — жми /cards"
-                    % (f["open_cards"],
-                       _plural(f["open_cards"],
-                               "карточку", "карточки", "карточек")))
+    from ..dashboard import attention
+    needed = attention(limit=1)["total"]
+    if needed:
+        todo.append("✋ Незавершённых дел: %d — жми /tasks" % needed)
     iv = f["counts"].get("INTERVIEW_PROPOSED", 0)
     if iv:
-        todo.append("🗓 Подтвердить время интервью (%d) — /cards" % iv)
+        todo.append("🗓 Подтвердить время интервью (%d) — /tasks" % iv)
     if todo:
         lines.append("── НУЖЕН ТЫ ─────────────")
         lines += todo
@@ -266,17 +269,8 @@ def interviews() -> tuple:
 
 
 def cards() -> tuple:
-    rows = report.open_cards(10)
-    lines = ["✋ ЖДУТ ТВОЕГО РЕШЕНИЯ · %s" % _now(), ""]
-    if not rows:
-        lines.append("Ничего не ждёт — на всё отвечено. 👌")
-    for r in rows:
-        head = (r["question"] or "").split("\n")[0]
-        lines.append(head[:70])
-    if rows:
-        lines += ["", "Карточки приходят отдельными сообщениями с кнопками.",
-                  "Найди их выше в этом чате."]
-    return "\n".join(lines), _kb(_nav("cards"))
+    from .workbench import tasks
+    return tasks(0)
 
 
 def channels() -> tuple:
@@ -349,11 +343,20 @@ SCREENS = {"main": main, "stats": stats, "funnel": funnel, "queue": queue,
 
 
 def render(name: str) -> tuple:
+    if name.startswith("work_") or name == "tracks":
+        from .workbench import render as work_render
+        return work_render("work_tracks" if name == "tracks" else name)
     return SCREENS.get(name, main)()
 
 
 HELP = (
     "jobhunter — пульт\n\n"
+    "/tasks — все незавершённые дела, ошибки и ответы\n"
+    "/results — интерес, интервью, офферы и история\n"
+    "/tracks — Backend / AI–ML / Tech Lead и дополнительные\n"
+    "/sending — причины ожидания откликов\n"
+    "/reading — полнота чтения и неизвестный остаток\n"
+    "/feedback — причины пропуска вакансий\n"
     "/start, /stats — главный экран\n"
     "/mail — сводка почты: что непрочитано и от кого\n"
     "/queue — очередь на отправку\n"
@@ -370,6 +373,11 @@ HELP = (
 )
 
 COMMANDS = [
+    ("tasks", "нужно сделать"),
+    ("results", "результаты и история"),
+    ("tracks", "направления поиска"),
+    ("sending", "почему ждёт отправка"),
+    ("reading", "полнота чтения"),
     ("start", "главный экран"),
     ("stats", "статистика"),
     ("queue", "очередь на отправку"),

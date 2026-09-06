@@ -270,64 +270,33 @@ def messages_today() -> dict:
 
 
 def by_template(min_sent: int = 1) -> list:
-    """Доля ответов по шаблонам письма.
+    """Ответы и явные результаты по шаблонам одной 90-дневной когорты.
 
-    Размер выборки возвращается рядом с долей намеренно: при 67 отправках
-    разница между шаблонами неотличима от шума, и показывать проценты без
-    знаменателя — значит приглашать принять решение по случайности.
+    Старые key/sent/replied/rate сохранены; quality_rate считает только
+    положительные результаты. Неизвестный текст ручной отправки исключён.
     """
-    with session_scope() as sess:
-        sent = dict(sess.execute(
-            select(Application.message_skeleton_id, func.count(Application.id))
-            .where(Application.sent_at.is_not(None),
-                   Application.message_skeleton_id != "")
-            .group_by(Application.message_skeleton_id)).all())
-        replied = dict(sess.execute(
-            select(Application.message_skeleton_id, func.count(Application.id))
-            .where(Application.first_reply_at.is_not(None),
-                   Application.message_skeleton_id != "")
-            .group_by(Application.message_skeleton_id)).all())
-    out = [{"key": k, "sent": n, "replied": replied.get(k, 0),
-            "rate": 100.0 * replied.get(k, 0) / n}
-           for k, n in sent.items() if n >= min_sent]
-    return sorted(out, key=lambda x: (-x["rate"], -x["sent"]))
+    from .results import comparison_rows
+    return comparison_rows("template", min_sent)
 
 
 def by_source(min_sent: int = 1) -> list:
-    """Доля ответов по источнику вакансии — какой канал сбора окупается."""
-    with session_scope() as sess:
-        rows = sess.execute(
-            select(Job.source, Application.sent_at, Application.first_reply_at)
-            .join(Application, Application.job_id == Job.id)
-            .where(Application.sent_at.is_not(None))).all()
-        sent: Counter = Counter()
-        replied: Counter = Counter()
-    for source, _, first_reply in rows:
-        key = (source or "?").split(":")[0]
-        sent[key] += 1
-        if first_reply:
-            replied[key] += 1
-    out = [{"key": k, "sent": n, "replied": replied.get(k, 0),
-            "rate": 100.0 * replied.get(k, 0) / n}
-           for k, n in sent.items() if n >= min_sent]
-    return sorted(out, key=lambda x: (-x["rate"], -x["sent"]))
+    """Совместимая доля ответов и отдельная доля положительных результатов."""
+    from .results import comparison_rows
+    return comparison_rows("source", min_sent)
 
 
-def template_preferences(min_sent: int = 5) -> dict:
-    """Надёжные предпочтения для выбора нового скелета письма.
-
-    Маленькие группы намеренно исключены: четыре отправки с тремя ответами
-    выглядят лучше двадцати отправок с тремя ответами, но это не основание
-    отправлять весь следующий поток одним скелетом.
-    """
-    return {row["key"]: row["rate"] / 100.0
-            for row in by_template(min_sent=min_sent)}
+def template_preferences(min_sent: int = 20) -> dict:
+    """Качество после 14 дней наблюдения, минимум 20 отправок на шаблон."""
+    from .results import MIN_OBSERVATIONS, comparison_rows
+    return {row["key"]: row["quality_rate"] / 100.0
+            for row in comparison_rows("template", max(MIN_OBSERVATIONS, min_sent), mature=True)}
 
 
-def source_preferences(min_sent: int = 5) -> dict:
-    """Конверсия источников, пригодная для мягкого ранжирования очереди."""
-    return {row["key"]: row["rate"] / 100.0
-            for row in by_source(min_sent=min_sent)}
+def source_preferences(min_sent: int = 20) -> dict:
+    """Явные положительные результаты зрелых групп, минимум 20 отправок."""
+    from .results import MIN_OBSERVATIONS, comparison_rows
+    return {row["key"]: row["quality_rate"] / 100.0
+            for row in comparison_rows("source", max(MIN_OBSERVATIONS, min_sent), mature=True)}
 
 
 def source_priority_penalty(source: str, preferences: dict | None = None) -> float:
@@ -366,33 +335,19 @@ def totals() -> dict:
 
 
 def conversion_metrics(days: int = 90) -> dict:
-    """Полная воронка с качеством ответа и скоростью реакции."""
-    since = (datetime.now(timezone.utc) - timedelta(days=days)).replace(tzinfo=None)
-    with session_scope() as sess:
-        sent = sess.scalar(select(func.count(Application.id)).where(
-            Application.sent_at.is_not(None), Application.sent_at >= since)) or 0
-        replied = sess.scalar(select(func.count(Application.id)).where(
-            Application.first_reply_at.is_not(None), Application.first_reply_at >= since)) or 0
-        interviews = sess.scalar(select(func.count(Application.id)).where(
-            Application.interview_at_utc.is_not(None), Application.interview_at_utc >= since)) or 0
-        offers = sess.scalar(select(func.count(Application.id)).where(
-            Application.status == Status.OFFER.value,
-            Application.updated_at >= since)) or 0
-        response_rows = sess.execute(select(
-            Application.sent_at, Application.first_reply_at).where(
-                Application.sent_at.is_not(None),
-                Application.first_reply_at.is_not(None),
-                Application.first_reply_at >= since)).all()
-    hours = [((reply - sent_at).total_seconds() / 3600.0)
-             for sent_at, reply in response_rows if reply and sent_at and reply >= sent_at]
+    """Ответы, интервью и офферы той же когорты, что знаменатель отправок."""
+    from .results import aggregate
+    data = aggregate(days=days)
+    counts = data["counts"]
     return {
-        "days": days, "sent": sent, "replied": replied,
-        "interviews": interviews, "offers": offers,
-        "reply_rate": 100.0 * replied / sent if sent else 0.0,
-        "interview_rate": 100.0 * interviews / sent if sent else 0.0,
-        "offer_rate": 100.0 * offers / sent if sent else 0.0,
-        "avg_response_hours": sum(hours) / len(hours) if hours else None,
-        "responses_measured": len(hours),
+        "days": days, "sent": counts["sent"], "replied": counts["replied"],
+        "interviews": counts["interview_scheduled"], "offers": counts["offer"],
+        "reply_rate": data["reply_rate"], "positive": counts["positive"],
+        "positive_rate": data["positive_rate"],
+        "interview_rate": data["interview_scheduled_rate"],
+        "offer_rate": data["offer_rate"], "counts": counts,
+        "avg_response_hours": data["avg_response_hours"],
+        "responses_measured": data["responses_measured"],
     }
 
 

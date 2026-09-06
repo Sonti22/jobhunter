@@ -21,6 +21,7 @@ def db(tmp_path, monkeypatch):
     monkeypatch.setenv("DB_PATH", str(tmp_path / "runtime.db"))
     monkeypatch.setenv("LLM_ENABLED", "false")
     monkeypatch.setenv("SMTP_USER", "owner@example.com")
+    monkeypatch.setenv("SMTP_PORT", "587")
     monkeypatch.setenv("SMTP_APP_PASSWORD", "fake")
     monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "fake:test")
     monkeypatch.setenv("BOT_ALLOWED_USER_IDS", "1")

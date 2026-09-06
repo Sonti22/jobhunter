@@ -643,7 +643,7 @@ def test_approve_top_skips_unpassed_gate(db):
         ids = {}
         for tag, (passed, score) in {"bad": (False, 100), "good": (True, 50)}.items():
             job = Job(external_uuid=str(_uuid.uuid4()), source="test",
-                      title="t-" + tag)
+                      title="Python Backend Engineer " + tag)
             sess.add(job)
             sess.flush()
             app = Application(job_id=job.id,

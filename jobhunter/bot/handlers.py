@@ -45,6 +45,12 @@ def handle(update: dict) -> list:
         log.info("отклонён апдейт от user_id=%s", user_id)
         return []
 
+    if chat_id != user_id:
+        note = "Открой личный чат бота: данные и действия доступны только там."
+        if "callback_query" in update:
+            return [{"do": "answer", "cb_id": update["callback_query"]["id"], "text": note}]
+        return [{"do": "send", "chat_id": chat_id, "text": note}]
+
     if "callback_query" in update:
         # След каждого нажатия: «кнопки не работают» без этой строки
         # неотличимо от «нажатия не доходят», и диагностика упирается в
@@ -70,6 +76,12 @@ def _message(msg: dict, chat_id: int) -> list:
         return _free_input(waiting, text, chat_id)
 
     cmd = text.lstrip("/").split()[0].lower() if text.startswith("/") else ""
+    work_commands = {"tasks": "work_tasks_0", "results": "work_results_all_0",
+                     "reading": "work_reading", "sending": "work_sending_0",
+                     "tracks": "work_tracks", "feedback": "work_feedback"}
+    if cmd.split("@", 1)[0] in work_commands:
+        return [{"do": "screen", "chat_id": chat_id,
+                 "name": work_commands[cmd.split("@", 1)[0]]}]
 
     if cmd in ("start", "stats", ""):
         return [{"do": "screen", "chat_id": chat_id, "name": "main"}]
@@ -137,6 +149,10 @@ def _callback(cbq: dict, chat_id: int) -> list:
     if not data:
         return [{"do": "answer", "cb_id": cb_id, "text": ""}]
 
+    if data["kind"] == "work":
+        from .workbench import callback
+        return callback(data, cb_id, chat_id, msg_id)
+
     if data["kind"] == "screen":
         return [{"do": "answer", "cb_id": cb_id},
                 {"do": "screen", "chat_id": chat_id, "name": data["screen"],
@@ -166,6 +182,25 @@ def _callback(cbq: dict, chat_id: int) -> list:
             return [answer] + _manual_outreach(chat_id, "callback:" + cb_id)
         if action == "cancel":
             return [{**answer, "text": "Ничего не изменено"}]
+        if action == "why":
+            return [answer, {"do": "send", "chat_id": chat_id,
+                             "text": manual_tg.explain_card(aid)}]
+        if action == "skip_reason":
+            from .workbench import skip_keyboard
+            if not manual_tg.get_card(aid):
+                return [{**answer, "text": "Карточка уже обработана"}]
+            return [answer, {"do": "send", "chat_id": chat_id,
+                             "text": f"Почему не подходит #{aid}? Настройки поиска не изменятся.",
+                             "markup": skip_keyboard(aid)}]
+        if action == "undo":
+            ok, note = manual_tg.unmark(aid, chat_id)
+            if not ok:
+                return [{**answer, "text": note[:180]}]
+            # Карточка снова в работе — выдаём её же заново, одним сообщением.
+            manual_tg.queue_current(chat_id, "undo:" + cb_id)
+            return [answer, {"do": "edit", "chat_id": chat_id, "msg_id": msg_id,
+                             "text": f"↩️ #{aid}: {note}",
+                             "markup": {"inline_keyboard": []}}]
         if action in ("text", "handle", "cv", "confirm"):
             row = manual_tg.get_card(aid)
             if not row:
@@ -179,18 +214,16 @@ def _callback(cbq: dict, chat_id: int) -> list:
                     return [{**answer, "text": "Присылаю PDF сюда в чат"}]
                 return [answer, {"do": "send", "chat_id": chat_id,
                                  "text": row["text"] if action == "text" else "@" + row["handle"]}]
-            return [answer, {"do": "send", "chat_id": chat_id,
-                "text": f"Ты уже отправил сообщение @{row['handle']} по заявке #{aid}? "
-                        "Эта кнопка только запишет факт, ничего не отправит.",
-                "markup": {"inline_keyboard": [[
-                    {"text": "Окей, всё отправил", "callback_data": f"t:{aid}:sent"},
-                    {"text": "Нет", "callback_data": f"t:{aid}:cancel"}]]}}]
+            # «confirm» со старых карточек — теперь то же, что «sent»: второй
+            # диалог заменён кнопкой «↩️ Вернуть» на 15 минут.
+            action = "sent"
         ok, note = manual_tg.mark(aid, action, next_chat_id=chat_id)
         if not ok:
             return [answer, {"do": "send", "chat_id": chat_id, "text": note}]
+        label = "✅" if action == "sent" else "⏭"
         return [answer, {"do": "edit", "chat_id": chat_id, "msg_id": msg_id,
-                         "text": f"#{aid}: {note}", "markup": {"inline_keyboard": [[
-                             {"text": "Моя подборка / следующая", "callback_data": "t:0:next"}]]}}]
+                         "text": f"{label} #{aid}: {note}",
+                         "markup": manual_tg.after_mark_keyboard(aid, undo=(action == "sent"))}]
 
     if data["kind"] == "manual":
         if data["action"] == "form":
@@ -225,11 +258,10 @@ def _manual_outreach(chat_id: int, request_key: str = "") -> list:
         return [{"do": "send", "chat_id": chat_id,
                  "text": "Открой личный чат бота и нажми /outreach — данные не публикуются в группе."}]
     aid = manual_tg.queue_current(chat_id, request_key)
-    return [{"do": "send", "chat_id": chat_id,
-             "text": (manual_tg.WARNING + "\n\n" +
-                      (f"Текущий отклик #{aid} и PDF придут сюда. "
-                       "После «Окей, всё отправил» следующий отклик появится автоматически."
-                       if aid else "Сейчас нет подходящих новых откликов."))}]
+    if not aid:
+        return [{"do": "send", "chat_id": chat_id,
+                 "text": "Сейчас нет подходящих новых откликов для ручной отправки."}]
+    return [{"do": "send", "chat_id": chat_id, "text": manual_tg.WARNING}]
 
 
 def _decision(data: dict, cb_id: str, chat_id: int, msg_id: int) -> list:
@@ -268,6 +300,19 @@ def _claim(req_id: int, action: str, arg: str, cb_id: str, chat_id: int,
         req = sess.get(OwnerRequest, req_id)
         question = cards.strip_hints(req.question) if req else ""
         already = bool(req and req.decision)
+        app = sess.get(Application, req.application_id) if req and req.application_id else None
+        if app and (app.outcome or "").startswith("manual_tg_") and action in decisions.NEEDS_SEND:
+            return [{"do": "answer", "cb_id": cb_id, "text": "Этот диалог ведёшь вручную"},
+                    {"do": "screen", "chat_id": chat_id, "name": f"work_task_{app.id}"}]
+        if app and action in decisions.NEEDS_SEND and "incoming_message_ids" in (req.payload_json or {}):
+            from sqlalchemy import select
+            from ..models import Message
+            snapshot = req.payload_json["incoming_message_ids"]
+            latest = sess.scalar(select(Message.id).where(Message.application_id == app.id,
+                                  Message.direction == "in").order_by(Message.id.desc()).limit(1))
+            if latest is not None and latest not in snapshot:
+                return [{"do": "answer", "cb_id": cb_id, "text": "Пришло новое сообщение — обнови карточку"},
+                        {"do": "screen", "chat_id": chat_id, "name": f"work_task_{app.id}"}]
     if not req_id or not question:
         return [{"do": "answer", "cb_id": cb_id, "text": "Карточка не найдена"}]
     if already:
@@ -380,13 +425,16 @@ def _approve_top(n: int) -> int:
     """
     with session_scope() as sess:
         from sqlalchemy import select
+
+        from ..match.explain import approval_problem
+        from ..models import Job
         rows = sess.scalars(
             select(Application)
             .where(Application.status.in_((Status.PENDING_APPROVAL.value,
                                           Status.FOLLOWUP_PENDING_APPROVAL.value)),
                    Application.gate_passed.is_(True))
-            .order_by(Application.score.desc())
-            .limit(n)).all()
+            .order_by(Application.score.desc())).all()
+        rows = [a for a in rows if a.sent_at or not approval_problem(a, sess.get(Job, a.job_id))][:n]
         if not rows:
             return 0
         batch = Batch(planned_count=len(rows), approved_at=utcnow(),

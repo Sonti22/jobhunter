@@ -408,6 +408,37 @@ def transition_path(cur: Status, to: Status, max_len: int = 4) -> list:
             or bfs(lambda st: st not in TERMINAL))
 
 
+class ApplicationFeedback(Base):
+    """Owner feedback does not replace the durable manual-outreach outcome."""
+    __tablename__ = "application_feedback"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    application_id: Mapped[int] = mapped_column(ForeignKey("applications.id"), index=True)
+    reason: Mapped[str] = mapped_column(String, default="unspecified")
+    actor_id: Mapped[int] = mapped_column(BigInteger, default=0)
+    action_key: Mapped[str] = mapped_column(String, unique=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class ResultEvent(Base):
+    """Observed milestones, not synthetic intermediate state transitions."""
+    __tablename__ = "result_events"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    application_id: Mapped[int] = mapped_column(ForeignKey("applications.id"), index=True)
+    kind: Mapped[str] = mapped_column(String, index=True)
+    source: Mapped[str] = mapped_column(String)
+    event_key: Mapped[str] = mapped_column(String, unique=True)
+    occurred_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    recorded_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    details_json: Mapped[dict] = mapped_column(JSON, default=dict)
+
+
+class OwnerPreference(Base):
+    """Persist the owner's selected track without replacing an issued card."""
+    __tablename__ = "owner_preferences"
+    owner_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    outreach_track: Mapped[str] = mapped_column(String, default="all")
+
+
 class Batch(Base):
     __tablename__ = "batches"
     id: Mapped[int] = mapped_column(primary_key=True)

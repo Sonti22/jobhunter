@@ -257,9 +257,17 @@ def test_bot_command_authorization_copy_and_two_step_confirmation(db):
                 "data": f"t:{aid}:{action}", "message": {"message_id": 1, "chat": {"id": 1}}}}
     copied = handle(callback("text"))
     assert copied[-1]["text"] == "Hello, Python engineer here."
+    # Один тап: «✅ Отправил» записывает сразу, второго диалога нет —
+    # вместо него «↩️ Вернуть» на карточке.
+    acts = handle(callback("sent"))
+    assert mt.listing()["sent"] == 1
+    kb = acts[-1]["markup"]["inline_keyboard"]
+    assert any(b["callback_data"] == f"t:{aid}:undo" for r in kb for b in r)
+    # Откат возвращает карточку в работу и выдаёт её заново.
+    handle(callback("undo"))
+    assert mt.listing()["sent"] == 0 and mt.listing()["ready"] == 1
+    # Старые карточки с «confirm» ведут себя как «sent» — без диалога.
     handle(callback("confirm"))
-    assert mt.listing()["sent"] == 0
-    handle(callback("sent"))
     assert mt.listing()["sent"] == 1
 
 
@@ -287,7 +295,7 @@ def test_username_link_opens_exact_draft_without_auto_send(db):
     mt.queue_current(1)
     row = mt.get_card(aid)
     buttons = [b for r in mt.keyboard(row)["inline_keyboard"] for b in r]
-    link = next(b["url"] for b in buttons if "с текстом" in b["text"])
+    link = next(b["url"] for b in buttons if "с письмом" in b["text"])
     parsed = urlparse(link)
     assert parsed.netloc == "t.me" and parsed.path == "/recruiter_test"
     assert parse_qs(parsed.query) == {"text": [text]}
@@ -400,16 +408,20 @@ def test_outbox_delivers_card_and_real_pdf_only_to_owner(db, tmp_path, monkeypat
     def message(chat_id, text, markup=None, http=None):
         sent.append(("message", chat_id, text))
         return {"message_id": 1}
-    def document(chat_id, filename, content, caption="", http=None):
-        sent.append(("document", chat_id, filename, content))
+    def document(chat_id, filename, content, caption="", http=None, markup=None):
+        sent.append(("document", chat_id, filename, content, caption, markup))
         return {"message_id": 2}
     monkeypatch.setattr(outbox.api, "send_message", message)
     monkeypatch.setattr(outbox.api, "send_document", document)
     monkeypatch.setattr(outbox.time, "sleep", lambda _: None)
-    assert outbox.drain() == 2
-    assert [r[0] for r in sent] == ["message", "document"]
+    # Одно сообщение на отклик: PDF с подписью-карточкой и кнопками.
+    assert outbox.drain() == 1
+    assert [r[0] for r in sent] == ["document"]
     assert all(r[1] == 1 for r in sent)
-    assert sent[1][3] == pdf.read_bytes()
+    assert sent[0][3] == pdf.read_bytes()
+    assert "#%d" % aid in sent[0][4], "подпись — карточка"
+    buttons = [b["text"] for r in sent[0][5]["inline_keyboard"] for b in r]
+    assert "✅ Отправил" in buttons and "⏭ Пропустить" in buttons
     with db.session_scope() as sess:
         assert sess.scalar(select(func.count(SendLog.id))) == 0
         assert all(r.sent_at for r in sess.scalars(select(BotOutbox)))
@@ -434,13 +446,17 @@ def test_missing_pdf_is_visible_without_sending_arbitrary_file(db, tmp_path, mon
     from jobhunter.models import BotOutbox
     aid, pdf = _pdf_app(db, tmp_path)
     pdf.unlink()
-    monkeypatch.setattr(outbox.api, "send_message", lambda *a, **kw: {"message_id": 1})
+    sent = []
+    monkeypatch.setattr(outbox.api, "send_message",
+                        lambda chat_id, text, markup=None, http=None:
+                        sent.append(text) or {"message_id": 1})
     monkeypatch.setattr(outbox.api, "send_document", lambda *a, **kw: pytest.fail("missing PDF sent"))
     monkeypatch.setattr(outbox.time, "sleep", lambda _: None)
+    # Без PDF карточка уходит текстом (кнопки те же), а владелец получает
+    # отдельное предупреждение — никакого произвольного файла.
     assert outbox.drain() == 1
+    assert sent and "#%d" % aid in sent[0]
     with db.session_scope() as sess:
-        cv = sess.scalar(select(BotOutbox).where(BotOutbox.kind == "manual_tg_document"))
-        assert cv.sent_at is None and cv.attempts == 5
         assert sess.scalar(select(BotOutbox).where(BotOutbox.kind == "manual_tg_cv_error"))
 
 

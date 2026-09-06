@@ -9,8 +9,10 @@ from __future__ import annotations
 import html
 from collections import Counter
 from pathlib import Path
+from typing import Annotated, Literal
+from urllib.parse import urlencode
 
-from fastapi import FastAPI, Form
+from fastapi import FastAPI, Form, Query
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from sqlalchemy import func, select
@@ -33,6 +35,8 @@ from ..models import (
 from ..outreach import policy
 
 app = FastAPI(title="jobhunter")
+ResultTrack = Literal["all", "backend", "ml", "architect"]
+ManualTrack = Literal["all", "backend", "ml", "architect", "additional"]
 
 
 @app.middleware("http")
@@ -385,15 +389,24 @@ def _local_time(value) -> str:
 
 
 @app.get("/api/sending")
-def api_sending():
+def api_sending(offset: Annotated[int, Query(ge=0)] = 0,
+                limit: Annotated[int, Query(ge=1)] = 200):
     from ..dashboard import sending
-    return JSONResponse(jsonable_encoder(sending()))
+    return JSONResponse(jsonable_encoder(sending(offset=offset, limit=limit)))
 
 
 @app.get("/api/attention")
-def api_attention():
+def api_attention(offset: Annotated[int, Query(ge=0)] = 0,
+                  limit: Annotated[int, Query(ge=1, le=2000)] = 200):
     from ..dashboard import attention
-    return JSONResponse(jsonable_encoder(attention()))
+    return JSONResponse(jsonable_encoder(attention(offset=offset, limit=limit)))
+
+
+@app.get("/api/attention/{app_id}")
+def api_task_detail(app_id: int):
+    from ..taskhub import detail
+    data = detail(app_id)
+    return JSONResponse(jsonable_encoder(data), status_code=200 if data else 404)
 
 
 @app.get("/api/reading")
@@ -403,15 +416,36 @@ def api_reading():
 
 
 @app.get("/api/outcomes")
-def api_outcomes():
+@app.get("/api/results")
+def api_outcomes(days: Annotated[int, Query(ge=1)] = 90, track: ResultTrack = "all",
+                 offset: Annotated[int, Query(ge=0)] = 0,
+                 limit: Annotated[int, Query(ge=1, le=2000)] = 50):
     from ..dashboard import outcomes
-    return JSONResponse(jsonable_encoder(outcomes()))
+    return JSONResponse(jsonable_encoder(outcomes(days=days, track=track, offset=offset, limit=limit)))
+
+
+@app.get("/api/feedback")
+def api_feedback():
+    from ..feedback import summary
+    return JSONResponse(jsonable_encoder(summary()))
+
+
+def _pagination(path: str, data: dict, **filters) -> str:
+    offset, limit, total = data["offset"], data["limit"], data["total"]
+    links = []
+    for target, label in ((max(0, offset - limit), "Назад"), (offset + limit, "Дальше")):
+        if (label == "Назад" and offset > 0) or (label == "Дальше" and data["has_more"]):
+            url = path + "?" + urlencode(dict(filters, offset=target, limit=limit))
+            links.append("<a class='btn ghost sm' href='%s'>%s</a>" % (_h(url), label))
+    return "<nav aria-label='Страницы'><p>Показано %d–%d из %d · %s</p></nav>" % (
+        min(offset + 1, total), min(offset + limit, total), total, " ".join(links))
 
 
 @app.get("/sending", response_class=HTMLResponse)
-def sending_page():
+def sending_page(offset: Annotated[int, Query(ge=0)] = 0,
+                 limit: Annotated[int, Query(ge=1)] = 50):
     from ..dashboard import sending
-    data = sending()
+    data = sending(offset=offset, limit=limit)
     times = "".join("<p><b>%s:</b> %s · %s%s</p>" % (
         _h(channel), _h(_local_time(info["at"])),
         "оценка по расписанию" if info["estimated"] else "назначено планировщиком",
@@ -434,68 +468,116 @@ def sending_page():
                 data["total"], data["eligible"], data["quota"]["sent"], data["quota"]["cap"],
                 _h(_local_time(last["at"])) if last else "ещё нет", times,
                 _h(get_settings().owner_tz), rows or "<tr><td colspan='5'>Нет ожидающих заявок</td></tr>"))
-    return _layout(body)
+    return _layout(body + _pagination("/sending", data))
 
 
 @app.get("/attention", response_class=HTMLResponse)
-def attention_page():
+def attention_page(offset: Annotated[int, Query(ge=0)] = 0,
+                   limit: Annotated[int, Query(ge=1, le=2000)] = 50, note: str = ""):
     from ..dashboard import attention
-    data = attention()
+    data = attention(offset=offset, limit=limit)
     rows = []
     for r in data["items"]:
         action = ("<form method='post' action='/attention/%d/card'><button class='btn ghost sm'>"
                   "Открыть карточку для решения</button></form>" % r["id"]
                   if r["can_open_card"] else "")
+        if r.get("can_review_match"):
+            action += ("<a class='btn ghost sm' href='/attention/%d/match'>"
+                       "Проверить соответствие</a>" % r["id"])
+        if r["manual"] and r["can_open_card"] and r["request_id"]:
+            action += ("<form method='post' action='/attention/%d/manual'>"
+                       "<input type='hidden' name='req_id' value='%d'>"
+                       "<button class='btn ghost sm'>Ответил вручную</button></form>"
+                       % (r["id"], r["request_id"]))
         rows.append("<article class='bar'><h3><a href='/applications/%d'>#%d · %s</a></h3>"
                     "<p>%s · ожидание %.1f ч</p><details><summary>Переписка и черновик</summary>"
-                    "<b>Рекрутёр:</b><pre>%s</pre><b>Черновик:</b><pre>%s</pre></details>%s</article>" % (
+                    "<p>%s</p><b>Рекрутёр:</b><pre>%s</pre><b>Черновик:</b><pre>%s</pre>"
+                    "</details>%s</article>" % (
                         r["id"], r["id"], _h(r["title"]), _h(r["reason"]), r["waiting_hours"] or 0,
+                        _h("@" + r["handle"] if r["handle"] else ""),
                         _h(r["incoming"] or "нет входящего текста"), _h(r["draft"] or "не подготовлен"), action))
-    return _layout("<h2>Нужен мой ответ · %d</h2><p class='muted'>"
-                   "Истёкшие карточки и ошибки доставки не закрывают диалог. "
-                   "Кнопка открывает карточку владельцу для проверки текста.</p>%s" % (
-                       data["total"], "".join(rows) or "<p>Незавершённых решений нет.</p>"))
+    body = ("<h2>Нужен мой ответ · %d</h2><p class='muted'>"
+            "Истёкшие карточки и ошибки доставки не закрывают диалог. "
+            "Ручная Telegram-переписка: чтение и черновик; ответ отправляешь сам.</p>" % data["total"])
+    if note:
+        body += "<p role='status'>%s</p>" % _h(note)
+    return _layout(body + ("".join(rows) or "<p>Незавершённых решений нет.</p>")
+                   + _pagination("/attention", data))
 
 
 @app.post("/attention/{app_id}/card")
 def attention_card(app_id: int):
-    from ..models import OwnerRequest
-    from ..owner import create_human_request
+    from ..taskhub import open_card
+    result = open_card(app_id)
+    if not result["ok"]:
+        return HTMLResponse(_h(result["note"]), status_code=409)
+    return RedirectResponse("/attention?" + urlencode({"note": result["note"]}), status_code=303)
+
+
+@app.post("/api/attention/{app_id}/card")
+def api_attention_card(app_id: int):
+    from ..taskhub import open_card
+    result = open_card(app_id)
+    return JSONResponse(result, status_code=200 if result["ok"] else 409)
+
+
+def _web_owner_id() -> int:
+    return next(iter(sorted(get_settings().bot_owner_ids)), 0)
+
+
+@app.get("/attention/{app_id}/match", response_class=HTMLResponse)
+def attention_match(app_id: int):
+    from ..manual_telegram import explain_card
+    from ..match.explain import review_fingerprint
+    from ..taskhub import detail
+    data = detail(app_id)
+    if not data or not data.get("can_review_match"):
+        return HTMLResponse("Проверка недоступна или уже завершена", status_code=409)
     with session_scope() as sess:
-        a = sess.get(Application, app_id)
-        if not a or a.status not in (Status.NEEDS_HUMAN.value, Status.REPLIED.value,
-                                     Status.IN_DIALOGUE.value, Status.SENT.value,
-                                     Status.AWAITING_REPLY.value, Status.INTERVIEW_CONFIRMED.value,
-                                     Status.INTERVIEW_PROPOSED.value):
-            return HTMLResponse("Диалог недоступен для новой карточки", status_code=409)
-        from ..convo.send import reply_target_problem
-        problem = reply_target_problem(sess, a)
-        if problem:
-            return HTMLResponse(_h(problem), status_code=409)
-        pending = sess.scalar(select(OwnerRequest).where(OwnerRequest.application_id == app_id,
-                              OwnerRequest.applied_at.is_(None), OwnerRequest.decision != "expired")
-                              .order_by(OwnerRequest.id.desc()).limit(1))
-        if pending and (pending.decision or not pending.expires_at or
-                        pending.expires_at > utcnow().replace(tzinfo=None)):
-            return RedirectResponse("/attention", status_code=303)
-        if pending:
-            pending.decision = "expired"
-            pending.answered_at = utcnow()
-        latest = sess.scalar(select(OwnerRequest).where(OwnerRequest.application_id == app_id)
-                             .order_by(OwnerRequest.id.desc()).limit(1))
-        incoming = sess.scalar(select(Message).where(Message.application_id == app_id,
-                                                     Message.direction == "in")
-                               .order_by(Message.id.desc()).limit(1))
-        draft = (latest.payload_json or {}).get("draft", "") if latest else ""
-        create_human_request(sess, a, sess.get(Job, a.job_id),
-                             incoming.body if incoming else "", "повторная проверка владельцем", draft)
-        if a.status != Status.NEEDS_HUMAN.value:
-            a.advance(Status.NEEDS_HUMAN)
-        for msg in sess.scalars(select(Message).where(Message.application_id == app_id,
-                               Message.direction == "in", Message.processing_pending.is_(True))):
-            msg.processing_pending = False
-            msg.processing_error = ""
-    return RedirectResponse("/attention", status_code=303)
+        application = sess.get(Application, app_id)
+        fingerprint = review_fingerprint(application, sess.get(Job, application.job_id))
+        draft = application.message_body
+    return _layout("<h2>Проверка соответствия #%d</h2><pre>%s</pre>"
+                   "<h3>Текст отклика</h3><pre>%s</pre>"
+                   "<p>Подтверди только если проверил требования и достоверность текста. "
+                   "Для Telegram одобрение оставляет отправку ручной.</p>"
+                   "<form method='post' action='/attention/%d/match/confirm'>"
+                   "<input type='hidden' name='fingerprint' value='%s'>"
+                   "<button class='btn'>Проверил — одобрить</button></form>"
+                   % (app_id, _h(explain_card(app_id)), _h(draft), app_id, fingerprint))
+
+
+@app.post("/attention/{app_id}/match/confirm")
+def attention_match_confirm(app_id: int, fingerprint: str = Form(...)):
+    from ..match.explain import approve_reviewed
+    ok, note = approve_reviewed(app_id, fingerprint, _web_owner_id())
+    if not ok:
+        return HTMLResponse(_h(note), status_code=409)
+    return RedirectResponse("/attention?" + urlencode({"note": note}), status_code=303)
+
+
+@app.post("/attention/{app_id}/manual", response_class=HTMLResponse)
+def attention_manual(app_id: int, req_id: int = Form(...)):
+    from ..taskhub import detail
+    data = detail(app_id)
+    if not data or not data["manual"] or not data["can_open_card"] or data["request_id"] != req_id:
+        return HTMLResponse("Карточка недоступна или устарела", status_code=409)
+    return _layout("<h2>Подтвердить ручной ответ #%d</h2>"
+                   "<p>Ты уже отправил ответ @%s в Telegram? Отметка сохранит твои слова.</p>"
+                   "<form method='post' action='/attention/%d/manual/confirm'>"
+                   "<input type='hidden' name='req_id' value='%d'>"
+                   "<button class='btn'>Да, уже ответил вручную</button></form>"
+                   "<p><a href='/attention'>Вернуться без отметки</a></p>"
+                   % (app_id, _h(data["handle"]), app_id, req_id))
+
+
+@app.post("/attention/{app_id}/manual/confirm")
+def attention_manual_confirm(app_id: int, req_id: int = Form(...)):
+    from ..taskhub import complete_manual
+    ok, note = complete_manual(app_id, req_id, _web_owner_id())
+    if not ok:
+        return HTMLResponse(_h(note), status_code=409)
+    return RedirectResponse("/attention?" + urlencode({"note": note}), status_code=303)
 
 
 @app.get("/reading", response_class=HTMLResponse)
@@ -532,18 +614,77 @@ def reading_page():
 
 
 @app.get("/outcomes", response_class=HTMLResponse)
-def outcomes_page():
+@app.get("/results", response_class=HTMLResponse)
+def outcomes_page(days: Annotated[int, Query(ge=1)] = 90, track: ResultTrack = "all",
+                  offset: Annotated[int, Query(ge=0)] = 0,
+                  limit: Annotated[int, Query(ge=1, le=2000)] = 50):
     from ..dashboard import outcomes
-    data = outcomes()
+    data = outcomes(days=days, track=track, offset=offset, limit=limit)
     titles = {"no_reply": "Пока без ответа", "interested": "Проявили интерес",
               "cv_requested": "Запросили резюме", "rejected": "Отказы",
-              "interview": "Интервью", "offer": "Офферы", "other_reply": "Другие ответы"}
-    rows = "".join("<tr><td>%s</td><td>%d</td></tr>" % (titles[k], v)
-                   for k, v in data["categories"].items())
-    return _layout("<h2>Оценка результата</h2><p>Отправлено за %d дней: %d.</p>"
-                   "<p class='muted'>%s Каждая заявка учитывается в одной категории.</p>"
-                   "<table><tr><th>Результат</th><th>Заявок</th></tr>%s</table>" % (
-                       data["days"], data["sent"], _h(data["note"]), rows))
+              "interview": "Интервью", "offer": "Офферы", "other_reply": "Другие ответы",
+              "interview_scheduled": "Интервью назначено", "interview_done": "Интервью проведено"}
+    tracks = {"all": "Все", "backend": "Backend", "ml": "AI / ML", "architect": "Архитектор"}
+    proof = {"owner_reported": "Со слов владельца", "transport_confirmed": "Принято транспортом",
+             "unknown": "Подтверждение неизвестно"}
+    options = "".join("<option value='%s'%s>%s</option>" % (
+        key, " selected" if key == track else "", label) for key, label in tracks.items())
+    body = ("<h2>Оценка результата</h2><form method='get' action='/outcomes'>"
+            "<label>Направление <select name='track'>%s</select></label> "
+            "<label>Дней <input type='number' min='1' name='days' value='%d'></label> "
+            "<input type='hidden' name='limit' value='%d'>"
+            "<button class='btn ghost sm'>Показать</button></form>"
+            "<p>Отправлено за %d дней: %d.</p><p class='muted'>%s</p>"
+            % (options, days, limit, data["days"], data["sent"], _h(data["note"])))
+    counts = data.get("counts", {})
+    body += ("<h3>Подтверждение отправки</h3><p>Со слов владельца: %d · принято транспортом: %d · "
+             "подтверждение неизвестно: %d</p>" % (
+                 counts.get("owner_reported_sent", 0), counts.get("transport_confirmed_sent", 0),
+                 counts.get("unknown_sent_proof", 0)))
+    stages = "".join("<tr><td>%s</td><td>%d</td><td>%.1f%%</td></tr>" % (
+        _h(titles.get(row["kind"], row["kind"])), row["count"], row["rate"])
+        for row in data.get("stages", []))
+    body += ("<h3>Этапы</h3><p class='muted'>Этапы могут пересекаться и сохраняются после отказа.</p>"
+             "<table><tr><th>Этап</th><th>Заявок</th><th>Доля отправленных</th></tr>%s</table>"
+             % (stages or "<tr><td colspan='3'>Нет данных</td></tr>"))
+    categories = "".join("<tr><td>%s</td><td>%d</td></tr>" % (_h(titles.get(k, k)), v)
+                         for k, v in data["categories"].items())
+    body += ("<h3>Текущий результат</h3><p class='muted'>Каждая заявка учитывается в одной категории.</p>"
+             "<table><tr><th>Результат</th><th>Заявок</th></tr>%s</table>" % categories)
+    groups = "".join("<tr><td>%s</td><td>%d</td><td>%d</td><td>%d</td><td>%.1f%%</td></tr>" % (
+        _h(tracks.get(key, key)), row["sent"], row["counts"].get("replied", 0),
+        row["counts"].get("positive", 0), row.get("positive_rate", 0))
+        for key, row in data.get("by_track", {}).items())
+    body += ("<h3>Направления · вся когорта</h3><table><tr><th>Направление</th><th>Отправлено</th>"
+             "<th>Ответов</th><th>Позитивных</th><th>Доля позитивных</th></tr>%s</table>"
+             % (groups or "<tr><td colspan='5'>Нет данных</td></tr>"))
+    history = []
+    for row in data.get("applications", []):
+        events = "".join("<li>%s · %s · %s%s</li>" % (
+            _h(titles.get(event["kind"], event["kind"])),
+            _h(_local_time(event.get("occurred_at"))) if event.get("occurred_at") else "дата неизвестна",
+            _h(event.get("source", "")), " · исторические данные" if event.get("historical") else "")
+            for event in row.get("events", []))
+        history.append("<tr><td><a href='/applications/%d'>#%d · %s</a><p>%s</p></td>"
+                       "<td>%s%s</td><td>%s<br>%s</td><td>%s"
+                       "<details><summary>История этапов</summary><ul>%s</ul></details></td></tr>" % (
+                           row["id"], row["id"], _h(row["title"]), _h(row.get("company", "")),
+                           _h(tracks.get(row["track"], row["track"])),
+                           " · определено по описанию" if row.get("track_inferred") else "",
+                           _h(_local_time(row["sent_at"])), _h(proof.get(row["send_proof"], row["send_proof"])),
+                           _h(titles.get(row["category"], row["category"])), events or "<li>Нет событий</li>"))
+    body += ("<h3>История заявок</h3><table><tr><th>Заявка</th><th>Направление</th>"
+             "<th>Отправка</th><th>Результат и история</th></tr>%s</table>"
+             % ("".join(history) or "<tr><td colspan='4'>Нет заявок</td></tr>"))
+    body += _pagination("/outcomes", data, days=days, track=track)
+    feedback = data.get("feedback", {})
+    if feedback:
+        from ..feedback import REASONS
+        reasons = " · ".join("%s: %d" % (_h(REASONS.get(key, key)), count)
+                             for key, count in feedback.get("reasons", {}).items())
+        body += ("<h3>Причины пропусков · за всё время</h3><p>%s</p><p class='muted'>%s</p>"
+                 % (reasons or "Нет отметок", _h(feedback.get("note", ""))))
+    return _layout(body)
 
 
 @app.get("/api/applications")
@@ -607,12 +748,23 @@ def blacklist_toggle(employer_id: int, on: str = Form("1")):
 
 
 @app.get("/manual-telegram", response_class=HTMLResponse)
-def manual_telegram_page(note: str = ""):
+def manual_telegram_page(note: str = "", track: ManualTrack | None = None):
     from .. import manual_telegram as manual_tg
-    data = manual_tg.listing()
+    from ..feedback import REASONS
+    track = track or manual_tg.selected_track(_web_owner_id())
+    data = manual_tg.listing(track=track)
     body = "<h2>Telegram — отправлю сам</h2><p>%s</p>" % _h(manual_tg.WARNING)
     if note:
         body += "<p role='status'>%s</p>" % _h(note)
+    tracks = {"all": "Все основные", "backend": "Backend", "ml": "AI / ML",
+              "architect": "Архитектор", "additional": "Другие направления"}
+    options = "".join("<option value='%s'%s>%s</option>" % (
+        key, " selected" if key == track else "", label) for key, label in tracks.items())
+    body += ("<form method='post' action='/manual-telegram/track'>"
+             "<label>Направление <select name='track'>%s</select></label> "
+             "<button class='btn ghost sm'>Сохранить направление</button></form>"
+             "<p class='muted'>Фильтр применяется к новым подборкам. Уже выданные карточки остаются видимыми.</p>"
+             % options)
     body += ("<p>Ждут отметки: %d · отправлено с твоих слов: %d · не подошло: %d · "
              "не получилось: %d</p>" % (data["ready"], data["sent"], data["skipped"], data["failed"]))
     body += ("<form method='post' action='/manual-telegram/next'>"
@@ -624,6 +776,10 @@ def manual_telegram_page(note: str = ""):
         aid = row["id"]
         body += ("<section class='bar'><h3>#%d · %s</h3><p>%s · соответствие %.0f</p>"
                  % (aid, _h(row["title"]), _h(row["company"]), row["score"]))
+        if row.get("matches_filter") is False:
+            body += "<p class='muted'>Карточка выдана ранее; вне выбранного направления.</p>"
+        body += ("<details><summary>Почему подходит</summary><pre>%s</pre></details>"
+                 % _h(manual_tg.explain_card(aid)))
         if row["problem"]:
             body += "<p class='pill bad'>Не отправляй: %s</p>" % _h(row["problem"])
         else:
@@ -640,11 +796,16 @@ def manual_telegram_page(note: str = ""):
                               ("failed", "Не получилось")):
             confirm = (" onsubmit=\"return confirm('Сообщение уже отправлено тобой в Telegram?')\""
                        if action == "sent" else "")
+            reason = ("<label>Причина <select name='reason'>%s</select></label> " % "".join(
+                "<option value='%s'%s>%s</option>" % (
+                    key, " selected" if key == "unspecified" else "", _h(title))
+                for key, title in REASONS.items())) if action == "skip" else ""
             body += ("<form style='display:inline' method='post' action='/manual-telegram/mark'%s>"
                      "<input type='hidden' name='app_id' value='%d'>"
                      "<input type='hidden' name='action' value='%s'>"
+                     "%s"
                      "<button class='btn ghost sm'>%s</button></form> "
-                     % (confirm, aid, action, label))
+                     % (confirm, aid, action, reason, label))
         body += "</section>"
     body += """<script>async function copyDraft(id,button){
       const field=document.getElementById('draft-'+id);
@@ -664,12 +825,26 @@ def manual_telegram_next():
 
 
 @app.post("/manual-telegram/mark")
-def manual_telegram_mark(app_id: int = Form(...), action: str = Form(...)):
+def manual_telegram_mark(app_id: int = Form(...), action: str = Form(...),
+                         reason: str = Form("unspecified")):
     from urllib.parse import urlencode
 
     from ..manual_telegram import mark
-    _, note = mark(app_id, action)
+    try:
+        _, note = mark(app_id, action, reason=reason)
+    except ValueError as exc:
+        return HTMLResponse(_h(str(exc)), status_code=422)
     return RedirectResponse("/manual-telegram?" + urlencode({"note": note}), status_code=303)
+
+
+@app.post("/manual-telegram/track")
+def manual_telegram_track(track: ManualTrack = Form(...)):
+    from ..manual_telegram import set_track
+    try:
+        set_track(_web_owner_id(), track)
+    except PermissionError as exc:
+        return HTMLResponse(_h(str(exc)), status_code=403)
+    return RedirectResponse("/manual-telegram", status_code=303)
 
 
 # ─────────────────────────────────────────── отклик вручную (ATS) ──

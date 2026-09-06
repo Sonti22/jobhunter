@@ -223,11 +223,11 @@ def close_old_low_score(days: int = 7, threshold: float = AUTO_APPROVE_MIN_SCORE
 
 
 def step_auto_approve() -> int:
-    """Одобряет то, что прошло гейт и набрало скор.
+    """Новые автоодобрения: прежний порог/гейт плюс свежая проверка требований."""
+    from .match.explain import MAIN_TRACKS, approval_problem
+    from .match.role import classify
+    from .models import SendLog
 
-    Гейт уже отсеял всё, где есть выдумка, — здесь только порог качества
-    соответствия вакансии.
-    """
     approved = 0
     closed = close_old_low_score()
     if closed:
@@ -237,15 +237,22 @@ def step_auto_approve() -> int:
             select(Application)
             .where(Application.status == Status.PENDING_APPROVAL.value,
                    Application.score >= AUTO_APPROVE_MIN_SCORE,
+                   Application.gate_passed.is_(True),
+                   Application.sent_at.is_(None),
+                   Application.applied_at.is_(None),
+                   Application.send_attempts == 0,
+                   Application.send_last_attempt_at.is_(None),
+                   ~select(SendLog.id).where(
+                       SendLog.application_id == Application.id).exists(),
                    # Письмо, забракованное самопроверкой, уходит только с
                    # ведома владельца: правдивый, но невнятный текст тратит
                    # единственную попытку у рекрутёра так же, как выдумка.
                    Application.review_note == "")
-            # Берём запас: ниже применяется мягкое ранжирование по источнику,
-            # поэтому первые 25 по одному score не всегда лучшие по истории
-            # ответов. Не выгружаем всю базу.
-            .order_by(Application.score.desc())
-            .limit(AUTO_APPROVE_MAX_PER_RUN * 4)).all()
+            # A score-only pre-limit can hide every main-track vacancy behind
+            # additional roles or rows requiring review. Stream the eligible
+            # queue; apply the batch limit after review and track selection.
+            .order_by(Application.score.desc(), Application.id.desc())
+            .execution_options(yield_per=200))
         # Ранний выход при пустой основной очереди недопустим: ниже ещё
         # одобрение почтовых follow-up, и оно должно идти даже в день, когда
         # новых заявок нет — как раз в такие дни напоминания и накапливаются.
@@ -255,6 +262,10 @@ def step_auto_approve() -> int:
             if not job:
                 if a.advance(Status.WITHDRAWN, reason="вакансия удалена"):
                     log.info("заявка #%d закрыта: вакансия не найдена", a.id)
+                continue
+            problem = approval_problem(a, job)
+            if problem:
+                log.info("заявка #%d ждет проверки требований: %s", a.id, problem)
                 continue
             # Всё, что не умеем отправлять и не умеем подать через ATS,
             # закрываем явно: вечный PENDING_APPROVAL был немым тупиком.
@@ -280,7 +291,8 @@ def step_auto_approve() -> int:
 
         def priority(item):
             app, job = item
-            return app.score - source_priority_penalty(job.source, source_rates)
+            main = classify(job.title, job.tag, job.description_raw).family in MAIN_TRACKS
+            return main, app.score - source_priority_penalty(job.source, source_rates)
 
         candidates.sort(key=lambda item: (priority(item), item[0].id), reverse=True)
         candidates = candidates[:AUTO_APPROVE_MAX_PER_RUN]

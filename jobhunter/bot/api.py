@@ -191,11 +191,25 @@ def edit_message_text(chat_id: int, message_id: int, text: str,
         # «message is not modified» — не ошибка: экран уже показывает это же.
         if "not modified" in str(e):
             return {}
+        # Карточка ручной отправки — документ (PDF с подписью): у него
+        # правится caption, а editMessageText отвечает «no text in the
+        # message to edit». Один вызов, два вида сообщений.
+        if "no text in the message" in str(e).lower():
+            cap: dict = {"chat_id": chat_id, "message_id": message_id,
+                         "caption": text[:1024]}
+            if markup is not None:
+                cap["reply_markup"] = markup
+            try:
+                return call("editMessageCaption", _http=http, **cap) or {}
+            except RuntimeError as e2:
+                if "not modified" in str(e2):
+                    return {}
+                raise
         raise
 
 
 def send_document(chat_id: int, filename: str, content: bytes, caption: str = "",
-                  http=None) -> dict:
+                  http=None, markup: dict | None = None) -> dict:
     """PDF upload to the configured owner only; never to a recruiter or group.
 
     Immutable bytes let the bounded HTTP retries resend a complete multipart
@@ -207,8 +221,15 @@ def send_document(chat_id: int, filename: str, content: bytes, caption: str = ""
     if (not content.startswith(b"%PDF-") or len(content) > 10 * 1024 * 1024
             or not filename.lower().endswith(".pdf") or "/" in filename or "\\" in filename):
         raise ValueError("некорректный PDF-файл")
+    extra: dict = {}
+    if markup:
+        # Кнопки прямо на PDF: карточка ручной отправки — одно сообщение,
+        # его же владелец пересылает рекрутёру.
+        import json as _json
+        extra["reply_markup"] = _json.dumps(markup, ensure_ascii=False)
     return call("sendDocument", _http=http, chat_id=chat_id, caption=caption[:1024],
-                _read_timeout=30, _files={"document": (filename, content, "application/pdf")}) or {}
+                _read_timeout=30, _files={"document": (filename, content, "application/pdf")},
+                **extra) or {}
 
 
 def answer_callback_query(cb_id: str, text: str = "", alert: bool = False,

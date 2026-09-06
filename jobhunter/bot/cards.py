@@ -31,6 +31,9 @@ def parse_cb(data: str) -> dict:
     if not parts:
         return {}
     head = parts[0]
+    if head == "w" and 3 <= len(parts) <= 4:
+        return {"kind": "work", "action": parts[1], "arg": parts[2],
+                "extra": parts[3] if len(parts) == 4 else ""}
     if head == "d" and len(parts) >= 3:
         return {"kind": "decision", "req_id": int(parts[1]) if parts[1].isdigit() else 0,
                 "action": parts[2], "arg": parts[3] if len(parts) > 3 else ""}
@@ -58,6 +61,11 @@ def keyboard_for(req) -> dict:
     s = get_settings()
     rid = req.id
     payload = dict(getattr(req, "payload_json", None) or {})
+
+    if payload.get("manual_reply"):
+        aid = req.application_id
+        return _kb([[{"text": "Открыть диалог и черновик", "callback_data": cb("s", f"work_task_{aid}")}],
+                    [{"text": "Ответил вручную", "callback_data": cb("w", "manual", aid, rid)}]])
 
     if req.kind == OwnerRequestKind.SLOT_CONFIRM.value:
         rows = []

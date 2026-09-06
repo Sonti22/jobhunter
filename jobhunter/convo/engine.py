@@ -238,6 +238,21 @@ def _remember_llm_verdict(app_id: int, v, error: str = "") -> None:
         pass
 
 
+def _record_business_result(sess, app_id: int, text: str, kind: str, intent) -> None:
+    """Tie an observed intent to its saved inbound message, including on retries."""
+    from ..results import record_event
+
+    message = sess.scalar(select(Message).where(
+        Message.application_id == app_id, Message.direction == "in",
+        (Message.body_hash == norm_hash(text)) | (Message.body == text[:4000]),
+    ).order_by(Message.id.desc()).limit(1))
+    if message is not None:
+        record_event(sess, app_id, kind, "classifier", "message:%d:%s" % (message.id, kind),
+                     occurred_at=message.received_at,
+                     details={"message_id": message.id, "label": intent.label,
+                              "confidence": intent.confidence, "evidence": "inbound_intent"})
+
+
 async def handle_message(client, app_id: int, text: str,
                          dry: bool = False) -> str:
     """Решает судьбу одного входящего. Возвращает краткий итог для лога."""
@@ -273,6 +288,8 @@ async def handle_message(client, app_id: int, text: str,
                 app = sess.get(Application, app_id)
                 job = sess.get(Job, app.job_id)
                 app.advance(Status.REJECTED_BY_EMPLOYER, reason="отказ рекрутёра")
+                if not dry:
+                    _record_business_result(sess, app_id, text, "rejected", intent)
                 # Раньше закрытие было молчаливым — владелец узнавал о нём
                 # из статистики. Отказ — тоже событие.
                 notify.push("rejection_closed",
@@ -307,6 +324,16 @@ async def handle_message(client, app_id: int, text: str,
         if v is not None and v.confidence >= 0.75 \
                 and v.label in (C.ASK_CV, C.ASK_CALL, C.ACK, C.SLOT_PROPOSED):
             intent = C.Intent(v.label, v.confidence, "llm:" + v.reason[:50])
+
+    # Record the observed business signal before any reply or state-machine
+    # path. A proposed slot is interest; only an explicit booking proves that
+    # an interview was scheduled. Dry previews never append result events.
+    if not dry:
+        from ..results import classifier_kind
+        kind = classifier_kind(intent.label, intent.confidence)
+        if kind is not None:
+            with session_scope() as sess:
+                _record_business_result(sess, app_id, text, kind, intent)
 
     # Предложение времени — слоты + карточка владельцу. Автоответа нет:
     # подтверждение слота и есть назначение встречи, а его делает человек.

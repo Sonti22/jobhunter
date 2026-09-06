@@ -18,8 +18,10 @@ from sqlalchemy import select
 
 from .config import get_settings
 from .db import session_scope
+from .match.explain import MAIN_TRACKS, explain_job
+from .match.role import classify
 from .match.scorer import score_job
-from .models import Application, Job, Status
+from .models import Application, Job, SendLog, Status
 from .tailor.llm_writer import quality_problem, write_message
 from .tailor.message import generate as gen_message
 from .tailor.message import source_label
@@ -70,7 +72,23 @@ def prepare_application(app_id: int,
         app = sess.get(Application, app_id)
         if app is None:
             raise ValueError("нет заявки %d" % app_id)
+        # Preparation must never replace approval/outreach history, including
+        # legacy rows reset to DISCOVERED after an attempt recorded only in logs.
+        preparable = {Status.DISCOVERED.value, Status.SCORED.value,
+                      Status.CONTENT_READY.value, Status.GATE_FAILED.value,
+                      Status.HANDLE_MISSING.value, Status.PENDING_APPROVAL.value}
+        if (app.status not in preparable or app.approved_at or app.sent_at
+                or app.send_attempts or app.send_last_attempt_at or app.applied_at
+                or app.sending_lease_until or app.telegram_msg_id
+                or sess.scalar(select(SendLog.id).where(
+                    SendLog.application_id == app.id).limit(1)) is not None):
+            return Prepared(app.id, app.status, app.score, cv_path=app.cv_path,
+                            message=app.message_body,
+                            reason="история одобрения/отправки сохранена; повторная подготовка пропущена")
         job = sess.get(Job, app.job_id)
+
+        assessment = explain_job(job)
+        app.score_breakdown_json = dict(app.score_breakdown_json or {}, assessment=assessment)
 
         from .outreach.eligibility import vacancy_problem
         problem = vacancy_problem(job)
@@ -80,9 +98,10 @@ def prepare_application(app_id: int,
 
         score = score_job(job.title, job.tag, job.description_raw)
         app.score = score.total
-        app.score_breakdown_json = {"reason": score.reason,
-                                    "matched": [t for t, _, _ in score.matched_skills],
-                                    "forbidden": score.forbidden_demands}
+        app.score_breakdown_json = dict(
+            app.score_breakdown_json or {}, reason=score.reason,
+            matched=[t for t, _, _ in score.matched_skills],
+            forbidden=score.forbidden_demands, assessment=assessment)
 
         if not score.recommend:
             app.transition(Status.REJECTED_SCORE,
@@ -240,9 +259,17 @@ def prepare_all_discovered(limit: int | None = None) -> dict:
     from .report import template_preferences
 
     with session_scope() as sess:
-        ids = sess.scalars(
-            select(Application.id).where(Application.status == Status.DISCOVERED.value)
-            .order_by(Application.id).limit(limit or 10_000)).all()
+        rows = sess.execute(
+            select(Application.id, Job.title, Job.tag, Job.description_raw)
+            .outerjoin(Job, Application.job_id == Job.id)
+            .where(Application.status == Status.DISCOVERED.value)
+            .order_by(Application.id)).all()
+        # Prioritize the three main tracks before applying a batch limit. Other
+        # families stay in the queue and retain their original numerical score.
+        rows.sort(key=lambda row: (
+            classify(row.title, row.tag, row.description_raw).family not in MAIN_TRACKS,
+            row.id))
+        ids = [row.id for row in rows[:limit or 10_000]]
 
     stats = {"processed": 0, "pending": 0, "rejected": 0, "gate_failed": 0}
     preferences = template_preferences()
