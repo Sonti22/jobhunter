@@ -367,7 +367,7 @@ def approve_reviewed(app_id: int, fingerprint: str, actor_id: int) -> tuple[bool
     from ..outreach.eligibility import vacancy_problem
     from .scorer import score_job
 
-    if actor_id not in get_settings().bot_owner_ids:
+    if isinstance(actor_id, bool) or actor_id not in get_settings().bot_owner_ids:
         return False, "Подтвердить соответствие может только владелец"
     with session_scope() as sess:
         sess.connection().exec_driver_sql("BEGIN IMMEDIATE")

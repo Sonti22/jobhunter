@@ -30,21 +30,15 @@ def db(tmp_path_factory):
 
 @pytest.fixture(autouse=True)
 def clean(db):
-    from sqlalchemy import delete
+    from jobhunter.models import Base
 
-    from jobhunter.models import (
-        Application,
-        BotOutbox,
-        Employer,
-        Job,
-        Message,
-        OwnerRequest,
-        SendLog,
-    )
+    # Все таблицы в обратном порядке зависимостей, а не семь по списку:
+    # у applications появились новые потомки (feedback, батчи), и ручной
+    # список падал на FOREIGN KEY, если перед этим модулем отработал любой
+    # другой — тест зависел от порядка запуска.
     with db.session_scope() as sess:
-        for model in (Message, SendLog, OwnerRequest, Application, Job,
-                      Employer, BotOutbox):
-            sess.execute(delete(model))
+        for table in reversed(Base.metadata.sorted_tables):
+            sess.execute(table.delete())
     yield
 
 

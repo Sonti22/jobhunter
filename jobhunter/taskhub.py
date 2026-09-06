@@ -146,6 +146,7 @@ def _detail(sess, app, job, requests, messages, now):
     active = bool(unfinished or unanswered or error or expired or pending)
     if not decided and app.status in (Status.NEEDS_HUMAN.value, Status.REPLIED.value,
                                       Status.INTERVIEW_PROPOSED.value,
+                                      Status.SEND_FAILED.value,
                                       Status.SEND_FAILED_AMBIGUOUS.value):
         active = True
     active = active and app.status not in CLOSED and app.outcome != "manual_tg_skipped"
@@ -177,7 +178,7 @@ def _detail(sess, app, job, requests, messages, now):
         priority, category = 0, "interview"
     elif unfinished:
         priority, category = 2, "processing"
-    elif error or app.status == Status.SEND_FAILED_AMBIGUOUS.value:
+    elif error or app.status in (Status.SEND_FAILED.value, Status.SEND_FAILED_AMBIGUOUS.value):
         priority, category = 3, "error"
     elif expired:
         priority, category = 4, "expired"
@@ -185,6 +186,8 @@ def _detail(sess, app, job, requests, messages, now):
         priority, category = 1, "incoming"
     waiting = (app.last_inbound_at or (incoming.received_at if incoming else None)
                or (req.created_at if req else app.updated_at))
+    if unfinished:
+        waiting = min((m.received_at for m in unfinished if m.received_at), default=waiting)
     return {"id": app.id, "title": (job.title or job.tag) if job else "",
             "status": app.status, "sent_at": app.sent_at, "reason": reason,
             "request_id": req.id if req else None,
@@ -352,7 +355,7 @@ def complete_manual(app_id: int, req_id: int, actor_id: int) -> tuple[bool, str]
     """Record the owner's report, never a transport receipt or a synthetic message."""
     from .config import get_settings
 
-    if not actor_id or actor_id not in get_settings().bot_owner_ids:
+    if isinstance(actor_id, bool) or not actor_id or actor_id not in get_settings().bot_owner_ids:
         return False, "Подтверждение доступно только владельцу"
     with session_scope() as sess:
         sess.execute(text("BEGIN IMMEDIATE"))

@@ -382,7 +382,7 @@ def _local_time(value) -> str:
     if not value:
         return "неизвестно"
     if isinstance(value, str):
-        value = datetime.fromisoformat(value)
+        value = datetime.fromisoformat(value.replace("Z", "+00:00"))
     if value.tzinfo is None:
         value = value.replace(tzinfo=timezone.utc)
     return value.astimezone(ZoneInfo(get_settings().owner_tz)).strftime("%d.%m %H:%M")

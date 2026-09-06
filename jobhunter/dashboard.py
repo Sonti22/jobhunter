@@ -142,7 +142,8 @@ def attention(limit: int = 200, offset: int = 0) -> dict:
         for app, job in sess.execute(select(Application, Job).outerjoin(Job).where(
                 Application.status.notin_(ATTENTION_CLOSED),
                 Application.status.in_((Status.NEEDS_HUMAN.value, Status.REPLIED.value,
-                                       Status.INTERVIEW_PROPOSED.value, Status.SEND_FAILED_AMBIGUOUS.value,
+                                       Status.INTERVIEW_PROPOSED.value, Status.SEND_FAILED.value,
+                                       Status.SEND_FAILED_AMBIGUOUS.value,
                                        Status.PENDING_APPROVAL.value)) |
                 Application.id.in_(candidate_ids))):
             row = taskhub._detail(sess, app, job, requests.get(app.id, []),

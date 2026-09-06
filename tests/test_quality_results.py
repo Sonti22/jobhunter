@@ -349,3 +349,29 @@ def test_engine_observes_cv_request_without_requiring_outbound_send(db, make_app
     with db.session_scope() as sess:
         rows = sess.scalars(select(ResultEvent)).all()
         assert [row.kind for row in rows] == ([] if dry else ["cv_requested"])
+
+
+def test_offer_classifier_signal_is_not_owner_confirmed_offer(db, make_app):
+    aid = make_app()
+    with db.session_scope() as sess:
+        sess.add(Message(application_id=aid, direction="in", received_at=NOW,
+                         classifier_label="offer", classifier_confidence=0.99))
+    data = results.aggregate()
+    assert data["counts"]["offer"] == 0 and data["counts"]["interested"] == 1
+    assert results.owner_record(aid, "offer", 77, "confirm")[0]
+    assert results.aggregate()["counts"]["offer"] == 1
+
+
+def test_cv_only_does_not_prefer_template_or_source(db, make_app):
+    for _ in range(20):
+        event(db, make_app(), "cv_requested", source="classifier")
+    assert results.aggregate()["counts"]["cv_requested"] == 20
+    assert report.template_preferences(5) == {"tested": 0.0}
+    assert report.source_preferences(5) == {"tg": 0.0}
+
+
+def test_old_application_history_outside_cohort_is_still_readable(db, make_app):
+    aid = make_app(sent_at=NOW - timedelta(days=100))
+    event(db, aid, "interview_done")
+    assert results.aggregate()["sent"] == 0
+    assert [e["kind"] for e in results.application_history(aid)] == ["interview_done"]

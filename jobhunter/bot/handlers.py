@@ -306,6 +306,7 @@ def _claim(req_id: int, action: str, arg: str, cb_id: str, chat_id: int,
                     {"do": "screen", "chat_id": chat_id, "name": f"work_task_{app.id}"}]
         if app and action in decisions.NEEDS_SEND and "incoming_message_ids" in (req.payload_json or {}):
             from sqlalchemy import select
+
             from ..models import Message
             snapshot = req.payload_json["incoming_message_ids"]
             latest = sess.scalar(select(Message.id).where(Message.application_id == app.id,
