@@ -131,7 +131,24 @@ def run_forever() -> int:
 
     http = api._client()
     try:
-        me = api.get_me(http=http)
+        # Контейнер стартует раньше DNS docker-сети: первые секунды getMe
+        # падает с «Temporary failure in name resolution», процесс выходил,
+        # и Docker поднимал бота по 3-4 раза на каждый деплой. Ждём сеть до
+        # двух минут — это старт, а не рабочий цикл.
+        me = None
+        for attempt in range(24):
+            try:
+                me = api.get_me(http=http)
+                break
+            except api.TokenRevoked:
+                raise
+            except Exception as e:                          # noqa: BLE001
+                log.warning("getMe при старте: %s (попытка %d/24), жду сеть",
+                            type(e).__name__, attempt + 1)
+                time.sleep(5)
+        if me is None:
+            log.error("сеть так и не появилась — выхожу, Docker перезапустит")
+            return 3
         log.info("бот @%s (id %s), владельцы: %s",
                  me.get("username"), me.get("id"),
                  ", ".join(str(i) for i in sorted(s.bot_owner_ids)) or "НЕ ЗАДАНЫ")
