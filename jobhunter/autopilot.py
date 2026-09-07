@@ -294,7 +294,8 @@ def step_auto_approve() -> int:
             main = classify(job.title, job.tag, job.description_raw).family in MAIN_TRACKS
             return main, app.score - source_priority_penalty(job.source, source_rates)
 
-        candidates.sort(key=lambda item: (priority(item), item[0].id), reverse=True)
+        candidates.sort(key=lambda item: (priority(item), item[1].posted_at or 0, item[0].id),
+                        reverse=True)
         candidates = candidates[:AUTO_APPROVE_MAX_PER_RUN]
         if candidates:
             batch = Batch(planned_count=len(candidates), approved_at=utcnow(),

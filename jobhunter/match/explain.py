@@ -130,7 +130,7 @@ def _clauses(text: str) -> tuple[list[str], list[str], list[str]]:
             continue
         header = _HEADER.match(clause)
         if header:
-            mode = header.lastgroup
+            mode = header.lastgroup or "context"
             if mode == "other" and re.match(r"responsibilities|duties|what you|обязанности|задачи|стек|tech stack", header[0], re.I):
                 mode = "context"
             clause = clause[header.end():].lstrip(" :–—-").strip()
@@ -262,7 +262,9 @@ def explain_job(job, profile=None) -> dict:
     for skill in _skill_hits(_plain("\n".join((title, tag, body))), p):
         if not _skill_problem(skill, p):
             matched.append({"skill": skill.canonical, "evidence_ids": _evidence(p, skill)})
-    gaps, unknowns, reasons = [], [], []
+    gaps: list[str] = []
+    unknowns: list[str] = []
+    reasons: list[str] = []
     if role.family == "unknown":
         reasons.append("роль не распознана")
     elif role.ambiguous:

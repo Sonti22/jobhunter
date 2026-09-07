@@ -84,31 +84,56 @@ def parse_reply_to(text: str) -> int:
     return 0
 
 
-@contextmanager
-def smtp_session():
+def _smtp_connect():
     """Защищённый SMTP: implicit TLS на 465, обязательный STARTTLS иначе.
 
     Авторизация только после TLS с проверкой сертификата. Не переключаем
     транспорт при ошибке: повторная попытка остаётся за отправителем.
+    Вынесено из smtp_session, чтобы партия могла переподключиться, когда
+    Gmail закрыл сессию между письмами.
     """
     s = get_settings()
-    server = None
+    context = ssl.create_default_context()
+    if s.smtp_port == 465:
+        server = smtplib.SMTP_SSL(s.smtp_host, s.smtp_port, timeout=30, context=context)
+    else:
+        server = smtplib.SMTP(s.smtp_host, s.smtp_port, timeout=30)
     try:
-        context = ssl.create_default_context()
-        if s.smtp_port == 465:
-            server = smtplib.SMTP_SSL(s.smtp_host, s.smtp_port, timeout=30, context=context)
-        else:
-            server = smtplib.SMTP(s.smtp_host, s.smtp_port, timeout=30)
+        if s.smtp_port != 465:
             server.starttls(context=context)
         server.login(s.smtp_user, s.smtp_app_password)
+    except Exception:
+        # Сокет уже открыт: провал STARTTLS/логина не должен его утечь.
+        _smtp_close(server)
+        raise
+    return server
+
+
+def _smtp_close(server) -> None:
+    if server is None:
+        return
+    try:
+        server.quit()
+    except Exception:
+        # QUIT сам может оборваться: всё равно освобождаем сокет,
+        # не подменяя исходную ошибку отправки ошибкой очистки.
+        try:
+            server.close()
+        except Exception:
+            pass
+
+
+@contextmanager
+def smtp_session():
+    server = None
+    try:
+        server = _smtp_connect()
         yield server
     finally:
         if server is not None:
             try:
                 server.quit()
             except Exception:
-                # QUIT сам может оборваться: всё равно освобождаем сокет,
-                # не подменяя исходную ошибку отправки ошибкой очистки.
                 try:
                     server.close()
                 except Exception:
@@ -233,11 +258,25 @@ def _mailbox_ok(addr: str) -> bool:
     return True
 
 
+def _socket_already_dead(exc: Exception) -> bool:
+    """Соединение закрылось ДО этого письма — передачи данных не было.
+
+    smtplib кидает SMTPServerDisconnected("please run connect() first"),
+    когда сокет уже None: Gmail закрыл сессию между письмами партии. Это
+    не «неоднозначная доставка», а гарантированная недоставка — 20 писем
+    простояли замороженными с 04.09 именно из-за этой ошибки.
+    """
+    return (isinstance(exc, smtplib.SMTPServerDisconnected)
+            and "run connect() first" in str(exc))
+
+
 def _smtp_delivery_ambiguous(exc: Exception) -> bool:
     """Мог ли сервер принять письмо до того, как клиент получил ошибку."""
     # Отказ SMTP с кодом 4xx/5xx означает, что DATA не была принята. Для
     # сетевого обрыва, таймаута и неизвестной ошибки доказать это нельзя.
     if isinstance(exc, smtplib.SMTPResponseException):
+        return False
+    if _socket_already_dead(exc):
         return False
     return True
 
@@ -370,6 +409,7 @@ def _send_batch(limit: int, dry: bool) -> int:
 
     from contextlib import nullcontext
     with (smtp_session() if not dry else nullcontext(None)) as server:
+        session_server = server          # что закроет контекст-менеджер
         rng = random.Random()
         ok = 0
         errors = 0
@@ -439,7 +479,18 @@ def _send_batch(limit: int, dry: bool) -> int:
             try:
                 if server is None:
                     raise RuntimeError("SMTP-сессия не открыта")
-                server.send_message(msg)
+                try:
+                    server.send_message(msg)
+                except smtplib.SMTPServerDisconnected as e:
+                    # Gmail закрывает сессию между письмами (паузы в партии —
+                    # минуты). Если сокет умер ДО письма — переподключаемся и
+                    # повторяем один раз; обрыв посреди DATA так не лечим —
+                    # он честно неоднозначен.
+                    if not _socket_already_dead(e):
+                        raise
+                    _smtp_close(server)
+                    server = _smtp_connect()
+                    server.send_message(msg)
             except Exception as e:
                 errors += 1
                 with session_scope() as sess:
@@ -450,8 +501,10 @@ def _send_batch(limit: int, dry: bool) -> int:
                     a.sending_lease_until = None
                     a.send_error_class = type(e).__name__
                     a.send_error_detail = str(e)[:500]
+                    # Мёртвый сокет — повторить через 15 минут, как SMTP 4xx.
                     a.send_next_try_at = (utcnow() + timedelta(minutes=15)
-                                          if _smtp_retryable(e) else None)
+                                          if _smtp_retryable(e) or _socket_already_dead(e)
+                                          else None)
                     sess.add(SendLog(application_id=it["app_id"],
                                      result="ambiguous" if target == Status.SEND_FAILED_AMBIGUOUS
                                      else "error",
@@ -515,6 +568,10 @@ def _send_batch(limit: int, dry: bool) -> int:
             if i < len(batch) - 1:
                 time.sleep(rng.uniform(60, 180))
 
+        # Контекст-менеджер закроет исходное соединение; переподключённое
+        # после мёртвого сокета — наше, закрываем сами.
+        if server is not None and server is not session_server:
+            _smtp_close(server)
         print("\nИтог: отправлено %d из %d" % (ok, len(batch)))
         return 1 if errors else 0
 

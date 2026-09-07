@@ -375,3 +375,12 @@ def test_old_application_history_outside_cohort_is_still_readable(db, make_app):
     event(db, aid, "interview_done")
     assert results.aggregate()["sent"] == 0
     assert [e["kind"] for e in results.application_history(aid)] == ["interview_done"]
+
+
+def test_small_samples_visible_without_affecting_preferences(db, make_app):
+    event(db, make_app(), "interested")
+    data = results.aggregate()
+    for rows in data["group_quality"].values():
+        assert len(rows) == 1 and rows[0]["sent"] == 1
+        assert rows[0]["interested"] == 1 and not rows[0]["preference_eligible"]
+    assert report.source_preferences() == report.template_preferences() == {}

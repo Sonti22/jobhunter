@@ -130,9 +130,9 @@ def feedback() -> tuple:
     return _view(lines, [])
 
 
-def skip_keyboard(app_id: int) -> dict:
+def skip_keyboard(app_id: int, action: str = "skip") -> dict:
     from ..feedback import REASONS
-    rows = [[{"text": label, "callback_data": cb("w", "skip", app_id, key)}]
+    rows = [[{"text": label, "callback_data": cb("w", action, app_id, key)}]
             for key, label in REASONS.items()]
     rows.append([{"text": "Отмена", "callback_data": cb("t", app_id, "cancel")}])
     return {"inline_keyboard": rows}
@@ -244,8 +244,10 @@ def quality(track: str = "all") -> tuple:
         if not rows:
             lines.append("Недостаточно наблюдений — предпочтения нейтральны.")
         for row in rows[:8]:
-            lines.append(f"{row['key']}: {row['sent']} откликов, "
-                         f"положительный результат {row.get('positive', 0)}")
+            lines.append(f"{row['key']}: выборка {row['sent']}, интерес {row['interested']}, "
+                         f"назначено {row['interview_scheduled']}, прошло {row['interview_done']}, "
+                         f"офферы {row['offer']}" +
+                         ("" if row.get("preference_eligible") else " · нейтрально (<20)"))
     lines += ["", "Отказы, запрос CV и обычные ответы сами по себе не повышают рейтинг."]
     return _view(lines, [[_button("Результаты", f"work_results_{track}_0")]])
 
@@ -286,7 +288,15 @@ def callback(data: dict, cb_id: str, chat_id: int, msg_id: int) -> list:
     if not arg.isdigit():
         return [{**answer, "text": "Неверная заявка"}]
     aid = int(arg)
-    if action == "match":
+    if action == "feedback":
+        return [answer, {"do": "send", "chat_id": chat_id,
+                        "text": f"Почему не подходит #{aid}? Можно оставить без причины. "
+                                "Настройки поиска автоматически не изменятся.",
+                        "markup": skip_keyboard(aid, "reason")}]
+    if action == "reason":
+        from ..feedback import complete_reason
+        ok, note = complete_reason(aid, extra, chat_id)
+    elif action == "match":
         from ..db import session_scope
         from ..match.explain import review_fingerprint
         from ..models import Application, Job

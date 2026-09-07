@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
+from typing import Any, overload
 
 from sqlalchemy import select
 from sqlalchemy.dialects.sqlite import insert
@@ -31,6 +32,14 @@ _ACTIVE_STATUSES = {
     Status.NEEDS_HUMAN.value, Status.INTERVIEW_PROPOSED.value,
     Status.INTERVIEW_CONFIRMED.value, Status.INTERVIEW_DONE.value, Status.OFFER.value,
 }
+
+
+@overload
+def _utc(value: datetime) -> datetime: ...
+
+
+@overload
+def _utc(value: None) -> None: ...
 
 
 def _utc(value: datetime | None) -> datetime | None:
@@ -264,7 +273,9 @@ def _cohort(days=90, *, mature=False) -> list[dict]:
         apps = sess.execute(select(Application, Job).join(Job, Application.job_id == Job.id)
                             .where(Application.id.in_(cohort))
                             .order_by(Application.sent_at.desc(), Application.id.desc())).all()
-        messages, stored, logs = defaultdict(list), defaultdict(list), defaultdict(list)
+        messages: dict[int, list[Any]] = defaultdict(list)
+        stored: dict[int, list[Any]] = defaultdict(list)
+        logs: dict[int, list[Any]] = defaultdict(list)
         for model, target in ((Message, messages), (ResultEvent, stored), (SendLog, logs)):
             for row in sess.scalars(select(model).where(model.application_id.in_(cohort))):
                 target[row.application_id].append(row)
@@ -353,7 +364,7 @@ Dates are UTC ISO strings; unknown event dates are null. Rates are percentages.
             "group_quality": {
                 "by_" + group: _comparison_from_rows(
                     [row for row in selected if row["mature"]], group,
-                    MIN_OBSERVATIONS, days=days, mature=True)
+                    1, days=days, mature=True)
                 for group in ("source", "template")},
             "avg_response_hours": sum(hours) / len(hours) if hours else None,
             "responses_measured": len(hours),
@@ -385,5 +396,6 @@ def _comparison_from_rows(rows, group, min_sent, *, days, mature):
                     "rate": summary["reply_rate"], "reply_rate": summary["reply_rate"],
                     "quality_rate": summary["positive_rate"],
                     "positive_rate": summary["positive_rate"],
+                    "preference_eligible": bool(mature and days == 90 and len(rows) >= MIN_OBSERVATIONS),
                     "mature": mature, "days": days})
     return sorted(out, key=lambda row: (-row["quality_rate"], -row["sent"], row["key"]))

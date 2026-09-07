@@ -358,3 +358,36 @@ def test_prepare_batch_prioritizes_main_tracks_without_deleting(db, monkeypatch)
     assert seen == [main]
     with db.session_scope() as sess:
         assert sess.get(Application, extra).status == "DISCOVERED"
+
+
+def test_explicit_match_review_keeps_score_text_and_blocks_repeat(db, monkeypatch):
+    from jobhunter.config import get_settings
+    monkeypatch.setenv("BOT_ALLOWED_USER_IDS", "1")
+    get_settings.cache_clear()
+    aid = insert_app(db, body="Required: Python FastAPI Docker and AtlantisDB")
+    with db.session_scope() as sess:
+        application = sess.get(Application, aid)
+        fingerprint = explain.review_fingerprint(application, sess.get(Job, application.job_id))
+    assert not explain.approve_reviewed(aid, fingerprint, True)[0]
+    assert not explain.approve_reviewed(aid, fingerprint, 2)[0]
+    ok, note = explain.approve_reviewed(aid, fingerprint, 1)
+    assert ok, note
+    assert not explain.approve_reviewed(aid, fingerprint, 1)[0]
+    with db.session_scope() as sess:
+        application = sess.get(Application, aid)
+        assert application.status == "APPROVED" and application.sent_at is None
+        assert application.score == 80 and application.message_body == "Original message"
+
+
+def test_autoapproval_tie_breaks_by_freshness_then_id(db, monkeypatch):
+    from jobhunter import autopilot
+    monkeypatch.setattr(autopilot, "AUTO_APPROVE_MAX_PER_RUN", 1)
+    fresh = insert_app(db)
+    stale = insert_app(db)
+    with db.session_scope() as sess:
+        sess.get(Job, sess.get(Application, fresh).job_id).posted_at = int(utcnow().timestamp())
+        sess.get(Job, sess.get(Application, stale).job_id).posted_at = int(utcnow().timestamp()) - 3600
+    assert autopilot.step_auto_approve() == 1
+    with db.session_scope() as sess:
+        assert sess.get(Application, fresh).status == "APPROVED"
+        assert sess.get(Application, stale).status == "PENDING_APPROVAL"

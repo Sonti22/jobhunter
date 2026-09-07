@@ -214,7 +214,8 @@ def detail(app_id: int) -> dict | None:
         app = sess.get(Application, app_id)
         if app is None:
             return None
-        return _detail(sess, app, sess.get(Job, app.job_id), *_rows(sess, app_id), _now())
+        requests, messages = _rows(sess, app_id)
+        return _detail(sess, app, sess.get(Job, app.job_id), requests, messages, _now())
 
 
 def _manual_request(sess, app, job, incoming, draft, reason, now):

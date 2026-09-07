@@ -160,7 +160,10 @@ def _lock_owner_alive(path: Path, pid: int, owner: str, marker: str) -> bool:
             stat = Path("/proc/%d/stat" % pid).read_text(encoding="utf-8")
             tail = stat.rsplit(") ", 1)[1].split()
             ticks = int(tail[19])
-            hz = os.sysconf("SC_CLK_TCK")
+            sysconf = getattr(os, "sysconf", None)
+            if sysconf is None:  # Windows has no procfs clock; retain the conservative PID verdict.
+                return True
+            hz = sysconf("SC_CLK_TCK")
             uptime = float(Path("/proc/uptime").read_text().split()[0])
             started = time.time() - uptime + ticks / hz
             if path.stat().st_mtime < started - 2:

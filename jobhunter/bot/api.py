@@ -195,6 +195,10 @@ def edit_message_text(chat_id: int, message_id: int, text: str,
         # правится caption, а editMessageText отвечает «no text in the
         # message to edit». Один вызов, два вида сообщений.
         if "no text in the message" in str(e).lower():
+            if len(text) > 1024:
+                # The screen caller will send a full text message; never silently
+                # hide task details or result history inside a truncated caption.
+                raise ValueError("Экран не помещается в подпись документа") from e
             cap: dict = {"chat_id": chat_id, "message_id": message_id,
                          "caption": text[:1024]}
             if markup is not None:

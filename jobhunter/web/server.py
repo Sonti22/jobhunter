@@ -677,6 +677,19 @@ def outcomes_page(days: Annotated[int, Query(ge=1)] = 90, track: ResultTrack = "
              "<th>Отправка</th><th>Результат и история</th></tr>%s</table>"
              % ("".join(history) or "<tr><td colspan='4'>Нет заявок</td></tr>"))
     body += _pagination("/outcomes", data, days=days, track=track)
+    body += ("<h3>Источники и шаблоны</h3><p>Та же когорта; отправки старше 14 дней. "
+             "При выборке менее 20 предпочтения нейтральны. Различия не объявляются "
+             "статистически доказанными.</p>")
+    for key, label in (("by_source", "Источники"), ("by_template", "Шаблоны")):
+        comparisons = "".join(
+            "<tr><td>%s</td><td>%d</td><td>%d</td><td>%d / %d</td><td>%d</td><td>%s</td></tr>"
+            % (_h(row["key"]), row["sent"], row["interested"], row["interview_scheduled"],
+               row["interview_done"], row["offer"],
+               "достаточный объём" if row["preference_eligible"] else "нейтрально")
+            for row in data.get("group_quality", {}).get(key, []))
+        body += ("<h4>%s</h4><table><tr><th>Группа</th><th>Выборка</th><th>Интерес</th>"
+                 "<th>Назначено / прошло</th><th>Офферы</th><th>Предпочтение</th></tr>%s</table>"
+                 % (label, comparisons or "<tr><td colspan='6'>Нет наблюдений</td></tr>"))
     feedback = data.get("feedback", {})
     if feedback:
         from ..feedback import REASONS

@@ -10,6 +10,7 @@ import hashlib
 import re
 from collections import Counter
 from contextlib import nullcontext
+from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlencode
 
@@ -158,6 +159,9 @@ def after_mark_keyboard(aid: int, undo: bool) -> dict:
     rows = []
     if undo:
         rows.append([{"text": "↩️ Вернуть", "callback_data": f"t:{aid}:undo"}])
+    else:
+        rows.append([{"text": "Почему не подошло? (необязательно)",
+                      "callback_data": f"w:feedback:{aid}"}])
     rows.append([{"text": "➡️ Следующий", "callback_data": "t:0:next"}])
     return {"inline_keyboard": rows}
 
@@ -241,7 +245,7 @@ def explain_card(app_id: int) -> str:
         job = sess.get(Job, app.job_id)
         data = assessment_for(app, job)
         lines = [f"Почему подходит #{app_id} · {job.title[:160]}",
-                 "Направление: " + TRACKS.get(data.get("track"), "Не определено"),
+                 "Направление: " + TRACKS.get(str(data.get("track") or "unknown"), "Не определено"),
                  f"Версия правил: {data.get('version', 'неизвестно')}",
                  "Оценка соответствия — не вероятность оффера."]
         for item in data.get("matched", [])[:8]:
@@ -302,6 +306,10 @@ def mark(app_id: int, action: str, *, next_chat_id: int | None = None,
                 sess.add(employer)
                 sess.flush()
             app.employer_id = employer.id
+            packet = _packet(app)
+            packet["previous_employer_contacted_at"] = (
+                employer.last_contacted_at.isoformat() if employer.last_contacted_at else None)
+            app.apply_packet_json = dict(app.apply_packet_json or {}, manual_telegram=packet)
             employer.last_contacted_at = now
             employer.total_messages_sent = (employer.total_messages_sent or 0) + 1
             note = "Записано с твоих слов: отправлено вручную. Бот повторно не отправит."
@@ -335,6 +343,11 @@ def unmark(app_id: int, chat_id: int | None = None) -> tuple[bool, str]:
         app = sess.get(Application, app_id)
         if not app or app.outcome != SENT or app.send_channel != "telegram_manual":
             return False, "Эту отметку вернуть нельзя"
+        from .models import Message, ResultEvent, SendLog
+        if app.status != Status.AWAITING_REPLY.value or any(
+                sess.scalar(select(model.id).where(model.application_id == app_id).limit(1))
+                for model in (Message, ResultEvent, SendLog)):
+            return False, "Есть история переписки или результата — отмена отправки недоступна"
         if app.first_reply_at or app.last_inbound_at:
             return False, "Рекрутёр уже ответил — отправка была настоящей"
         sent_at = app.sent_at.replace(tzinfo=None) if app.sent_at else None
@@ -350,7 +363,11 @@ def unmark(app_id: int, chat_id: int | None = None) -> tuple[bool, str]:
         employer = sess.get(Employer, app.employer_id) if app.employer_id else None
         if employer:
             employer.total_messages_sent = max(0, (employer.total_messages_sent or 0) - 1)
-            employer.last_contacted_at = None
+            packet = _packet(app)
+            if (employer.last_contacted_at == sent_at and
+                    "previous_employer_contacted_at" in packet):
+                previous = packet["previous_employer_contacted_at"]
+                employer.last_contacted_at = datetime.fromisoformat(previous) if previous else None
         return True, "Отметка снята — карточка снова в работе"
 
 

@@ -201,3 +201,69 @@ def test_reading_unknown_remaining_is_not_zero(db, monkeypatch):
     text, _ = reading()
     assert "Осталось загрузить: неизвестно" in text
     assert "Осталось загрузить: 0" in text
+
+
+def test_one_tap_skip_then_optional_reason_does_not_repeat_next_card(db):
+    from jobhunter import feedback
+    from jobhunter import manual_telegram as mt
+    from jobhunter.bot.handlers import handle
+    from jobhunter.models import Application, BotOutbox
+    aid = make_app(db)
+    mt.issue(deliver=False)
+    acts = handle(button(f"t:{aid}:skip"))
+    assert f"w:feedback:{aid}" in str(acts)
+    assert feedback.summary()["reasons"] == {"unspecified": 1}
+    with db.session_scope() as sess:
+        queued = sess.scalar(select(func.count(BotOutbox.id)))
+    handle(button(f"w:feedback:{aid}"))
+    handle(button(f"w:reason:{aid}:stack"))
+    handle(button(f"w:reason:{aid}:stack"))
+    assert feedback.summary()["reasons"] == {"stack": 1}
+    with db.session_scope() as sess:
+        assert sess.get(Application, aid).outcome == mt.SKIPPED
+        assert sess.scalar(select(func.count(BotOutbox.id))) == queued
+    assert not feedback.complete_reason(aid, "salary", 2)[0]
+
+
+def test_long_screen_from_pdf_card_is_sent_in_full(db, monkeypatch):
+    from jobhunter.bot import api, runner, screens
+    calls = []
+    body = "Task details " * 180
+    def call(method, **kwargs):
+        calls.append((method, kwargs))
+        if method == "editMessageText":
+            raise RuntimeError("Bad Request: there is no text in the message to edit")
+        return {"message_id": 987}
+    monkeypatch.setattr(api, "call", call)
+    monkeypatch.setattr(screens, "render", lambda name: (body, {"inline_keyboard": []}))
+    runner._show_screen({"chat_id": 1, "msg_id": 20, "name": "work_tasks_0"}, None)
+    assert any(method == "sendMessage" and params["text"] == body for method, params in calls)
+    assert not any(method == "editMessageCaption" and params.get("caption") == body[:1024]
+                   for method, params in calls)
+
+
+def test_manual_undo_cannot_erase_a_confirmed_result(db):
+    from jobhunter import manual_telegram as mt
+    from jobhunter.models import utcnow
+    from jobhunter.results import owner_record
+    aid = make_app(db, status="AWAITING_REPLY", outcome=mt.SENT,
+                   send_channel="telegram_manual", sent_at=utcnow())
+    assert owner_record(aid, "interview_done", 1, "confirmation")[0]
+    assert not mt.unmark(aid, 1)[0]
+
+
+def test_manual_undo_restores_previous_contact_history(db):
+    from jobhunter import manual_telegram as mt
+    from jobhunter.models import Application, Employer, utcnow
+    aid = make_app(db)
+    previous = utcnow() - timedelta(days=60)
+    with db.session_scope() as sess:
+        employer = sess.get(Employer, sess.get(Application, aid).employer_id)
+        employer.last_contacted_at, employer.total_messages_sent = previous, 2
+    mt.issue(deliver=False)
+    assert mt.mark(aid, "sent")[0]
+    assert mt.unmark(aid, 1)[0]
+    with db.session_scope() as sess:
+        employer = sess.get(Employer, sess.get(Application, aid).employer_id)
+        assert employer.last_contacted_at == previous.replace(tzinfo=None)
+        assert employer.total_messages_sent == 2

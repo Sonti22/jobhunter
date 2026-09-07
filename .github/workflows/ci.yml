@@ -30,5 +30,7 @@ jobs:
           jobhunter/repo_safety.py jobhunter/decisions.py jobhunter/dashboard.py
           jobhunter/manual_telegram.py jobhunter/outreach/eligibility.py
           jobhunter/bot/api.py jobhunter/bot/outbox.py
+          jobhunter/taskhub.py jobhunter/results.py jobhunter/feedback.py
+          jobhunter/match/explain.py jobhunter/bot/workbench.py jobhunter/release_check.py
       - run: pytest --cov=jobhunter --cov-report=term-missing --cov-fail-under=50
       - run: pip-audit -r requirements.txt
