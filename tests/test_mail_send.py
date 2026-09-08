@@ -203,3 +203,36 @@ def test_kill_switch_stops_email(db, smtp, monkeypatch):
     res = asyncio.run(send_reply(None, app_id, "текст"))
     assert res.startswith("stop:")
     assert smtp.sent == []
+
+
+def test_subject_drops_hashtag_titles_from_telegram():
+    """Диагностика 08.09: 9 писем в очереди имели тему «Отклик: lead
+    #гибрид #нижнийновгород». Заголовок телеграм-поста — подпись автора,
+    а не должность; настоящая роль лежит в tag."""
+    from types import SimpleNamespace
+
+    from jobhunter.outreach.mailer import _subject_role
+
+    cases = [
+        ("lead #гибрид #нижнийновгород", "DevOps", "DevOps-инженер"),
+        ("120k #удаленка #офис #тюмень", "python", "Backend-разработчик"),
+        ("senior #удаленка", "DevOps", "DevOps-инженер"),
+        ("middle #москва", "backend", "Backend-разработчик"),
+    ]
+    for title, tag, want in cases:
+        job = SimpleNamespace(title=title, tag=tag, description_raw="")
+        assert _subject_role(job, "ru") == want, (title, _subject_role(job, "ru"))
+
+
+def test_subject_keeps_real_role_with_trailing_hashtags():
+    """Роль рядом с хештегами сохраняется — режем только мусор."""
+    from types import SimpleNamespace
+
+    from jobhunter.outreach.mailer import _subject_role
+
+    job = SimpleNamespace(title="Python-разработчик #удаленка #fulltime",
+                          tag="python", description_raw="")
+    assert _subject_role(job, "ru") == "Python-разработчик"
+    job_en = SimpleNamespace(title="Senior Backend Engineer #remote",
+                             tag="backend", description_raw="")
+    assert _subject_role(job_en, "en") == "Senior Backend Engineer"

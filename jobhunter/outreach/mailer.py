@@ -187,6 +187,25 @@ _PLACEHOLDER_ROLE = re.compile(
     r"^(?:текст\s+вакансии|vacancy\s+text|job\s+description|description)"
     r"\s*:?[\s-]*$", re.I)
 
+# Заголовок телеграм-поста — это подпись автора, а не название должности:
+# «lead #гибрид #нижнийновгород», «120k #удаленка #офис #тюмень». В теме
+# письма такое читается как рассылка, а не как отклик на конкретную роль.
+_HASHTAG = re.compile(r"#\S+")
+_MONEY_ONLY = re.compile(r"^[\d\s.,]+\s*(?:k|к|тыс|руб|₽|\$|€)?$", re.I)
+# Грейд без роли: «senior», «lead», «middle+» — не должность.
+_GRADE_ONLY = re.compile(
+    r"^(?:senior|middle|junior|lead|team\s*lead|tech\s*lead|стажёр|интерн)"
+    r"[\s+/-]*$", re.I)
+
+
+def _clean_role(raw: str) -> str:
+    """Заголовок без хештегов и мусора, или пустая строка, если роли нет."""
+    role = _HASHTAG.sub(" ", raw or "")
+    role = re.sub(r"[\s,;·|/–—-]+$", "", re.sub(r"\s{2,}", " ", role)).strip()
+    if len(role) < 3 or _MONEY_ONLY.match(role) or _GRADE_ONLY.match(role):
+        return ""
+    return role
+
 
 def _subject_role(job: Job, lang: str) -> str:
     """Человеческое название роли для темы, даже если источник сломан."""
@@ -209,10 +228,12 @@ def _subject_role(job: Job, lang: str) -> str:
             continue
         if re.match(r"^(?:https?://|www\.)", role, re.I):
             continue
+        role = _clean_role(role)
+        if not role:
+            continue                  # были одни хештеги/грейд — берём tag
         if role.lower() in generic_tags:
             return generic_tags[role.lower()]
-        if role:
-            return role
+        return role
 
     blob = " ".join([job.title or "", job.tag or "", job.description_raw or ""])
     if re.search(r"product\s*(?:manager|owner)|продакт|продуктов\w*\s+менедж", blob, re.I):
