@@ -19,7 +19,7 @@ from sqlalchemy import select
 from . import notify
 from .config import ROOT, get_settings
 from .db import session_scope
-from .models import Application, Employer, Job, OwnerPreference, Status, utcnow
+from .models import Application, Employer, HandleCache, Job, OwnerPreference, Status, utcnow
 from .outreach import eligibility
 
 PREFIX = "manual_tg_"
@@ -79,6 +79,47 @@ def _in_track(assessment: dict, track: str) -> bool:
     return family == track
 
 
+GROUP_MARKERS = re.compile(r"(subscriber|подписчик|member|участник)", re.I)
+_SUBS_RE = re.compile(r'tgme_page_extra">([^<]*)</div>')
+
+
+def _cached_kind(sess, handle: str) -> str:
+    """Что резолвер уже знает о хендле: user | not_a_user | dead | unknown."""
+    row = sess.get(HandleCache, handle)
+    if row is None:
+        return "unknown"
+    if row.last_error in ("not_a_user", "dead"):
+        return row.last_error
+    return "user" if row.user_id else "unknown"
+
+
+def public_handle_kind(handle: str, http=None) -> str:
+    """Тип аккаунта по ОТКРЫТОЙ странице t.me: user | group | unknown.
+
+    Автоотправка узнаёт группу от резолвера (NotAUser «канал/группа»), но
+    ручная выдача в MTProto не ходит — и в карточки владельцу попали
+    @xyflow (канал) и @it_kz_chat (групповой чат). Отклик, отправленный
+    в общий чат, — спам на глазах у сотни человек. Публичная страница
+    отличает их без сессии: у групп и каналов есть счётчик участников.
+    """
+    import httpx
+
+    own = http is None
+    http = http or httpx.Client(trust_env=False, follow_redirects=True)
+    try:
+        r = http.get("https://t.me/" + handle, timeout=10,
+                     headers={"User-Agent": "Mozilla/5.0"})
+        if r.status_code != 200:
+            return "unknown"
+        m = _SUBS_RE.search(r.text)
+        return "group" if (m and GROUP_MARKERS.search(m.group(1))) else "user"
+    except Exception:                      # noqa: BLE001 — сеть не обязана быть
+        return "unknown"
+    finally:
+        if own:
+            http.close()
+
+
 def _problem(app, job, employer) -> str:
     verdict = eligibility.check(app, job, employer, manual=True)
     if not verdict.allowed:
@@ -89,6 +130,11 @@ def _problem(app, job, employer) -> str:
         return "Это не личный Telegram-контакт"
     if not re.fullmatch(r"[a-z][a-z0-9_]{4,31}", _handle(job)) or _handle(job).endswith("bot"):
         return "Контакт не подходит для личного сообщения"
+    # Кеш резолвера читаем без сети: он уже знает ботов, каналы и группы.
+    from .db import session_scope as _scope
+    with _scope() as _s:
+        if _cached_kind(_s, _handle(job)) in ("not_a_user", "dead"):
+            return "Это групповой чат, канал или мёртвый контакт — не личное сообщение"
     if app.review_note or not (app.message_body or "").strip():
         return "Текст требует проверки"
     if len(app.message_body) > 2800:
@@ -213,6 +259,19 @@ def issue(limit: int = BATCH_SIZE, *, deliver: bool = True, sess=None,
             employer = sess.get(Employer, app.employer_id) if app.employer_id else None
             if _handle(job) in used or _problem(app, job, employer):
                 continue
+            # Незнакомый хендл проверяем по открытой странице t.me: выдача
+            # идёт по расписанию и по кнопке владельца, задержка допустима,
+            # а карточка «напиши в групповой чат» — нет. Результат кладём в
+            # общий кеш, чтобы и автоотправка не тратила на него резолв.
+            if _cached_kind(sess, _handle(job)) == "unknown":
+                kind = public_handle_kind(_handle(job))
+                if kind == "group":
+                    row = sess.get(HandleCache, _handle(job)) or HandleCache(
+                        handle_norm=_handle(job))
+                    row.last_error = "not_a_user"
+                    row.resolved_at = utcnow()
+                    sess.merge(row)
+                    continue
             app.outcome = READY
             packet = dict(app.apply_packet_json or {})
             # Telegram post ids come from the parser as channel/message_id.

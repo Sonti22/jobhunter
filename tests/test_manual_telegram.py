@@ -508,3 +508,49 @@ def test_api_document_rejects_unsafe_input_before_network(db, monkeypatch, chat_
     monkeypatch.setattr(api, "call", lambda *a, **kw: pytest.fail("network called"))
     with pytest.raises(exception):
         api.send_document(chat_id, filename, content)
+
+
+def test_group_chats_never_reach_the_owner_card(db, monkeypatch):
+    """Инцидент 07.09: в ручные карточки попали @xyflow (канал) и
+    @it_kz_chat (групповой чат). Отклик в общий чат — спам при сотне
+    свидетелей; автоотправка такие отбрасывает резолвером, ручная выдача
+    обязана делать то же без MTProto."""
+    from jobhunter import manual_telegram as mt
+    from jobhunter.models import Application, HandleCache
+
+    group = make_app(db, handle="it_kz_chat", score=95)
+    human = make_app(db, handle="recruiter_ok", score=80)
+
+    seen = []
+
+    def fake_kind(handle, http=None):
+        seen.append(handle)
+        return "group" if handle == "it_kz_chat" else "user"
+
+    monkeypatch.setattr(mt, "public_handle_kind", fake_kind)
+    mt.issue(limit=5)
+
+    ids = [r["id"] for r in mt.listing()["items"]]
+    assert group not in ids, "групповой чат не должен попадать в карточки"
+    assert human in ids, "живой рекрутёр обязан остаться"
+    with db.session_scope() as sess:
+        assert sess.get(HandleCache, "it_kz_chat").last_error == "not_a_user", \
+            "вердикт кладём в общий кеш, чтобы и автоотправка его знала"
+        assert sess.get(Application, group).outcome == "", "заявка не тронута"
+
+
+def test_cached_group_verdict_blocks_card_without_network(db, monkeypatch):
+    """Уже известный канал отсекается по кешу, без единого запроса в сеть."""
+    from jobhunter import manual_telegram as mt
+    from jobhunter.models import HandleCache
+
+    aid = make_app(db, handle="known_channel", score=90)
+    with db.session_scope() as sess:
+        sess.add(HandleCache(handle_norm="known_channel", last_error="not_a_user"))
+
+    def boom(*a, **kw):
+        raise AssertionError("сеть при известном вердикте не нужна")
+
+    monkeypatch.setattr(mt, "public_handle_kind", boom)
+    mt.issue(limit=5)
+    assert aid not in [r["id"] for r in mt.listing()["items"]]
