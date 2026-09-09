@@ -236,3 +236,28 @@ def test_subject_keeps_real_role_with_trailing_hashtags():
     job_en = SimpleNamespace(title="Senior Backend Engineer #remote",
                              tag="backend", description_raw="")
     assert _subject_role(job_en, "en") == "Senior Backend Engineer"
+
+
+def test_dns_failure_is_not_ambiguous_and_retries():
+    """09.09: DNS отвалился посреди партии, девять писем встали в
+    SEND_FAILED_AMBIGUOUS. Резолв имени идёт ДО TCP-соединения — байты
+    письма никуда не уходили, такие заявки обязаны повторяться."""
+    import socket
+
+    from jobhunter.outreach.mailer import _never_reached_server, _smtp_delivery_ambiguous
+
+    for exc in (socket.gaierror(-3, "Temporary failure in name resolution"),
+                OSError(101, "Network is unreachable"),
+                OSError(113, "No route to host"),
+                ConnectionRefusedError(111, "Connection refused")):
+        assert _never_reached_server(exc), exc
+        assert not _smtp_delivery_ambiguous(exc), exc
+
+
+def test_unknown_network_error_stays_ambiguous():
+    """Обрыв на полпути по-прежнему неоднозначен: письмо могло уйти."""
+    from jobhunter.outreach.mailer import _never_reached_server, _smtp_delivery_ambiguous
+
+    for exc in (TimeoutError("timed out"), OSError(104, "Connection reset by peer")):
+        assert not _never_reached_server(exc), exc
+        assert _smtp_delivery_ambiguous(exc), exc

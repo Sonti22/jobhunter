@@ -17,6 +17,7 @@ import hmac
 import random
 import re
 import smtplib
+import socket
 import ssl
 import sys
 import time
@@ -291,6 +292,23 @@ def _socket_already_dead(exc: Exception) -> bool:
             and "run connect() first" in str(exc))
 
 
+def _never_reached_server(exc: Exception) -> bool:
+    """До сервера не дошли вовсе: имя не разрешилось или сети нет.
+
+    09.09 DNS отвалился посреди партии, и девять писем встали в
+    SEND_FAILED_AMBIGUOUS с gaierror. Но резолв имени происходит ДО
+    установки TCP-соединения: раз имени нет, байты письма никуда не
+    уходили. Держать такие заявки замороженными — терять отклики на
+    ровном месте, их нужно повторять.
+    """
+    if isinstance(exc, socket.gaierror):
+        return True
+    if isinstance(exc, (ConnectionRefusedError, smtplib.SMTPConnectError)):
+        return True
+    # ENETUNREACH / EHOSTUNREACH / ENETDOWN — стека сети не было под рукой.
+    return isinstance(exc, OSError) and exc.errno in (100, 101, 113)
+
+
 def _smtp_delivery_ambiguous(exc: Exception) -> bool:
     """Мог ли сервер принять письмо до того, как клиент получил ошибку."""
     # Отказ SMTP с кодом 4xx/5xx означает, что DATA не была принята. Для
@@ -298,6 +316,8 @@ def _smtp_delivery_ambiguous(exc: Exception) -> bool:
     if isinstance(exc, smtplib.SMTPResponseException):
         return False
     if _socket_already_dead(exc):
+        return False
+    if _never_reached_server(exc):
         return False
     return True
 
@@ -522,10 +542,13 @@ def _send_batch(limit: int, dry: bool) -> int:
                     a.sending_lease_until = None
                     a.send_error_class = type(e).__name__
                     a.send_error_detail = str(e)[:500]
-                    # Мёртвый сокет — повторить через 15 минут, как SMTP 4xx.
-                    a.send_next_try_at = (utcnow() + timedelta(minutes=15)
-                                          if _smtp_retryable(e) or _socket_already_dead(e)
-                                          else None)
+                    # Мёртвый сокет и пропавшая сеть — повторить через 15
+                    # минут, как SMTP 4xx: письмо гарантированно не ушло.
+                    a.send_next_try_at = (
+                        utcnow() + timedelta(minutes=15)
+                        if (_smtp_retryable(e) or _socket_already_dead(e)
+                            or _never_reached_server(e))
+                        else None)
                     sess.add(SendLog(application_id=it["app_id"],
                                      result="ambiguous" if target == Status.SEND_FAILED_AMBIGUOUS
                                      else "error",
