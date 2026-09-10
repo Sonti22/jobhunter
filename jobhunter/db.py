@@ -221,17 +221,22 @@ def _migrate(engine) -> None:
                 # одинаковых уведомлений в очереди. Прежний индекс покрывал и
                 # доставленные строки, и повторное событие с тем же ключом
                 # (второй cv_missing через неделю) не уведомляло уже никогда.
+                # Мёртвые строки (5 попыток, не доставлены) из индекса тоже
+                # выведены: иначе такая строка навсегда занимала ключ, и ту
+                # же карточку нельзя было переотправить никогда.
                 conn.execute(_sql(
                     "DROP INDEX IF EXISTS ux_bot_outbox_dedup_key"))
                 conn.execute(_sql(
-                    "DELETE FROM bot_outbox WHERE dedup_key <> '' "
-                    "AND sent_at IS NULL AND id NOT IN ("
-                    "SELECT MIN(id) FROM bot_outbox WHERE dedup_key <> '' "
-                    "AND sent_at IS NULL GROUP BY dedup_key)"))
+                    "DROP INDEX IF EXISTS ux_bot_outbox_dedup_pending"))
                 conn.execute(_sql(
-                    "CREATE UNIQUE INDEX IF NOT EXISTS ux_bot_outbox_dedup_pending "
+                    "DELETE FROM bot_outbox WHERE dedup_key <> '' "
+                    "AND sent_at IS NULL AND attempts < 5 AND id NOT IN ("
+                    "SELECT MIN(id) FROM bot_outbox WHERE dedup_key <> '' "
+                    "AND sent_at IS NULL AND attempts < 5 GROUP BY dedup_key)"))
+                conn.execute(_sql(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS ux_bot_outbox_dedup_live "
                     "ON bot_outbox (dedup_key) "
-                    "WHERE dedup_key <> '' AND sent_at IS NULL"))
+                    "WHERE dedup_key <> '' AND sent_at IS NULL AND attempts < 5"))
 
             conn.execute(_sql(
                 "INSERT OR IGNORE INTO schema_migrations(version, applied_at, note) "

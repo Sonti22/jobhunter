@@ -146,9 +146,32 @@ def drain(http=None, limit: int = 20) -> int:
             else:
                 log.info("уведомление #%d ждёт: владелец ещё не нажал /start",
                          row["id"])
+        elif _network_down(err):
+            # Не доставили из-за сети — это не отказ Telegram, попытку не
+            # считаем. Устаревшее закрываем по тому же сроку, что и ждущих.
+            if _too_old(row):
+                notify.mark_failed(row["id"], "не доставлено за %d ч: %s"
+                                   % (WAIT_TTL_HOURS, err))
+            else:
+                notify.defer(row["id"], err)
         elif err:
             notify.mark_failed(row["id"], err)
     return sent
+
+
+_NETWORK_MARKERS = (
+    "connecterror", "connecttimeout", "readtimeout", "writetimeout",
+    "pooltimeout", "remoteprotocolerror", "name resolution",
+    "network is unreachable", "no route to host", "connection reset",
+    "connection refused", "timed out", "http 502", "http 503", "http 504",
+    "bad gateway", "service unavailable", "gateway timeout",
+)
+
+
+def _network_down(err: str) -> bool:
+    """Сбой сети или шлюза Telegram — повторять можно и нужно."""
+    low = (err or "").lower()
+    return any(m in low for m in _NETWORK_MARKERS)
 
 
 WAIT_TTL_HOURS = 48

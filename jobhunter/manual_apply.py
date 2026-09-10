@@ -12,6 +12,7 @@ ATS-фиды (Greenhouse, Lever, Ashby) дают лучшие вакансии �
 from __future__ import annotations
 
 import argparse
+import re
 import sys
 from datetime import datetime, timezone
 
@@ -125,6 +126,30 @@ OUTCOME_NOT_FIT = "not_fit"
 OUTCOME_SNOOZED = "snoozed"
 
 
+# Английские маркеры — только целыми фразами: голые «closed»/«filled»
+# ловили бы «closed beta» и «fun-filled team» в описании.
+_CLOSED_MARK = re.compile(
+    r"(\bзакрыт[аo]?\b|набор\s+закрыт|"
+    r"(?:position|role|vacancy|job)\s+(?:is\s+|has\s+been\s+)?(?:closed|filled)|"
+    r"no\s+longer\s+(?:open|available|accepting))", re.I)
+
+
+def _display_title(job) -> str:
+    """Название для карточки: без разметки, эмодзи и служебных шапок.
+
+    careered пересказывает телеграм-посты как есть, и заголовком
+    становилось «Публикатор: Margarita Ivanishcheva» или «🔍 **Backend».
+    Чистку не пишем заново — берём ту же, что у телеграм-сборщика.
+    """
+    from .ingest.tgchannels import _LEAD_JUNK, _META_LINE, _first_line
+
+    raw = re.sub(r"\*+", "", job.title or "")
+    title = _LEAD_JUNK.sub("", raw).strip()
+    if not title or _META_LINE.match(title):
+        title = _first_line(re.sub(r"\*+", "", job.description_raw or ""))
+    return (title or job.tag or "вакансия")[:180]
+
+
 def listing(top: int = 30, source: str = "", pending_only: bool = True) -> list:
     """Данные для очереди: что открыть, с каким резюме и в каком состоянии.
 
@@ -134,6 +159,7 @@ def listing(top: int = 30, source: str = "", pending_only: bool = True) -> list:
     """
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     rows = []
+    seen = set()
     with session_scope() as sess:
         q = (select(Application).join(Job, Application.job_id == Job.id)
              .where(Application.status == Status.HANDLE_MISSING.value,
@@ -163,10 +189,23 @@ def listing(top: int = 30, source: str = "", pending_only: bool = True) -> list:
                 age_days = (now - datetime.utcfromtimestamp(j.posted_at)).days
                 if age_days > 14:
                     continue
+            # Автор сам пометил вакансию закрытой («❌ЗАКРЫТА❌»), а флаг
+            # is_closed ставит только сборщик — 10.09 такая ушла в пачку.
+            if _CLOSED_MARK.search((j.title or "") + " "
+                                   + (j.description_raw or "")[:200]):
+                continue
+            title = _display_title(j)
+            company = j.company_name or (j.source or "").split(":")[-1]
+            # Одна и та же вакансия, выложенная дважды (разные локации,
+            # разные id на площадке), — одна карточка, не две подряд.
+            key = (company.strip().lower(), title.strip().lower())
+            if key in seen:
+                continue
+            seen.add(key)
             rows.append({
                 "id": a.id, "score": a.score,
-                "company": j.company_name or (j.source or "").split(":")[-1],
-                "title": j.title or "",
+                "company": company,
+                "title": title,
                 "tag": j.tag, "url": j.contact_url or "",
                 "salary": j.salary_raw or "",
                 "cv_path": a.cv_path or "",

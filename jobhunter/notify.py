@@ -159,6 +159,20 @@ def mark_failed(row_id: int, error: str) -> None:
             row.claimed_at = None
 
 
+def defer(row_id: int, error: str) -> None:
+    """Отложить без траты попытки: сеть лежит, Telegram тут ни при чём.
+
+    Lease (claimed_at) остаётся — строку снова возьмут через
+    OUTBOX_LEASE_MIN минут. Это и есть пауза между повторами: цикл
+    доставки крутится раз в секунду, и без неё обрыв DNS сжигал все пять
+    попыток за секунды — 10.09 так пропала утренняя пачка из 17 карточек.
+    """
+    with session_scope() as sess:
+        row = sess.get(BotOutbox, row_id)
+        if row:
+            row.last_error = (error or "")[:200]
+
+
 def cancel(row_id: int, reason: str) -> None:
     """Cancel obsolete notification without claiming Telegram accepted it."""
     with session_scope() as sess:
