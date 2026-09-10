@@ -322,6 +322,37 @@ def _smtp_delivery_ambiguous(exc: Exception) -> bool:
     return True
 
 
+def _followup_failed(it: dict, exc: Exception) -> None:
+    """Не ушло напоминание — заявка обязана остаться живой.
+
+    Первое письмо уже доставлено, рекрутёр может ответить в любой момент.
+    Прежде сбой напоминания переводил всю заявку в SEND_FAILED(_AMBIGUOUS),
+    а этих статусов нет ни в LIVE, ни в LIVE_EMAIL: ответ на первое письмо
+    просто не читался. 09.09 так выпали три заявки с доставленными
+    откликами (по «Отправленным» Gmail — ни одно напоминание не ушло).
+
+    Недоставка — назад в AWAITING_REPLY, следующий цикл напоминаний
+    повторит сам. Неоднозначность — FOLLOWED_UP без повтора: пропущенное
+    напоминание стоит дешевле двух «напоминаю о себе» подряд.
+    """
+    ambiguous = _smtp_delivery_ambiguous(exc)
+    with session_scope() as sess:
+        a = sess.get(Application, it["app_id"])
+        a.transition(Status.SENT, reason="попытка напоминания завершена")
+        a.transition(Status.FOLLOWED_UP if ambiguous else Status.AWAITING_REPLY,
+                     reason="напоминание не подтверждено: %s" % type(exc).__name__)
+        if ambiguous:
+            a.followup_sent_at = utcnow()
+            a.followup_due_at = None
+        a.sending_lease_until = None
+        a.send_next_try_at = None
+        a.send_error_class = type(exc).__name__
+        a.send_error_detail = str(exc)[:500]
+        sess.add(SendLog(application_id=it["app_id"],
+                         result="ambiguous" if ambiguous else "error",
+                         error_class=type(exc).__name__, peer_id=it["email"]))
+
+
 def _smtp_retryable(exc: Exception) -> bool:
     """4xx SMTP-ответ не принял письмо и может быть повторён позже."""
     return (isinstance(exc, smtplib.SMTPResponseException)
@@ -534,6 +565,10 @@ def _send_batch(limit: int, dry: bool) -> int:
                     server.send_message(msg)
             except Exception as e:
                 errors += 1
+                if is_followup:
+                    _followup_failed(it, e)
+                    print("  ! %s (напоминание): %s" % (it["email"], str(e)[:60]))
+                    continue
                 with session_scope() as sess:
                     a = sess.get(Application, it["app_id"])
                     target = (Status.SEND_FAILED_AMBIGUOUS

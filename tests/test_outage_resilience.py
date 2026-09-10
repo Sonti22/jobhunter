@@ -158,3 +158,49 @@ def test_listing_skips_closed_dedups_and_cleans_titles(db):
     assert rows[meta]["title"] == "Инженер по данным в команду платформы"
     assert rows[emoji]["title"] == "Backend-разработчик"
     assert fun in rows, "«fun-filled» и «closed beta» — не закрытие вакансии"
+
+
+# ── напоминание не ушло: заявка обязана остаться живой ──
+
+def _delivered_app_sending_followup(db):
+    from jobhunter.models import Application, Job, Status, utcnow
+    with db.session_scope() as sess:
+        job = Job(external_uuid=str(uuid.uuid4()), source="hn", title="Backend",
+                  contact_kind="email", contact_url="hr@example.com")
+        sess.add(job)
+        sess.flush()
+        app = Application(job_id=job.id, status=Status.SENDING.value,
+                          score=80, gate_passed=True,
+                          sent_at=utcnow() - timedelta(days=6),
+                          followup_body="Напоминаю о себе")
+        sess.add(app)
+        sess.flush()
+        return app.id
+
+
+@pytest.mark.parametrize("exc,want", [
+    # до сервера не дошли — напоминание не ушло, цикл повторит
+    (__import__("socket").gaierror(-3, "Temporary failure in name resolution"),
+     "AWAITING_REPLY"),
+    # обрыв посреди передачи — могло уйти, второй раз не шлём
+    (__import__("smtplib").SMTPServerDisconnected("Connection unexpectedly closed"),
+     "FOLLOWED_UP"),
+])
+def test_failed_followup_keeps_application_live(db, exc, want):
+    """09.09 сбой напоминания выкинул три заявки с доставленными
+    откликами в SEND_FAILED_AMBIGUOUS — вне LIVE, ответы не читались."""
+    from jobhunter.convo.inbox_email import LIVE_EMAIL
+    from jobhunter.models import Application
+    from jobhunter.outreach.mailer import _followup_failed
+
+    aid = _delivered_app_sending_followup(db)
+    _followup_failed({"app_id": aid, "email": "hr@example.com"}, exc)
+    with db.session_scope() as sess:
+        a = sess.get(Application, aid)
+        assert a.status == want, a.status
+        assert a.status in LIVE_EMAIL, "ответ рекрутёра должен читаться"
+        assert a.sent_at is not None, "факт доставки первого письма не теряется"
+        if want == "FOLLOWED_UP":
+            assert a.followup_sent_at is not None, "неоднозначное — не повторять"
+        else:
+            assert a.followup_sent_at is None, "недоставленное — повторит цикл"
