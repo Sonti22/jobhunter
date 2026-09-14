@@ -145,7 +145,43 @@ def step_ingest() -> dict:
     new = sum(t.get("new", 0) for t in totals.values())
     contacts = sum(t.get("with_contact", 0) for t in totals.values())
     log.info("ingest: новых %d, с прямым контактом %d", new, contacts)
-    return {"new": new, "with_contact": contacts, "sources": totals}
+    result = ingest_result(totals, new, contacts)
+    if result["failed_sources"]:
+        log.warning("ingest: не отработали источники %s",
+                    ", ".join(result["failed_sources"]))
+    return result
+
+
+def ingest_result(totals: dict, new: int, contacts: int) -> dict:
+    """Итог сбора для планировщика: провал — только если не сработал ни один источник.
+
+    Детали источников лежали словарём, и has_errors помечал весь шаг
+    ошибкой из-за одного канала из двухсот (10.09 — forpython) или одного
+    упавшего API. Маркер «сбор выполнен» застрял на 07.09, и догон при
+    каждом включении машины заново гонял сбор на полчаса с лишним.
+
+    Детали теперь списком: планировщик заглядывает только в словари, так
+    что ошибкой шага считается лишь отказ всех источников сразу. Источник
+    считается упавшим, если бросил исключение, если у Telegram не
+    открылась половина каналов или если сохранение ничего не увидело.
+    """
+    def dead(t) -> bool:
+        if not isinstance(t, dict) or t.get("error"):
+            return True
+        channels = t.get("scan_channels") or 0
+        if channels:
+            return (t.get("scan_errors") or 0) * 2 >= channels
+        return bool(t.get("errors")) and not (t.get("seen") or t.get("new"))
+
+    failed = sorted(name for name, t in totals.items() if dead(t))
+    details = [dict({"source": name}, **{k: v for k, v in t.items()
+                                         if isinstance(v, (int, float, str, bool))})
+               for name, t in totals.items() if isinstance(t, dict)]
+    out = {"new": new, "with_contact": contacts, "failed_sources": failed,
+           "sources": details}
+    if totals and len(failed) == len(totals):
+        out["error"] = "все источники сбора недоступны"
+    return out
 
 
 def step_ingest_telegram() -> dict:
