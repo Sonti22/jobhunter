@@ -115,7 +115,8 @@ def test_stop_does_not_book_interview_or_consume_attempt(db, monkeypatch):
     from jobhunter import decisions
     from jobhunter.models import OwnerRequest
     _, req = make_request(db, decision="ok")
-    monkeypatch.setattr("jobhunter.convo.send.can_reply", lambda sess: (False, "manual-only"))
+    monkeypatch.setattr("jobhunter.convo.send.can_reply",
+                        lambda sess, channel="telegram": (False, "manual-only"))
     monkeypatch.setattr("jobhunter.schedule.book.confirm", lambda *a: pytest.fail("No calendar write"))
     assert asyncio.run(decisions.apply_one(None, req)) == "stop:manual-only"
     with db.session_scope() as sess:

@@ -20,6 +20,8 @@ MONEY = "money"                   # зарплата/ставка → челов
 OFFER = "offer"                   # оффер → человек
 REJECTION = "rejection"           # отказ
 WORK_FORMAT = "work_format"       # «готовы в офис / переехать?» — ответ из профиля
+TASK_REQUEST = "task_request"     # «next steps: пришлите work sample / тестовое» → человек
+APPLY_LINK = "apply_link"         # «подайте через сайт: <ссылка>» → человек
 UNKNOWN = "unknown"               # → человек
 
 # ABOUT здесь условно: plan_reply отвечает сам ТОЛЬКО при заполненном
@@ -34,8 +36,11 @@ AUTO_OK_BOLD = AUTO_OK | {TECH_QUESTION, WORK_FORMAT}
 
 # Деньги, оффер и предложенное время не автоматизируются НИКОГДА, при
 # любых настройках. Прямое решение владельца, закреплено тестом.
-ESCALATE_ALWAYS = {MONEY, OFFER, SLOT_PROPOSED}
-ESCALATE = {TECH_QUESTION, MONEY, OFFER, UNKNOWN, SLOT_PROPOSED, WORK_FORMAT}
+# Задание от работодателя и «подайте через сайт» — тоже: ответ «спасибо» на
+# «пришлите work sample» хоронит лучший разговор (Astoria AI, 09.09).
+ESCALATE_ALWAYS = {MONEY, OFFER, SLOT_PROPOSED, TASK_REQUEST, APPLY_LINK}
+ESCALATE = {TECH_QUESTION, MONEY, OFFER, UNKNOWN, SLOT_PROPOSED, WORK_FORMAT,
+            TASK_REQUEST, APPLY_LINK}
 
 
 def auto_ok_set(bold: bool = False) -> set:
@@ -84,11 +89,38 @@ _PATTERNS = [
                      r"(?:position|role)\s+has\s+been\s+filled|"
                      r"(?:decided|chosen)\s+to\s+(?:move\s+forward|proceed)\s+with\s+(?:another|other)|"
                      r"will\s+not\s+be\s+moving\s+forward|"
-                     r"pursue\s+other\s+candidates)"),
-    (TECH_QUESTION, 0.85, r"(расскажите,?\s+как|как\s+бы\s+вы|тестовое|test\s*task|"
-                          r"take-?home\s+(?:test|task|assignment)|"
-                          r"coding\s+(?:challenge|test|assignment)|"
-                          r"technical\s+assessment|"
+                     r"pursue\s+other\s+candidates|"
+                     # «остановили поиск, т.к. определились с финальными
+                     # кандидатами» считалось вежливостью (#9353, 09.09).
+                     r"останов\w+\s+(?:поиск|подбор|набор)|"
+                     r"определились\s+с\s+(?:\w+\s+)?кандидат|"
+                     r"(?:we\s+are|we're)\s+only\s+hiring\s+in\b)"),
+    # «You can apply to the role directly here: <ссылка>» (SearchAtlas) —
+    # отклик надо подать на сайте, благодарность в ответ его не заменит.
+    (APPLY_LINK, 0.9, r"(\bapply\b[^.!?\n]{0,40}\b(?:directly|here|via|through|using|"
+                      r"on\s+our|at\s+our|on\s+the\s+(?:link|website|site|portal))\b|"
+                      r"(?:application|careers?)\s+(?:link|portal|page|form)\b|"
+                      r"откликн\w+\s+(?:через|на\s+сайте|по\s+ссылке)|"
+                      r"подайте\s+(?:заявку|отклик)|"
+                      r"(?:отклик|заявк\w+)[^.!?\n]{0,30}(?:через\s+сайт|по\s+ссылке))"),
+    # Следующий шаг процесса: работа, пример, анкета, тестовое, AI-интервью.
+    # Раньше «take-home»/«тестовое» считались техвопросом, а в смелом режиме
+    # на техвопрос бот отвечает сам — на задание так отвечать нельзя.
+    (TASK_REQUEST, 0.9, r"(next\s+steps?\b|work\s+samples?|portfolio|"
+                        r"(?:github|gitlab)\s+(?:repo\w*|profile|link)|"
+                        r"take-?home|test\s*task|"
+                        r"coding\s+(?:challenge|test|assignment|exercise)|"
+                        r"(?:technical|skills?|online)\s+(?:assessment|test)|"
+                        r"questionnaire|"
+                        r"(?:fill\s+(?:in|out)|complete)\s+(?:the|this|our|a|an)\s+"
+                        r"(?:short\s+)?(?:form|survey|questionnaire|assessment|test|task|assignment)|"
+                        r"please\s+(?:share|provide)\s+(?:the\s+following|us\s+with)|"
+                        # голая «анкетка» у рекрутёров часто значит резюме
+                        r"тестов\w+\s+задани\w*|тестовое|"
+                        r"заполн\w+\s+(?:\w+\s+)?(?:анкет|форм|опросник)\w*|"
+                        r"ai-?\s*интервью|"
+                        r"пройд\w+\s+(?:\w+\s+)?(?:интервью|тест\w*|ассессмент\w*|опрос\w*))"),
+    (TECH_QUESTION, 0.85, r"(расскажите,?\s+как|как\s+бы\s+вы|"
                           r"how\s+(?:would|did)\s+you\s+(?:design|build|handle|approach)|"
                           r"walk\s+(?:me|us)\s+through|"
                           r"какой\s+опыт\s+(?:у\s+вас\s+)?(?:с|в)\b|"
@@ -197,7 +229,8 @@ def classify(text: str) -> Intent:
         # проигрывал work_format 0.85 — «можете в офис? созвонимся в среду в
         # 15:00» уходило в автоответ про формат, и предложенное время исчезало
         # без карточки.
-        if label in (MONEY, OFFER, TECH_QUESTION, REJECTION, SLOT_PROPOSED):
+        if label in (MONEY, OFFER, TECH_QUESTION, REJECTION, SLOT_PROPOSED,
+                     APPLY_LINK, TASK_REQUEST):
             # «К сожалению, в четверг не получится, давайте в пятницу»:
             # маркеры отказа рядом с днём недели/временем — почти всегда
             # перенос, а не отказ. Уверенность режем вдвое, чтобы такое
@@ -211,5 +244,11 @@ def classify(text: str) -> Intent:
     # длинное сообщение с вопросительным знаком — почти всегда содержательный
     # вопрос, а не рутина; не рискуем
     if len(t) > 400 and "?" in t and label in AUTO_OK:
+        return Intent(UNKNOWN, 0.4, matched)
+    # «Спасибо» — вежливость, только если больше в сообщении ничего нет.
+    # «Благодарю за отклик. Был ли коммерческий опыт с LLM?» получал шаблонное
+    # «спасибо, жду», а длинное английское письмо с планом следующих шагов
+    # опознавалось по одному «Thank you for your interest».
+    if label == ACK and ("?" in t or len(t) > 300):
         return Intent(UNKNOWN, 0.4, matched)
     return Intent(label, conf, matched)

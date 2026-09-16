@@ -27,7 +27,7 @@ from sqlalchemy import select, update
 
 from .config import get_settings
 from .db import session_scope
-from .models import Application, Message, OwnerRequest, Status, utcnow
+from .models import Application, Job, Message, OwnerRequest, Status, utcnow
 
 log = logging.getLogger("decisions")
 
@@ -214,9 +214,13 @@ async def apply_one(client, req_id: int, dry: bool = False) -> str:
         return "дубль предотвращён"
 
     if decision in NEEDS_SEND:
+        from .convo import route
         from .convo.send import can_reply
         with session_scope() as sess:
-            allowed, why = can_reply(sess)
+            current = sess.get(Application, app_id)
+            job = sess.get(Job, current.job_id) if current else None
+            allowed, why = can_reply(sess, route.channel_for(current, job)[0]
+                                     if current else route.TELEGRAM)
         if not allowed:
             finish(req_id, False, "ожидает разрешения отправки", "stop:" + why)
             return "stop:" + why

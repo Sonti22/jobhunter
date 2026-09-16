@@ -97,6 +97,8 @@ def keyboard_for(req) -> dict:
 
     # NEEDS_HUMAN: кнопка отправки черновика есть только если черновик есть.
     rows = []
+    if str(payload.get("apply_url", "")).startswith(("https://", "http://")):
+        rows.append([{"text": "🔗 Подать отклик на сайте", "url": payload["apply_url"]}])
     if payload.get("draft"):
         rows.append([{"text": "📨 Отправить черновик",
                       "callback_data": cb("d", rid, "send")}])

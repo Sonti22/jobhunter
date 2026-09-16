@@ -328,7 +328,8 @@ def intents() -> tuple:
              "slot_proposed": "предлагают время", "ack": "вежливость",
              "about": "просят рассказать о себе", "tech_question": "техвопрос",
              "money": "про деньги", "offer": "оффер", "rejection": "отказ",
-             "work_format": "про формат работы", "unknown": "не понял"}
+             "work_format": "про формат работы", "task_request": "просят задание/материалы",
+             "apply_link": "просят подать на сайте", "unknown": "не понял"}
     for day, counts in data["days"].items():
         row = ", ".join("%s %d" % (human.get(k, k), v) for k, v in
                         sorted(counts.items(), key=lambda kv: -kv[1]))

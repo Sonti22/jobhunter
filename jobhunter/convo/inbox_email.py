@@ -55,6 +55,9 @@ def build_context() -> mailmatch.MatchContext:
                     ctx.by_employer.setdefault(addr, []).append(app.id)
                     if "@" in addr:
                         ctx.known_domains.add(addr.split("@")[-1])
+                    org = mailmatch.org_domain(addr)
+                    if org:
+                        ctx.by_domain.setdefault(org, []).append(app.id)
                 ctx.subjects[app.id] = job.title or job.tag or ""
         if live_ids:
             for msg in sess.scalars(
@@ -85,6 +88,10 @@ async def process(dry: bool = False) -> dict:
     except Exception as exc:
         stats["error"] = "%s: %s" % (type(exc).__name__, str(exc)[:220])
         result = stats
+    try:
+        result["retried"] = await retry_stuck(dry=dry)
+    except Exception as exc:                              # noqa: BLE001
+        log.warning("повтор зависших писем: %s: %s", type(exc).__name__, str(exc)[:160])
     if not dry:
         status = "error" if result.get("error") else "partial" if result.get("remaining") else "ok"
         record("gmail", status, details=result, error=result.get("error", ""))
@@ -133,9 +140,15 @@ async def _process(dry: bool, stats: dict) -> dict:
             stats["bodies"] += 1
             if not cand.matched:
                 # Последний шанс: plus-адрес в цитате пересланного письма.
+                unresolved = cand.unresolved
                 cand = mailmatch.match_by_body(body, ctx, _parse_plus)
                 if not cand.matched:
-                    stats["skipped"] += 1
+                    if unresolved:
+                        stats["ambiguous"] += 1
+                        if not dry:
+                            _notify_ambiguous(headers, unresolved)
+                    else:
+                        stats["skipped"] += 1
                     continue
             text = clean_email_body(body, is_html=is_html)
             matched.append((cand.app_id, uid, headers, cand.rule, text))
@@ -211,6 +224,45 @@ async def _handle_one(app_id: int, uid: int, headers: dict, rule: str,
         raise
     finish_incoming(app_id, new_ids, channel="email", error=verdict if "не ушёл" in verdict else "")
     return verdict
+
+
+# Так помечались письма, чей автоответ заблокировала политика. Повтора у них
+# не было: Astoria AI (next steps) и SearchAtlas (подать по ссылке) неделю
+# лежали «в обработке». Сбои-исключения сюда не входят — их разбирает владелец.
+STUCK_MARK = "автоответ не ушёл"
+
+
+async def retry_stuck(dry: bool = False, limit: int = 10) -> int:
+    """Прогнать зависшие почтовые письма заново. Возвращает число заявок."""
+    with session_scope() as sess:
+        rows = sess.execute(
+            select(Message.id, Message.application_id, Message.body)
+            .join(Application, Message.application_id == Application.id)
+            .join(Job, Application.job_id == Job.id)
+            .where(Message.direction == "in", Message.processing_pending.is_(True),
+                   Message.processing_error.startswith(STUCK_MARK),
+                   Job.contact_kind == ContactKind.EMAIL.value)
+            .order_by(Message.id)).all()
+    by_app: dict = {}
+    for msg_id, app_id, body in rows:
+        by_app.setdefault(app_id, []).append((msg_id, body or ""))
+    done = 0
+    for app_id, items in list(by_app.items())[:limit]:
+        text = "\n\n".join(body for _, body in items)
+        if dry:
+            log.info("   #%d: повтор %d зависших писем (dry)", app_id, len(items))
+            done += 1
+            continue
+        verdict = await handle_message(None, app_id, text)
+        with session_scope() as sess:
+            for msg_id, _ in items:
+                msg = sess.get(Message, msg_id)
+                stuck = "не ушёл" in verdict
+                msg.processing_pending = stuck
+                msg.processing_error = verdict[:200] if stuck else ""
+        log.info("   #%d: повтор зависших писем: %s", app_id, verdict)
+        done += 1
+    return done
 
 
 def _notify_ambiguous(headers: dict, apps: list) -> None:

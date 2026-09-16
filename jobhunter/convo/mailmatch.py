@@ -15,6 +15,8 @@
   plus      адрес suren6pro+jh42xSIG@ в To/Cc/Delivered-To
   alias     From совпал с адресом, с которого уже отвечали по этой заявке
   employer  From → работодатель → его живые заявки
+  domain    корпоративный домен From → единственная заявка в эту компанию
+            (HR-платформа Сбера пишет не с того адреса, куда ушёл отклик)
   reftoken  plus-адрес найден в ТЕЛЕ (пересылка, «ответ» новым письмом)
   subject   уточнение, когда заявок к работодателю несколько
 """
@@ -36,6 +38,15 @@ AUTO_SUBJECT = re.compile(
     r"авто-?ответ|в\s+отпуске|отсутству\w+\s+в\s+офисе|"
     r"undelivered|delivery\s+status|не\s+доставлено)", re.I)
 
+# Общие почтовые сервисы: один домен на миллионы людей, по нему не привязать.
+FREEMAIL = frozenset("""gmail.com googlemail.com yahoo.com ymail.com outlook.com
+    hotmail.com live.com msn.com icloud.com me.com mac.com aol.com gmx.com gmx.de
+    gmx.net web.de proton.me protonmail.com pm.me zoho.com zohomail.com mail.com
+    mail.ru bk.ru inbox.ru list.ru internet.ru yandex.ru yandex.com ya.ru
+    rambler.ru qq.com 163.com""".split())
+# Второй уровень, за которым ещё не организация: example.co.uk, example.com.ru.
+_SHARED_SLD = frozenset("co com net org gov edu ac".split())
+
 EMAIL_RE = re.compile(r"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}")
 MSGID_RE = re.compile(r"<[^<>@\s]+@[^<>@\s]+>")
 SUBJ_PREFIX = re.compile(
@@ -51,6 +62,7 @@ class MatchContext:
     by_employer: dict = field(default_factory=dict)  # адрес -> [app_id]
     subjects: dict = field(default_factory=dict)     # app_id -> тема отклика
     known_domains: set = field(default_factory=set)
+    by_domain: dict = field(default_factory=dict)    # домен организации -> [app_id]
 
 
 @dataclass
@@ -60,6 +72,9 @@ class Candidate:
     need_body: bool = False       # можно ли скачивать тело
     ambiguous: list = field(default_factory=list)
     drop_reason: str = ""         # непусто — письмо отбрасываем молча
+    # Домен подходит к нескольким заявкам: сначала ищем plus-адрес в теле,
+    # не нашли — неоднозначность уходит владельцу.
+    unresolved: list = field(default_factory=list)
 
     @property
     def matched(self) -> bool:
@@ -70,6 +85,17 @@ def addr_of(raw: str) -> str:
     """Первый адрес из заголовка. «Имя <a@b>» → «a@b»."""
     m = EMAIL_RE.search(raw or "")
     return m.group(0).lower() if m else ""
+
+
+def org_domain(addr: str) -> str:
+    """Домен организации: hr@mail.sberbank.ru → sberbank.ru. Freemail → пусто."""
+    host = (addr or "").rsplit("@", 1)[-1].strip().lower().rstrip(".")
+    if "." not in host or host in FREEMAIL:
+        return ""
+    parts = host.split(".")
+    keep = 3 if len(parts) >= 3 and parts[-2] in _SHARED_SLD else 2
+    org = ".".join(parts[-keep:])
+    return "" if org in FREEMAIL else org
 
 
 def all_addrs(*values) -> list:
@@ -153,15 +179,24 @@ def match_by_headers(headers: dict, ctx: MatchContext,
         return Candidate(apps[0], "employer", True)
     if len(apps) > 1:
         # R6: несколько заявок в одну компанию — разбираем по теме.
-        want = norm(norm_subject(headers.get("subject", "")))
-        scored = [(similarity(want, norm(ctx.subjects.get(a, ""))), a)
-                  for a in apps]
-        scored.sort(reverse=True)
-        if scored and scored[0][0] >= 0.85:
-            return Candidate(scored[0][1], "employer+subject", True)
+        best = _by_subject(headers, ctx, apps)
+        if best:
+            return Candidate(best, "employer+subject", True)
         # Гадать нельзя: цена ошибки — подтверждение интервью не по той
         # вакансии. Отдаём неоднозначность владельцу.
         return Candidate(0, "ambiguous", False, ambiguous=apps)
+
+    # R5: другой адрес той же компании. Слабее адреса работодателя, поэтому
+    # только при единственной заявке в эту организацию или совпавшей теме.
+    org = org_domain(sender)
+    apps = list(dict.fromkeys(ctx.by_domain.get(org, []))) if org else []
+    if len(apps) == 1:
+        return Candidate(apps[0], "domain", True)
+    if len(apps) > 1:
+        best = _by_subject(headers, ctx, apps)
+        if best:
+            return Candidate(best, "domain+subject", True)
+        return Candidate(0, "", True, unresolved=apps)
 
     # Тело качаем ещё в одном случае: домен знакомый, но адрес новый —
     # там может лежать plus-адрес в цитате (правило reftoken).
@@ -169,6 +204,13 @@ def match_by_headers(headers: dict, ctx: MatchContext,
     if domain and domain in ctx.known_domains:
         return Candidate(0, "", True)
     return Candidate(0, "", False)
+
+
+def _by_subject(headers: dict, ctx: MatchContext, apps: list) -> int:
+    want = norm(norm_subject(headers.get("subject", "")))
+    scored = sorted(((similarity(want, norm(ctx.subjects.get(a, ""))), a)
+                     for a in apps), reverse=True)
+    return scored[0][1] if scored and scored[0][0] >= 0.85 else 0
 
 
 def match_by_body(body: str, ctx: MatchContext, parse_plus=None) -> Candidate:

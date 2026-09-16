@@ -110,7 +110,7 @@ async def send_reply_email(app_id: int, text: str, attach_cv: bool = False,
         problem = reply_target_problem(sess, current)
         if problem:
             return "skipped:" + problem
-        allowed, why = can_reply(sess)
+        allowed, why = can_reply(sess, route.EMAIL)
         if not allowed:
             return "stop:" + why
         if route.channel_for(current, sess.get(Job, current.job_id)) != (route.EMAIL, addr):

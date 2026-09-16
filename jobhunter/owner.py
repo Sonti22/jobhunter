@@ -35,6 +35,7 @@ from .db import session_scope
 from .models import (
     Application,
     CampaignState,
+    ContactKind,
     Job,
     Message,
     OwnerRequest,
@@ -68,6 +69,18 @@ def _title(job: Job) -> str:
     return t[:80]
 
 
+# Почта — не мессенджер: рекрутёр ждёт ответа днями, и карточка, сгоревшая
+# за сутки (Sentilink, Recrohub 09.09), теряет разговор раньше, чем владелец
+# до неё дошёл.
+EMAIL_CARD_TTL_HOURS = 72
+
+
+def _ttl_hours(job: Job, hours: int) -> int:
+    if (job.contact_kind or "") == ContactKind.EMAIL.value:
+        return max(EMAIL_CARD_TTL_HOURS, hours)
+    return hours
+
+
 def create_slot_request(sess, app: Application, job: Job, slots: list,
                         incoming: str = "", draft_text: str = "") -> OwnerRequest:
     """Карточка «рекрутёр предложил время».
@@ -75,12 +88,13 @@ def create_slot_request(sess, app: Application, job: Job, slots: list,
     draft_text — заготовка подтверждения от LLM: /ok не должен быть
     одобрением вслепую, но отправляет текст только человек.
     """
+    from .convo.route import peer_label
     s = get_settings()
     payload = {"slots": [x.to_json() for x in slots],
                "handle": job.contact_handle, "incoming": (incoming or "")[:600],
                "draft": (draft_text or "")[:800]}
     lines = ["🗓 #%d · %s" % (app.id, _title(job)),
-             "Рекрутёр @%s предлагает время:" % (job.contact_handle or "?")]
+             "Рекрутёр %s предлагает время:" % peer_label(app, job)]
     for i, sl in enumerate(slots, 1):
         mark = "" if sl.has_time else "  ← время не названо, задай через /time"
         lines.append("  %d) %s%s" % (i, fmt(sl.dt_utc, s.owner_tz), mark))
@@ -96,7 +110,7 @@ def create_slot_request(sess, app: Application, job: Job, slots: list,
         application_id=app.id, kind=OwnerRequestKind.SLOT_CONFIRM.value,
         question="\n".join(lines), payload_json=payload,
         expires_at=(datetime.now(timezone.utc).replace(tzinfo=None)
-                    + timedelta(hours=s.owner_decision_ttl_hours)))
+                    + timedelta(hours=_ttl_hours(job, s.owner_decision_ttl_hours))))
     sess.add(req)
     sess.flush()
     _to_bot(req, sess)
@@ -105,14 +119,17 @@ def create_slot_request(sess, app: Application, job: Job, slots: list,
 
 def create_human_request(sess, app: Application, job: Job, incoming: str,
                          reason: str, draft_text: str = "",
-                         draft_note: str = "") -> OwnerRequest:
+                         draft_note: str = "", apply_url: str = "") -> OwnerRequest:
     """Карточка «автоматика не берётся отвечать»."""
+    from .convo.route import peer_label
     s = get_settings()
     lines = ["✋ #%d · %s" % (app.id, _title(job)),
              "Нужен твой ответ (%s)." % reason,
-             "", "Рекрутёр @%s: «%s»"
-             % (job.contact_handle or "?",
+             "", "Рекрутёр %s: «%s»"
+             % (peer_label(app, job),
                 (incoming or "").strip().replace("\n", " ")[:600])]
+    if apply_url:
+        lines += ["", "Подать отклик: %s" % apply_url]
     if draft_text:
         lines += ["", "Черновик: «%s»" % draft_text.replace("\n", " ")[:700],
                   "", "/send %d   ·   /say %d свой текст   ·   /skip %d"
@@ -125,9 +142,10 @@ def create_human_request(sess, app: Application, job: Job, incoming: str,
         application_id=app.id, kind=OwnerRequestKind.NEEDS_HUMAN.value,
         question="\n".join(lines),
         payload_json={"incoming": (incoming or "")[:900], "draft": draft_text,
-                      "reason": reason, "handle": job.contact_handle},
+                      "reason": reason, "handle": job.contact_handle,
+                      "apply_url": apply_url},
         expires_at=(datetime.now(timezone.utc).replace(tzinfo=None)
-                    + timedelta(hours=max(24, s.owner_decision_ttl_hours))))
+                    + timedelta(hours=_ttl_hours(job, max(24, s.owner_decision_ttl_hours)))))
     sess.add(req)
     sess.flush()
     _to_bot(req, sess)

@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import asyncio
 import random
+import re
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select
@@ -430,7 +431,17 @@ async def handle_message(client, app_id: int, text: str,
                     app.auto_tech_replies_count = (
                         app.auto_tech_replies_count or 0) + 1
             return "автоответ (%s, %s): %s" % (plan.intent, out_src, res)
-        return "автоответ не ушёл: %s" % res
+        # Непрошедший автоответ раньше оставлял письмо «в обработке» навсегда:
+        # повтора нет, карточки нет, рекрутёр ждёт. Теперь решает владелец —
+        # кроме случаев, когда писать этому контакту нельзя вовсе.
+        from .send import reply_target_problem
+        with session_scope() as sess:
+            problem = reply_target_problem(sess, sess.get(Application, app_id))
+        if problem:
+            return "без ответа: %s" % problem
+        return await _escalate(client, app_id, text, history, title, jd_text,
+                               plan.intent, "автоответ заблокирован (%s)" % res[:80],
+                               dry)
 
     # Эскалация: черновик от LLM (может быть пустым) + карточка.
     if plan.escalate:
@@ -452,6 +463,13 @@ async def _escalate(client, app_id: int, text: str, history: list,
     from .draft import draft_reply
 
     d = draft_reply(title, jd_text, text, history, intent=intent)
+    apply_url = ""
+    if intent == C.APPLY_LINK:
+        m = re.search(r"https?://[^\s<>\"')\]]+", text or "")
+        apply_url = m.group(0).rstrip(".,;:") if m else ""
+        reason = "просят подать отклик на сайте"
+    elif intent == C.TASK_REQUEST:
+        reason = "работодатель просит материалы или задание — следующий этап"
     with session_scope() as sess:
         app = sess.get(Application, app_id)
         job = sess.get(Job, app.job_id)
@@ -461,7 +479,7 @@ async def _escalate(client, app_id: int, text: str, history: list,
         if not owner.open_request_for(sess, app_id,
                                       OwnerRequestKind.NEEDS_HUMAN.value):
             owner.create_human_request(sess, app, job, text, reason,
-                                       d.text, d.problem)
+                                       d.text, d.problem, apply_url=apply_url)
     return "эскалация (%s), черновик: %s" % (
         reason, "есть" if d.text else "нет — " + (d.problem or "?"))
 

@@ -40,17 +40,24 @@ def warm_sent_today(sess) -> int:
                Application.first_reply_at.is_not(None))) or 0)
 
 
-def can_reply(sess) -> tuple:
-    """(можно, причина). Тёплые ответы не расходуют холодную квоту."""
+def can_reply(sess, channel: str = route.TELEGRAM) -> tuple:
+    """(можно, причина). Тёплые ответы не расходуют холодную квоту.
+
+    Ручной режим и лок — реакция на антиспам Telegram и касаются только его.
+    Пока они действовали на оба канала, PeerFlood в Telegram молча остановил
+    почтовые ответы: Astoria AI позвала на следующий этап 09.09, и письмо
+    неделю пролежало без ответа и без карточки.
+    """
     if policy.kill_switch_active():
         return False, "стоп-кран: %s" % get_settings().kill_switch.name
-    st = policy.get_state(sess)
-    if st.manual_only:
-        return False, "ручной режим после двух PeerFlood"
-    lk = policy.get_lock(sess)
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
-    if lk.locked_until and lk.locked_until > now and lk.scope == "all":
-        return False, "лок до %s (%s)" % (lk.locked_until, lk.reason)
+    if channel != route.EMAIL:
+        st = policy.get_state(sess)
+        if st.manual_only:
+            return False, "ручной режим после двух PeerFlood"
+        lk = policy.get_lock(sess)
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        if lk.locked_until and lk.locked_until > now and lk.scope == "all":
+            return False, "лок до %s (%s)" % (lk.locked_until, lk.reason)
     n = warm_sent_today(sess)
     if n >= policy.WARM_REPLY_DAILY:
         return False, "дневной лимит ответов исчерпан (%d)" % n
@@ -89,21 +96,21 @@ async def send_reply(client, app_id: int, text: str, attach_cv: bool = False,
         return "skipped:пустой текст"
 
     with session_scope() as sess:
-        ok, why = can_reply(sess)
-        if not ok:
-            return "stop:%s" % why
         app = sess.get(Application, app_id)
         if not app:
             return "skipped:заявка %d не найдена" % app_id
+        job = sess.get(Job, app.job_id)
+        channel, peer = route.channel_for(app, job)
+        ok, why = can_reply(sess, channel)
+        if not ok:
+            return "stop:%s" % why
         problem = reply_target_problem(sess, app)
         if problem:
             return "skipped:" + problem
-        job = sess.get(Job, app.job_id)
-        channel, peer = route.channel_for(app, job)
         cv_path = app.cv_path
 
-    # Развилка по каналу стоит ПОСЛЕ can_reply: стоп-кран, ручной режим и
-    # лимит вежливости обязаны действовать одинаково на оба транспорта.
+    # Развилка по каналу стоит ПОСЛЕ can_reply: стоп-кран и лимит вежливости
+    # действуют на оба транспорта, антиспам Telegram — только на свой.
     if channel == route.EMAIL:
         from .send_email import send_reply_email
         return await send_reply_email(app_id, text, attach_cv=attach_cv,
@@ -136,7 +143,7 @@ async def send_reply(client, app_id: int, text: str, attach_cv: bool = False,
     # Re-read after typing: stop/withdrawal/contact changes can arrive while
     # this coroutine yields. An old owner card cannot bypass live guards.
     with session_scope() as sess:
-        ok, why = can_reply(sess)
+        ok, why = can_reply(sess, route.TELEGRAM)
         if not ok:
             return "stop:" + why
         current = sess.get(Application, app_id)
