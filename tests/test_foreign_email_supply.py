@@ -142,7 +142,8 @@ def test_laborer_from_devops_tagged_channel_is_not_devops():
     assert role.family == "nonit" and not role.supported
     # «руководитель» содержит «водител» — это не водитель
     lead = classify("Senior PostgreSQL Engineer", "",
-                    "Подчинение: руководитель платформенной команды. PostgreSQL, Patroni")
+                    "Подчинение: руководитель платформенной команды. PostgreSQL, Patroni, "
+                    "тюнинг производительности")
     assert lead.family != "nonit"
 
 
