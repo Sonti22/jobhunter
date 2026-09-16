@@ -60,12 +60,9 @@ _ROLE_WORD = re.compile(
     r"analysts?|administrators?|designers?|managers?|leads?|head|director|vp|cto|"
     r"founding|devops|sre|swe|mlops|trainer|builder|consultant|specialist|intern|"
     r"roles|positions|openings)\b", re.I)
-# Сегменты, которые точно не должность: локация, формат, занятость, ссылка, деньги.
-_NOISE_SEG = re.compile(
-    r"^(?:https?://|www\.)|\.(?:com|io|ai|dev|co|org|net|app)/?$|"
-    r"\b(?:remote|onsite|on-site|hybrid|in-office|full[- ]?time|part[- ]?time|contract|"
-    r"visa|relocation|usd|eur|gbp|equity|hiring)\b|[$€£]\s?\d|\d+\s?k\b|"
-    r"^[A-Z][\w .'-]+,\s*[A-Z][\w .'-]+$", re.I)
+# Длиннее — уже не заголовок, а приклеенный первый абзац («Full-time –
+# https://estuary.dev/ Estuary is building… hiring engineers»).
+_MAX_ROLE_LEN = 90
 
 
 def _company_role(first_line: str) -> tuple:
@@ -74,7 +71,9 @@ def _company_role(first_line: str) -> tuple:
     Порядок сегментов соблюдают не все: вторым бывает локация («NY, USA»),
     ссылка или «REMOTE ALMOST ANYWHERE», и такой «заголовок» скорер честно
     не узнавал как роль — треть HN-вакансий отсеивалась с «роль не
-    распознана». Роль ищем по смыслу, а не по позиции.
+    распознана». Роль ищем по слову-должности, а не по позиции. Нет такого
+    слова — роли нет: пустой заголовок честнее «Worldwide» или «√ PMF», роль
+    тогда определяется по тексту вакансии.
     """
     line = first_line or ""
     parts = [p.strip() for p in re.split(r"\s*\|\s*", line) if p.strip()]
@@ -84,14 +83,11 @@ def _company_role(first_line: str) -> tuple:
         return "", ""
     company, rest = parts[0][:120], parts[1:]
     for seg in rest:
-        if _ROLE_WORD.search(seg):
-            return company, seg[:180]
-    if _ROLE_WORD.search(parts[0]):
+        if len(seg) <= _MAX_ROLE_LEN and _ROLE_WORD.search(seg):
+            return company, seg
+    if len(parts[0]) <= _MAX_ROLE_LEN and _ROLE_WORD.search(parts[0]):
         # «Software Engineer — Remote (US Only)»: компании в строке нет.
-        return "", parts[0][:180]
-    for seg in rest:
-        if not _NOISE_SEG.search(seg) and len(seg) > 3:
-            return company, seg[:180]
+        return "", parts[0]
     return company, ""
 
 
