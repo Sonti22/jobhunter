@@ -106,6 +106,8 @@ async def _process(dry: bool, stats: dict) -> dict:
     try:
         conn = imapbox.connect()
     except imapbox.MailboxError as e:
+        if str(e).startswith("сеть:") and not dry:
+            _notify_network(str(e))
         return dict(stats, error=str(e))
 
     try:
@@ -338,6 +340,19 @@ async def retry_stuck(dry: bool = False, limit: int = 10) -> int:
         log.info("   #%d: повтор зависших писем: %s", app_id, verdict)
         done += 1
     return done
+
+
+def _notify_network(error: str) -> None:
+    """Ящик недоступен по сети — владелец узнаёт сразу и с причиной.
+
+    Раньше это была только строка WARNING в логе; за 12 дней так пропало 12%
+    проходов, включая три часа подряд 14.09, и никто не заметил. Дедуп по
+    дню: одна авария — одно сообщение.
+    """
+    from .. import notify
+    from ..models import utcnow
+    notify.push("error", "📪 Почта недоступна: %s\n%s" % (error[:160], imapbox.network_hint()),
+                dedup="mail_net:%s" % utcnow().date().isoformat())
 
 
 def _notify_ambiguous(headers: dict, apps: list) -> None:

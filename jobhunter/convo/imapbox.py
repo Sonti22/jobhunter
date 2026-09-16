@@ -106,6 +106,36 @@ def connect(retries: int = CONNECT_RETRIES, backoff: float = CONNECT_BACKOFF):
     raise MailboxError("сеть: соединение не установлено")
 
 
+def _tls_ok(host: str, port: int, timeout: float) -> bool:
+    try:
+        with socket.create_connection((host, port), timeout=timeout) as sock:
+            sock.settimeout(timeout)
+            with ssl.create_default_context().wrap_socket(sock, server_hostname=host):
+                return True
+    except OSError:
+        return False
+
+
+def network_hint(timeout: float = 6.0) -> str:
+    """Отличает «интернета нет» от «туннель режет почтовые порты».
+
+    16.09: TLS к www.google.com:443 проходил за 0.2 с и с хоста, и из
+    контейнера, а к imap.gmail.com:993 и smtp.gmail.com:465/587 висел без
+    ответа — весь трафик шёл через VPN (happ-xray), чей сервер не пропускает
+    почтовые порты. В логе это выглядело как «сеть: timeout», и причину
+    искали бы не там.
+    """
+    s = get_settings()
+    if _tls_ok(s.imap_host, s.imap_port, timeout):
+        return "Сейчас ящик отвечает — обрыв был кратким."
+    if _tls_ok("www.google.com", 443, timeout):
+        return ("HTTPS работает, а почтовые порты Gmail (993/465/587) не отвечают: "
+                "похоже, трафик идёт через VPN или прокси, который их не пропускает. "
+                "Исключи imap.gmail.com и smtp.gmail.com из туннеля или выключи VPN "
+                "на время работы бота — иначе почта не читается и не отправляется.")
+    return "Интернета нет вообще: не отвечает даже HTTPS."
+
+
 def _uidvalidity(conn, folder: str) -> int:
     typ, data = conn.status(folder, "(UIDVALIDITY)")
     if typ != "OK" or not data:

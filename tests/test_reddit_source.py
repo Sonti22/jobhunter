@@ -162,3 +162,38 @@ def test_listing_shape_survives_json_roundtrip():
     """Страховка от опечатки в фикстуре: структура ровно как у Reddit."""
     data = json.loads(json.dumps(LISTING))
     assert all("title" in c["data"] and "selftext" in c["data"] for c in data["data"]["children"])
+
+
+# ── сеть до Gmail: владелец узнаёт причину, а не «timeout» в логе ──
+
+def test_network_hint_tells_vpn_from_no_internet(monkeypatch):
+    from jobhunter.convo import imapbox
+    table = {("imap.gmail.com", 993): False, ("www.google.com", 443): True}
+    monkeypatch.setattr(imapbox, "_tls_ok", lambda h, p, t: table[(h, p)])
+    assert "VPN" in imapbox.network_hint()
+    table[("www.google.com", 443)] = False
+    assert "Интернета нет" in imapbox.network_hint()
+    table[("imap.gmail.com", 993)] = True
+    assert "отвечает" in imapbox.network_hint()
+
+
+def test_mailbox_network_error_notifies_owner_once_a_day(monkeypatch):
+    import asyncio
+
+    from jobhunter import notify
+    from jobhunter.convo import imapbox, inbox_email
+    pushed = []
+    monkeypatch.setattr(notify, "push", lambda kind, text, **kw: pushed.append((kind, text, kw.get("dedup"))))
+    monkeypatch.setattr(imapbox, "network_hint", lambda: "подсказка про VPN")
+
+    def down():
+        raise imapbox.MailboxError("сеть: TimeoutError: handshake timed out")
+    monkeypatch.setattr(imapbox, "connect", down)
+    monkeypatch.setattr(inbox_email, "record", lambda *a, **kw: None, raising=False)
+    stats = asyncio.run(inbox_email._process(False, {"seen": 0}))
+    assert stats["error"].startswith("сеть:")
+    assert len(pushed) == 1 and pushed[0][0] == "error"
+    assert "подсказка про VPN" in pushed[0][1] and pushed[0][2].startswith("mail_net:")
+    # dry-run ничего не шлёт
+    asyncio.run(inbox_email._process(True, {"seen": 0}))
+    assert len(pushed) == 1
