@@ -81,7 +81,8 @@ _GEOGRAPHY = re.compile(
     r"(?:allowed|eligible|hiring)\s+(?:countries|locations)\s*:", re.I,
 )
 _GEO_RESTRICTION = re.compile(
-    r"\b(?:US|USA|UK|EU|EEA|Europe|Canada|Russia)[ -]+only\b|"
+    # «REMOTE (US-Based Only)» проходил автоодобрение как «любая страна»
+    r"\b(?:US|USA|UK|EU|EEA|Europe|Canada|Russia)[ -]+(?:based[ -]+|residents?[ -]+)?only\b|"
     r"\b(?:residents? of|residency|citizenship|work authori[sz]ation|right to work)\b|"
     r"\b(?:must|need to)\s+(?:be\s+)?(?:based|located|reside)|"
     r"только\s+(?:из|в|для)\s+|гражданств\w*|резидентств\w*|разрешение на работу", re.I,

@@ -68,6 +68,9 @@ def test_review_card_stays_strict(profile):
     ("Required:\n- Expert AWS", "знакомство"),                     # familiar only
     ("Required:\n- 5+ years of Kubernetes", "стаж"),              # 2 years in profile
     ("Required:\n- Python\n- Remote (US only)", "географии"),
+    # HN-заголовок Duets Network: одобрялся как «любая страна» (16.09)
+    ("Duets Network | Founding Engineer | REMOTE (US-Based Only) | ~10–15 hrs/wk\n"
+     "Required:\n- Python", "географии"),
     ("Required:\n- Experience training neural models", ""),        # ML research
 ])
 def test_real_mismatches_still_block(profile, body, marker):
