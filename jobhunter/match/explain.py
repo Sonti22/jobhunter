@@ -339,6 +339,7 @@ _GENERIC_TECH = frozenset("""
     html html5 css css3 es6 utf-8 utf8 cli sdk ide ui ux url uri os vm vps
     it qa ai ml llm b2b b2c saas mvp kpi sla pr mr code review
     backend frontend fullstack devops sre mlops devsecops
+    apache
 """.split())
 _PRODUCT_NAME = re.compile(r"[a-z][A-Z]|[A-Za-z]{2}\d|\d[A-Za-z]{2}")
 
@@ -356,7 +357,8 @@ def _unknown_technologies(clause: str, profile: Profile) -> list[str]:
     found = [t for t in sorted(_find_terms(text))
              if t not in profile.allowed_terms and t not in _GENERIC_TECH]
     seen = {w for t in found for w in t.split()}
-    for token in re.findall(r"(?<![\w.])[A-Za-z][\w.+#-]*[\w+#]", text):
+    # Latin-only tokens: \w would glue "DevOps-инженера" into one product name.
+    for token in re.findall(r"(?<![\w.])[A-Za-z][A-Za-z0-9.+#-]*[A-Za-z0-9+#]", text):
         low = token.lower()
         if (low in seen or low in _GENERIC_TECH or low in profile.allowed_terms
                 or not _PRODUCT_NAME.search(token)):

@@ -44,6 +44,9 @@ APP = SimpleNamespace(review_note="")
     "Требования:\n- Python\n- Удаленно (гражданство РФ)",
     "Требования:\n- Python\n- JWT, CORS, HTTP/HTTPS, OOP и SOLID\n- График работы: Понедельник",
     "Required:\n- Python 3.10+\n- Contact @hr_lead or https://t.me/hr_lead",
+    # live false blocks 16.09: Cyrillic glued into a "product name", vendor prefix
+    "Требования:\n- Python\n- опыт в роли DevOps-инженера не менее 3 лет",
+    "Требования:\n- Python\n- Практический опыт работы с Apache и PostgreSQL",
 ])
 def test_unverifiable_words_do_not_block_auto_approval(profile, body):
     job = vacancy(body=body)
