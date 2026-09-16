@@ -49,6 +49,10 @@ _REMOTE_RE = re.compile(
 _REMOTE_NEG_RE = re.compile(
     r"(?:\bno\s+remote\b|\bnot\s+(?:a\s+)?remote\b|remote\s*:\s*no\b|"
     r"remote\s+(?:work\s+)?(?:is\s+)?not\s+(?:possible|available|an?\s+option)|"
+    # «ON SITE TORONTO MUST BE ON SITE. REMOTE WILL BE IGNORED» считалось удалёнкой
+    r"remote\s+(?:applicants?\s+|candidates?\s+)?will\s+be\s+ignored|"
+    r"must\s+be\s+(?:on[-\s]?site|in[-\s]office|in[-\s]person)|"
+    r"on[-\s]?site\s+only|in[-\s]office\s+only|"
     r"без\s+удал[ёе]нк\w*|удал[ёе]нк\w*\s+не(?:т\b|возможн\w*)|"
     r"удал[ёе]нн\w*\s+работ\w*\s+не\s+(?:предусмотрен\w*|предполагает\w*|"
     r"рассматрива\w*|возможн\w*)|"

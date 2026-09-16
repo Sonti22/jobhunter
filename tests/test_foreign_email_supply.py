@@ -98,6 +98,50 @@ def test_generic_software_engineer_is_a_known_role(title, family):
     assert classify(title, "", "").family == family
 
 
+# ── находки проверки очереди 16.09: эти письма ушли бы на следующий день ──
+
+HN_SEEKER = ("Location: Florianopolis, Brazil (UTC-3)\nRemote: Yes\nWilling to relocate: Not yet\n"
+             "Technologies: Node.js, TypeScript, PostgreSQL, Azure, MongoDB\n"
+             "Résumé/CV: https://example.com/cv.pdf\nEmail: felipe@example.com")
+
+
+def test_hn_who_wants_to_be_hired_template_is_a_seeker():
+    from jobhunter.ingest.postkind import is_seeker_post
+    assert is_seeker_post(HN_SEEKER)
+    assert not is_seeker_post("Acme | Backend Engineer | REMOTE\nWe're hiring. "
+                              "Technologies we use: Python, Postgres. Email jobs@acme.com")
+
+
+def test_onsite_only_header_is_not_remote():
+    text = "Lead SWE | ON SITE TORONTO MUST BE ON SITE. REMOTE WILL BE IGNORED | $130,000 CAD"
+    assert workformat.detect(text) == workformat.ONSITE
+
+
+@pytest.mark.parametrize("raw", [
+    "ON SITE TORONTO MUST BE ON SITE. REMOTE WILL BE IGNORED",
+    "Remote-first with PST overlap", "Location: Florianopolis, Brazil (UTC-3)",
+    "https://cyberatlas.ai", "US-Based / Remote",
+])
+def test_format_and_location_lines_are_not_letter_titles(raw):
+    from jobhunter.tailor.roletitle import clean_title, display_role
+    assert clean_title(raw) == ""
+    assert "Remote" not in display_role(raw, "Python", "", "en")
+
+
+def test_remote_titles_with_a_role_are_kept():
+    from jobhunter.tailor.roletitle import clean_title
+    assert clean_title("Remote Python Developer") == "Remote Python Developer"
+    assert clean_title("CTO (ONSITE, Stockholm) or Part-time Engineer (REMOTE ok)")
+
+
+def test_laborer_from_devops_tagged_channel_is_not_devops():
+    from jobhunter.match.role import classify
+    body = ("Разнорабочий\nОбязанности:\n• Выполнять строительные, хозяйственные, "
+            "погрузочно-разгрузочные работы\nГотового к вахтовому методу")
+    role = classify("Разнорабочий", "DevOps", body)
+    assert role.family == "nonit" and not role.supported
+
+
 def test_remote_only_board_is_remote_despite_relocation_word():
     text = "Senior Python Engineer. Benefits: relocation package optional, hybrid team offsites."
     assert workformat.detect(text) == workformat.ONSITE

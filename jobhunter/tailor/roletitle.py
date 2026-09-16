@@ -23,6 +23,18 @@ _NOT_A_TITLE = re.compile(
     r"вакансия|vacancy|job|hiring|"
     r"разработчик|developer|инженер|engineer|программист|programmer|специалист)"
     r"[\s+/,-]*$", re.I)
+# A location or work-format line from an HN header is not a title either:
+# «Regarding the “ON SITE TORONTO MUST BE ON SITE. REMOTE WILL BE IGNORED” role»
+# and «Location: Florianopolis, Brazil» were about to be mailed on 16.09.
+_FORMAT_LINE = re.compile(
+    r"^(?:location\s*:|remote\b|remote-first|fully\s+remote|on[\s-]?site\b|onsite\b|"
+    r"hybrid\b|in[\s-]office\b|us-based|usa?\b|eu\b|worldwide|anywhere|https?://|www\.)",
+    re.I)
+_ROLE_WORD = re.compile(
+    r"\b(?:engineers?|developers?|programmers?|architects?|scientists?|researchers?|"
+    r"analysts?|administrators?|managers?|leads?|head|director|cto|founding|devops|"
+    r"sre|swe|mlops|consultant|specialist)\b|разработчик|инженер|аналитик|архитектор|"
+    r"программист|тимлид|техлид|руководител", re.I)
 
 
 def clean_title(raw: str) -> str:
@@ -30,6 +42,8 @@ def clean_title(raw: str) -> str:
     role = _HASHTAG.sub(" ", raw or "")
     role = re.sub(r"[\s,;·|/–—-]+$", "", re.sub(r"\s{2,}", " ", role)).strip()
     if len(role) < 3 or _MONEY_ONLY.match(role) or _NOT_A_TITLE.match(role):
+        return ""
+    if _FORMAT_LINE.match(role) and not _ROLE_WORD.search(role):
         return ""
     return role
 
@@ -43,7 +57,9 @@ def display_role(title: str, tag: str, description: str, lang: str) -> str:
         "devops": "DevOps Engineer" if en else "DevOps-инженер",
         "product": "Product Manager" if en else "Продакт-менеджер",
         "ml": "ML Engineer" if en else "ML-инженер",
+        "ds / ml": "ML Engineer" if en else "ML-инженер",
         "data": "Data Engineer" if en else "Data-инженер",
+        "fullstack": "Full-Stack Engineer" if en else "Fullstack-разработчик",
     }
     for raw in (title or "", tag or ""):
         role = raw.strip()
