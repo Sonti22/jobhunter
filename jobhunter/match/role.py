@@ -168,7 +168,8 @@ ROLE_PATTERNS: dict[str, list[tuple[re.Pattern, float]]] = {
         (_rx(r"\bhr\b\s*(?:manager|generalist)", r"рекрут", r"маркетолог",
              r"\bsmm\b", r"копирайт", r"content\s*manager", r"\bpr\s*&",
              r"communications?\s*associate", r"supply\s*chain", r"бухгалтер",
-             r"логист", r"\bdriver\b", r"водител",
+             # (?<!руко): «руководитель разработки» — не водитель
+             r"логист", r"\bdriver\b", r"(?<!руко)водител",
              # Рабочие профессии из региональных каналов с меткой «DevOps»:
              # метка канала давала devops 6 баллов, и «Разнорабочий» с вахтой
              # стоял в очереди на автоодобрение (16.09).

@@ -140,6 +140,10 @@ def test_laborer_from_devops_tagged_channel_is_not_devops():
             "погрузочно-разгрузочные работы\nГотового к вахтовому методу")
     role = classify("Разнорабочий", "DevOps", body)
     assert role.family == "nonit" and not role.supported
+    # «руководитель» содержит «водител» — это не водитель
+    lead = classify("Senior PostgreSQL Engineer", "",
+                    "Подчинение: руководитель платформенной команды. PostgreSQL, Patroni")
+    assert lead.family != "nonit"
 
 
 def test_remote_only_board_is_remote_despite_relocation_word():
