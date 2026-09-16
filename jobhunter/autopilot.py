@@ -425,6 +425,19 @@ def step_send_email() -> dict:
     return {"error": "почтовая партия завершилась с ошибкой"} if rc else {"ok": True}
 
 
+def step_resend_en() -> dict:
+    """Повтор на английском тем HN-компаниям, кому ушло русское письмо (до 4 в день)."""
+    from .outreach import resend_en
+    s = get_settings()
+    if not (s.smtp_user and s.smtp_app_password):
+        return {"blocked": "SMTP не настроен"}
+    if policy.kill_switch_active():
+        return {"blocked": "активен стоп-кран"}
+    stats = resend_en.run()
+    log.info("повтор на английском: %s", stats)
+    return stats
+
+
 def step_send_telegram() -> dict:
     from .outreach.sender import run as sender_run
     s = get_settings()
@@ -919,6 +932,7 @@ def run_daemon() -> int:
     sched.add_job(step_prepare, "cron", hour=10, minute=0, id="prepare", **opts)
     sched.add_job(step_auto_approve, "cron", hour=10, minute=15, id="approve", **opts)
     sched.add_job(step_send_email, "cron", hour=10, minute=30, id="email", **opts)
+    sched.add_job(step_resend_en, "cron", hour=11, minute=0, id="resend_en", **opts)
     # Анкеты Ashby: stage вечером готовит кандидатов к утреннему prepare,
     # подача — после авто-одобрения. Свой дневной лимит (ATS_DAILY_LIMIT),
     # телеграмную квоту не трогает.
@@ -1005,7 +1019,7 @@ def run_daemon() -> int:
     # проверяет маркеры: плановое время прошло, прогона не было — шаг
     # ставится на ближайшую минуту, в исходном порядке конвейера.
     daily = [("discover", 9, 0), ("ingest", 9, 30), ("prepare", 10, 0),
-             ("approve", 10, 15), ("email", 10, 30), ("tg1", 11, 15),
+             ("approve", 10, 15), ("email", 10, 30), ("resend_en", 11, 0), ("tg1", 11, 15),
              ("manual_prep", 9, 40), ("manual_batch", 9, 45),
              ("followups", 12, 0), ("tg2", 16, 40)]
 
