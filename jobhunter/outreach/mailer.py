@@ -184,68 +184,16 @@ def build_message(*, to: str, subject: str, body: str, cv_path: str = "",
     return msg
 
 
-_PLACEHOLDER_ROLE = re.compile(
-    r"^(?:текст\s+вакансии|vacancy\s+text|job\s+description|description)"
-    r"\s*:?[\s-]*$", re.I)
-
-# Заголовок телеграм-поста — это подпись автора, а не название должности:
-# «lead #гибрид #нижнийновгород», «120k #удаленка #офис #тюмень». В теме
-# письма такое читается как рассылка, а не как отклик на конкретную роль.
-_HASHTAG = re.compile(r"#\S+")
-_MONEY_ONLY = re.compile(r"^[\d\s.,]+\s*(?:k|к|тыс|руб|₽|\$|€)?$", re.I)
-# Грейд без роли: «senior», «lead», «middle+» — не должность.
-_GRADE_ONLY = re.compile(
-    r"^(?:senior|middle|junior|lead|team\s*lead|tech\s*lead|стажёр|интерн)"
-    r"[\s+/-]*$", re.I)
-
-
 def _clean_role(raw: str) -> str:
     """Заголовок без хештегов и мусора, или пустая строка, если роли нет."""
-    role = _HASHTAG.sub(" ", raw or "")
-    role = re.sub(r"[\s,;·|/–—-]+$", "", re.sub(r"\s{2,}", " ", role)).strip()
-    if len(role) < 3 or _MONEY_ONLY.match(role) or _GRADE_ONLY.match(role):
-        return ""
-    return role
+    from ..tailor.roletitle import clean_title
+    return clean_title(raw)
 
 
 def _subject_role(job: Job, lang: str) -> str:
-    """Человеческое название роли для темы, даже если источник сломан."""
-    generic_tags = {
-        "python": "Backend Engineer" if lang == "en" else "Backend-разработчик",
-        "backend": "Backend Engineer" if lang == "en" else "Backend-разработчик",
-        "devops": "DevOps Engineer" if lang == "en" else "DevOps-инженер",
-        "product": "Product Manager" if lang == "en" else "Продакт-менеджер",
-        "ml": "ML Engineer" if lang == "en" else "ML-инженер",
-        "data": "Data Engineer" if lang == "en" else "Data-инженер",
-    }
-    candidates = [job.title or "", job.tag or ""]
-    for raw in candidates:
-        role = raw.strip()
-        # Часть источников сохраняет префикс буквально: «Текст вакансии:
-        # Python Backend». Берём полезную часть, а не тащим мусор в тему.
-        if re.match(r"^текст\s+вакансии\s*:", role, re.I):
-            role = role.split(":", 1)[1].strip()
-        if not role or _PLACEHOLDER_ROLE.match(role):
-            continue
-        if re.match(r"^(?:https?://|www\.)", role, re.I):
-            continue
-        role = _clean_role(role)
-        if not role:
-            continue                  # были одни хештеги/грейд — берём tag
-        if role.lower() in generic_tags:
-            return generic_tags[role.lower()]
-        return role
-
-    blob = " ".join([job.title or "", job.tag or "", job.description_raw or ""])
-    if re.search(r"product\s*(?:manager|owner)|продакт|продуктов\w*\s+менедж", blob, re.I):
-        return "Product Manager" if lang == "en" else "Продакт-менеджер"
-    if re.search(r"devops|\bsre\b|kubernetes|terraform", blob, re.I):
-        return "DevOps Engineer" if lang == "en" else "DevOps-инженер"
-    if re.search(r"data\s*engineer|etl|airflow|\bdwh\b|аналитик", blob, re.I):
-        return "Data Engineer" if lang == "en" else "Data-инженер"
-    if re.search(r"python|backend|back-end|fastapi|django|разработчик|инженер", blob, re.I):
-        return "Backend Engineer" if lang == "en" else "Backend-разработчик"
-    return "Software Engineer" if lang == "en" else "Разработчик"
+    """Человеческое название роли для темы — тем же правилом, что и в письме."""
+    from ..tailor.roletitle import display_role
+    return display_role(job.title or "", job.tag or "", job.description_raw or "", lang)
 
 
 def _subject(job: Job, lang: str) -> str:

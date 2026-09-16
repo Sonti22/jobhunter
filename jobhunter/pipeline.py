@@ -186,14 +186,18 @@ def prepare_application(app_id: int,
         llm_provider = ""
         # ── письмо ──
         corpus = _recent_message_corpus(sess)
-        msg = gen_message(job.title or job.tag, job.description_raw, score,
+        # Роль — человеческая: заголовок телеграм-поста с хештегами в
+        # первой фразе («По вакансии «удаленно #DevOps»») читается как рассылка.
+        from .tailor.roletitle import display_role
+        role = display_role(job.title or "", job.tag or "", job.description_raw or "", res.lang)
+        msg = gen_message(role, job.description_raw, score,
                           seed_str=job.external_uuid, recent_corpus=corpus,
                           source=source_label(job.source, lang=res.lang), lang=res.lang,
                           template_preferences=template_preferences)
         # LLM переписывает шаблон живым текстом; гейт внутри write_message
         # проверяет результат теми же правилами. Не прошло — остаётся шаблон.
         if msg.ok:
-            w = write_message(job.title or job.tag, job.description_raw, score,
+            w = write_message(role, job.description_raw, score,
                               source_label(job.source, lang=res.lang), msg.text,
                               lang=res.lang)
             if w.gate_passed and w.text and w.text != msg.text:

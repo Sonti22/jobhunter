@@ -27,7 +27,17 @@ from sqlalchemy import select
 
 from ..config import ROOT, get_settings
 from ..db import session_scope
-from ..models import Application, ContactKind, Employer, Job, Message, SendLog, Status, utcnow
+from ..models import (
+    Application,
+    ContactKind,
+    Employer,
+    HandleCache,
+    Job,
+    Message,
+    SendLog,
+    Status,
+    utcnow,
+)
 from ..tailor.render import resolve_cv
 from . import eligibility, policy
 from .resolver import HandleDead, NotAUser, resolve
@@ -220,6 +230,12 @@ def pick_batch(limit: int) -> list:
             if not job or job.is_closed or job.contact_kind != ContactKind.USER_HANDLE.value:
                 continue
             if not job.contact_handle:
+                continue
+            # Известный канал/группа или мёртвый ник: резолвер отсеял бы его
+            # и сам, но уже после того, как он занял слот партии, — а при
+            # потолке в 3 сообщения в день каждый слот на счету.
+            cached = sess.get(HandleCache, job.contact_handle.strip().lstrip("@").lower())
+            if cached and cached.last_error in ("dead", "not_a_user"):
                 continue
             emp = sess.get(Employer, app.employer_id) if app.employer_id else None
             if not eligibility.check(app, job, emp).allowed:

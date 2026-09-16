@@ -42,7 +42,9 @@ def _letter_for(job, lang: str) -> str:
     from ..match.scorer import score_job
     from ..tailor.message import generate, source_label
     score = score_job(job.title or "", job.tag or "", job.description_raw or "")
-    msg = generate(job.title or job.tag, job.description_raw or "", score,
+    from ..tailor.roletitle import display_role
+    role = display_role(job.title or "", job.tag or "", job.description_raw or "", lang)
+    msg = generate(role, job.description_raw or "", score,
                    seed_str=job.external_uuid,
                    source=source_label(job.source, lang=lang), lang=lang)
     return msg.text

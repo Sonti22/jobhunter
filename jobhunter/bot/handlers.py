@@ -409,7 +409,9 @@ def _manual_letter(app_id: int) -> str:
         lang = _pick_lang(job.description_raw or "", job.title or "")
         score = score_job(job.title or "", job.tag or "",
                           job.description_raw or "")
-        msg = generate(job.title or job.tag, job.description_raw or "", score,
+        from ..tailor.roletitle import display_role
+        role = display_role(job.title or "", job.tag or "", job.description_raw or "", lang)
+        msg = generate(role, job.description_raw or "", score,
                        seed_str=job.external_uuid,
                        source=source_label(job.source, lang=lang), lang=lang)
         return ("📋 Письмо для «%s» — скопируй в форму:\n\n%s"
