@@ -82,3 +82,42 @@ def test_sender_skips_cached_group_chats(tmp_path, monkeypatch):
         get_settings.cache_clear()
         dbmod._engine = None
         dbmod._Session = None
+
+
+def test_followup_quotes_job_title_not_hashtags(tmp_path, monkeypatch):
+    """Напоминание «Поднимаю своё сообщение по «удаленно #DevOps»» — брак."""
+    import uuid
+    from datetime import timedelta
+
+    monkeypatch.setenv("DB_PATH", str(tmp_path / "f.db"))
+    monkeypatch.setenv("LLM_ENABLED", "false")
+    from jobhunter.config import get_settings
+    get_settings.cache_clear()
+    import jobhunter.db as dbmod
+    dbmod._engine = None
+    dbmod._Session = None
+    from jobhunter.models import Application, Job, Status, utcnow
+    from jobhunter.outreach import followup
+
+    with dbmod.session_scope() as sess:
+        job = Job(external_uuid=str(uuid.uuid4()), source="tg:devops_jobs",
+                  title="удаленно #DevOps", tag="DevOps", description_raw="kubernetes",
+                  contact_kind="user_handle", contact_handle="recruiter")
+        sess.add(job)
+        sess.flush()
+        app = Application(job_id=job.id, status=Status.AWAITING_REPLY.value,
+                          score=80, gate_passed=True, message_body="Здравствуйте",
+                          sent_at=utcnow() - timedelta(days=10), cv_lang="ru")
+        sess.add(app)
+        sess.flush()
+        aid = app.id
+    try:
+        followup.prepare(dry=False)
+        with dbmod.session_scope() as sess:
+            body = sess.get(Application, aid).followup_body or ""
+        assert body, "напоминание должно подготовиться"
+        assert "#" not in body and "DevOps-инженер" in body, body
+    finally:
+        get_settings.cache_clear()
+        dbmod._engine = None
+        dbmod._Session = None

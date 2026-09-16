@@ -263,7 +263,11 @@ async def handle_message(client, app_id: int, text: str,
         app = sess.get(Application, app_id)
         job = sess.get(Job, app.job_id)
         intent = C.classify(text)
-        title = job.title or job.tag or ""
+        # Роль уходит в черновики LLM, а модель её цитирует рекрутёру: сырой
+        # заголовок поста («удаленно #DevOps») в ответе читается как бот.
+        from ..tailor.roletitle import display_role
+        title = display_role(job.title or "", job.tag or "", job.description_raw or "",
+                             app.cv_lang or "ru")
         jd_text = job.description_raw or ""
         history = [(m.direction, m.body) for m in sess.scalars(
             select(Message).where(Message.application_id == app_id)

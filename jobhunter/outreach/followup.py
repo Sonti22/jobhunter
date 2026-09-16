@@ -89,7 +89,9 @@ def prepare(dry: bool = True) -> dict:
             select(Application).where(Application.message_body != "")
             .order_by(Application.id.desc()).limit(30)).all() if a]
         for a, job, n in items:
-            role = (job.title or job.tag or "вакансия")[:60]
+            from ..tailor.roletitle import display_role
+            role = display_role(job.title or "", job.tag or "", job.description_raw or "",
+                                a.cv_lang or "ru")[:60]
             tpl = rng.choice(TEMPLATES_1_EN if (a.cv_lang or "ru") == "en"
                              else TEMPLATES_1)
             text = tpl.format(role=role)
