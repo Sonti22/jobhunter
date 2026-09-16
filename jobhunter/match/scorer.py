@@ -114,7 +114,8 @@ class Score:
         return len(self.forbidden_demands) >= 3 and len(self.matched_skills) < 2
 
 
-def score_job(title: str, tag: str, jd_text: str, profile: Profile | None = None) -> Score:
+def score_job(title: str, tag: str, jd_text: str, profile: Profile | None = None,
+              source: str = "") -> Score:
     p = profile or get_profile()
     blob = " ".join([title or "", tag or "", jd_text or ""])
     jd_terms = _find_terms(jd_text or "") | _find_terms(tag or "")
@@ -155,7 +156,7 @@ def score_job(title: str, tag: str, jd_text: str, profile: Profile | None = None
         - (30.0 if misfit else 0.0)
     forbidden_penalty = min(25.0, len(forbidden) * 8.0)
     total = max(0.0, min(100.0, skill_component + role_component + 15.0 - forbidden_penalty))
-    fmt = workformat.detect(title, tag, jd_text)
+    fmt = workformat.detect(title, tag, jd_text, source=source)
 
     reason_bits = []
     if matched:

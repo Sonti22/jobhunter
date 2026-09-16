@@ -5,6 +5,8 @@ from datetime import datetime, timedelta, timezone
 from ..config import get_settings
 from ..models import ContactKind, Status, utcnow
 
+HN_THREAD_DAYS = 35
+
 
 @dataclass(frozen=True)
 class Eligibility:
@@ -19,6 +21,17 @@ class Eligibility:
 
 def _utc_naive(value):
     return value.astimezone(timezone.utc).replace(tzinfo=None) if value.tzinfo else value
+
+
+def max_age_days(job) -> int:
+    """Сколько дней вакансия считается живой."""
+    days = get_settings().max_vacancy_age_days
+    if (getattr(job, "source", "") or "") == "hn":
+        # «Who is hiring» — ежемесячный тред: компании пишут в первые дни,
+        # а нанимают весь месяц. С общим окном в 21 день вся ветка
+        # протухала к 22-му числу (13 одобренных HN-заявок 16.09).
+        days = max(days, HN_THREAD_DAYS)
+    return days
 
 
 def vacancy_problem(job, now=None) -> Eligibility:
@@ -43,7 +56,7 @@ def vacancy_problem(job, now=None) -> Eligibility:
         now = now or utcnow()
         timestamp = _utc_naive(now).replace(tzinfo=timezone.utc).timestamp()
         age = max(0, int((timestamp - int(job.posted_at)) // 86400))
-        days = get_settings().max_vacancy_age_days
+        days = max_age_days(job)
         if age > days:
             return Eligibility("stale", "Вакансии %d дней, допустимо не больше %d" % (age, days))
     return Eligibility()

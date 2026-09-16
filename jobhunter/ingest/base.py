@@ -204,11 +204,25 @@ def extract_telegram_handle(text: str, denylist=None) -> str:
     return ""
 
 
+# Ящики из подвала вакансии, а не для откликов: политика данных, безопасность,
+# доступность собеседований, юристы. В WWR-вакансиях они стоят почти всегда, и
+# 11 из 32 «почтовых» вакансий WWR на деле были privacy@/security@/
+# candidateaccommodations@ — писать туда резюме бессмысленно и вредно.
+NON_HIRING_MAILBOX = re.compile(
+    r"privacy|security|accommodat|compliance|gdpr|\bdpo\b|dataprotection|"
+    r"data[._-]protection|trust|abuse|legal|ethics|whistleblow|noreply|no-reply|"
+    r"donotreply|unsubscribe|dsar", re.I)
+
+
+def is_hiring_mailbox(addr: str) -> bool:
+    return not NON_HIRING_MAILBOX.search((addr or "").split("@")[0])
+
+
 def extract_email(text: str) -> str:
-    """Email, включая обфусцированный вид HN ('a [at] b [dot] com')."""
+    """Email для отклика, включая обфусцированный вид HN ('a [at] b [dot] com')."""
     for m in _EMAIL.finditer(text or ""):
         addr = m.group(0).rstrip(".,;:")
-        if _valid_email(addr):
+        if _valid_email(addr) and is_hiring_mailbox(addr):
             return addr
     for m in _EMAIL_OBF.finditer(text or ""):
         # Ветка 1 (at в скобках) — группы 1-3, ветка 2 (at словом) — 4-6.
@@ -217,9 +231,22 @@ def extract_email(text: str) -> str:
         domain = re.sub(r"\s*(?:\[\s*dot\s*\]|\(\s*dot\s*\)|\s+dot\s+)\s*", ".",
                         raw_domain, flags=re.I).strip()
         addr = "%s@%s.%s" % (local, domain, tld)
-        if _valid_email(addr):
+        if _valid_email(addr) and is_hiring_mailbox(addr):
             return addr
     return ""
+
+
+def _contact_url(rj: RawJob) -> str:
+    """Для почтовой вакансии контакт — сам адрес, а не страница борда.
+
+    Борды отдают и ссылку на вакансию, и email из текста. Раньше ссылка
+    побеждала: у вакансии contact_kind=email, а в contact_url — страница WWR,
+    и отправщик видел «email не указан» (11 одобренных WWR 16.09). Ссылка при
+    этом не теряется — она в all_links.
+    """
+    if rj.contact_kind == ContactKind.EMAIL.value and rj.contact_email:
+        return rj.contact_email
+    return rj.contact_url or rj.contact_email
 
 
 def save_jobs(jobs: Iterator[RawJob], verbose: bool = True) -> dict:
@@ -264,7 +291,7 @@ def save_jobs(jobs: Iterator[RawJob], verbose: bool = True) -> dict:
                         ("salary_raw", rj.salary_raw),
                         ("contact_handle", rj.contact_handle),
                         ("contact_handle_norm", handle_norm),
-                        ("contact_url", rj.contact_url or rj.contact_email),
+                        ("contact_url", _contact_url(rj)),
                         ("posted_at", rj.posted_at), ("raw_json", rj.raw),
                     ):
                         if value not in (None, "", 0):
@@ -287,7 +314,7 @@ def save_jobs(jobs: Iterator[RawJob], verbose: bool = True) -> dict:
                     contact_kind=rj.contact_kind,
                     contact_handle=rj.contact_handle,
                     contact_handle_norm=handle_norm,
-                    contact_url=rj.contact_url or rj.contact_email,
+                    contact_url=_contact_url(rj),
                     all_links_json=rj.all_links,
                     posted_at=rj.posted_at, raw_json=rj.raw,
                     last_seen_at=utcnow(),

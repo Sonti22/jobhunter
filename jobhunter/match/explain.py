@@ -289,7 +289,7 @@ def explain_job(job, profile=None) -> dict:
         if problem:
             unknowns.append(clause + " — " + problem)
             reasons.append("проверить характер ML-задач: " + clause)
-    fmt = workformat.detect(title, tag, body)
+    fmt = workformat.detect(title, tag, body, source=_value(job, "source") or "")
     if fmt == workformat.ONSITE:
         gaps.append("требуется удаленная работа; указан офис/релокация без удаленки")
         reasons.append("формат работы не соответствует remote-only")
@@ -484,7 +484,7 @@ def approve_reviewed(app_id: int, fingerprint: str, actor_id: int) -> tuple[bool
         if not eligibility.allowed:
             return False, eligibility.reason
         profile = get_profile()
-        score = score_job(job.title, job.tag, job.description_raw, profile)
+        score = score_job(job.title, job.tag, job.description_raw, profile, source=job.source)
         if not score.recommend:
             return False, score.reason or "Вакансия не проходит обязательные правила отбора"
         # Match uncertainty can be explicitly accepted, but a requirement from

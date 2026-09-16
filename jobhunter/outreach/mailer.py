@@ -219,8 +219,9 @@ GOOD_MAILBOX = re.compile(r"^(hr|job|jobs|career|careers|recruit|recruiting|"
 
 def _mailbox_ok(addr: str) -> bool:
     """Служебный ящик ловим и в середине: npo_buh@, ooo-zakupki@."""
+    from ..ingest.base import is_hiring_mailbox
     local = (addr or "").split("@")[0]
-    if BAD_MAILBOX.match(local):
+    if BAD_MAILBOX.match(local) or not is_hiring_mailbox(addr):
         return False
     for part in re.split(r"[._\-+]", local):
         if part and BAD_MAILBOX.match(part):

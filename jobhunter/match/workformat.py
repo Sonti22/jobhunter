@@ -62,12 +62,21 @@ _ONSITE_RE = re.compile(
     r"переезд\w*|релокац\w*|relocation)", re.I)
 
 
-def detect(*parts: str) -> str:
+# Борды, которые публикуют только удалённые вакансии: формат задан самим
+# источником, и слово remote в тексте писать никто не обязан. Упоминание
+# «relocation package» или «hybrid team rituals» превращало такую вакансию в
+# «офис, удалёнка не упомянута». arbeitnow и ergodotisi — общие борды, там
+# формат по-прежнему решает текст.
+REMOTE_ONLY_SOURCES = frozenset({"wwr", "jobicy", "remoteok", "himalayas",
+                                 "workingnomads", "euremote", "remotive"})
+
+
+def detect(*parts: str, source: str = "") -> str:
     """REMOTE / ONSITE / UNKNOWN по тексту вакансии."""
     text = " ".join(p or "" for p in parts)
     if _REMOTE_NEG_RE.search(text):
         return ONSITE
-    if _REMOTE_RE.search(text):
+    if (source or "") in REMOTE_ONLY_SOURCES or _REMOTE_RE.search(text):
         return REMOTE
     if _ONSITE_RE.search(text):
         return ONSITE

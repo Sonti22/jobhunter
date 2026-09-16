@@ -96,7 +96,7 @@ def prepare_application(app_id: int,
             app.transition(Status.REJECTED_SCORE, reason=problem.reason)
             return Prepared(app.id, app.status, app.score, reason=problem.reason)
 
-        score = score_job(job.title, job.tag, job.description_raw)
+        score = score_job(job.title, job.tag, job.description_raw, source=job.source)
         app.score = score.total
         app.score_breakdown_json = dict(
             app.score_breakdown_json or {}, reason=score.reason,
@@ -112,8 +112,9 @@ def prepare_application(app_id: int,
         # пропускаем, иначе отсеются все источники без даты. Ноль как дату
         # трактовать нельзя: это 1970 год и возраст в два с половиной миллиона
         # дней, который наивная проверка «моложе N» молча пропустит.
+        from .outreach.eligibility import max_age_days
         age = _age_days(job.posted_at)
-        if age is not None and age > s.max_vacancy_age_days:
+        if age is not None and age > max_age_days(job):
             app.transition(Status.REJECTED_SCORE,
                            reason="вакансия протухла: опубликована %d дней назад" % age)
             return Prepared(app.id, app.status, score.total, reason=app.reject_reason)

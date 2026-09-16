@@ -43,7 +43,7 @@ from collections.abc import Iterator
 import httpx
 
 from ..models import ContactKind
-from .base import RawJob, extract_email, parse_ts
+from .base import RawJob, extract_email, is_hiring_mailbox, parse_ts
 
 # Обычный браузерный UA: у remoteok перед API стоит Cloudflare, и на
 # «библиотечный» User-Agent он отвечает 403.
@@ -333,7 +333,7 @@ def ergodotisi(http: httpx.Client, pages: int = 1) -> Iterator[RawJob]:
                 continue
             emails = [e for e in EMAIL_RE.findall(chunk[:4000])
                       if not e.lower().endswith((".png", ".jpg", ".svg"))
-                      and "ergodotisi" not in e.lower()]
+                      and "ergodotisi" not in e.lower() and is_hiring_mailbox(e)]
             if not emails:
                 continue
             body = _text(chunk[:4000])

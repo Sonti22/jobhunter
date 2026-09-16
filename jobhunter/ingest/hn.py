@@ -54,12 +54,45 @@ def _guess_tag(text: str) -> str:
     return "IT"
 
 
+# Слово, по которому сегмент заголовка — это должность.
+_ROLE_WORD = re.compile(
+    r"\b(?:engineers?|developers?|programmers?|architects?|scientists?|researchers?|"
+    r"analysts?|administrators?|designers?|managers?|leads?|head|director|vp|cto|"
+    r"founding|devops|sre|swe|mlops|trainer|builder|consultant|specialist|intern|"
+    r"roles|positions|openings)\b", re.I)
+# Сегменты, которые точно не должность: локация, формат, занятость, ссылка, деньги.
+_NOISE_SEG = re.compile(
+    r"^(?:https?://|www\.)|\.(?:com|io|ai|dev|co|org|net|app)/?$|"
+    r"\b(?:remote|onsite|on-site|hybrid|in-office|full[- ]?time|part[- ]?time|contract|"
+    r"visa|relocation|usd|eur|gbp|equity|hiring)\b|[$€£]\s?\d|\d+\s?k\b|"
+    r"^[A-Z][\w .'-]+,\s*[A-Z][\w .'-]+$", re.I)
+
+
 def _company_role(first_line: str) -> tuple:
-    """HN-конвенция: 'Company | Role | Location | REMOTE | salary'."""
-    parts = [p.strip() for p in re.split(r"\s*\|\s*", first_line or "") if p.strip()]
-    company = parts[0][:120] if parts else ""
-    role = parts[1][:180] if len(parts) > 1 else (parts[0][:180] if parts else "")
-    return company, role
+    """HN-конвенция: 'Company | Role | Location | REMOTE | salary'.
+
+    Порядок сегментов соблюдают не все: вторым бывает локация («NY, USA»),
+    ссылка или «REMOTE ALMOST ANYWHERE», и такой «заголовок» скорер честно
+    не узнавал как роль — треть HN-вакансий отсеивалась с «роль не
+    распознана». Роль ищем по смыслу, а не по позиции.
+    """
+    line = first_line or ""
+    parts = [p.strip() for p in re.split(r"\s*\|\s*", line) if p.strip()]
+    if len(parts) < 2:
+        parts = [p.strip() for p in re.split(r"\s+[—–-]\s+", line) if p.strip()]
+    if not parts:
+        return "", ""
+    company, rest = parts[0][:120], parts[1:]
+    for seg in rest:
+        if _ROLE_WORD.search(seg):
+            return company, seg[:180]
+    if _ROLE_WORD.search(parts[0]):
+        # «Software Engineer — Remote (US Only)»: компании в строке нет.
+        return "", parts[0][:180]
+    for seg in rest:
+        if not _NOISE_SEG.search(seg) and len(seg) > 3:
+            return company, seg[:180]
+    return company, ""
 
 
 class HackerNewsSource:

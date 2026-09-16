@@ -318,7 +318,7 @@ def test_pipeline_saves_assessment_and_preserves_legacy_fields(db, monkeypatch):
     aid = insert_app(db, body=job.description_raw, status="DISCOVERED",
                      score_breakdown_json={"unrelated": {"keep": True}})
     score = score_job(job.title, "", job.description_raw, Profile(PROFILE_RAW))
-    monkeypatch.setattr(pipeline, "score_job", lambda *a: score)
+    monkeypatch.setattr(pipeline, "score_job", lambda *a, **kw: score)
     gate = GateResult(passed=True)
     monkeypatch.setattr(pipeline, "tailor", lambda *a: SimpleNamespace(
         role=classify(job.title, "", job.description_raw), ok=True, gate=gate,

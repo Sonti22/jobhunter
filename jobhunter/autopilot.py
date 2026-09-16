@@ -89,7 +89,7 @@ def step_ingest() -> dict:
         log.warning("telegram-каналы: %s", str(e)[:100])
         totals["telegram"] = {"error": type(e).__name__}
     try:
-        totals["hn"] = save_jobs(HackerNewsSource().iter_jobs(threads=1), verbose=False)
+        totals["hn"] = save_jobs(HackerNewsSource().iter_jobs(threads=2), verbose=False)
     except Exception as e:
         log.warning("HN: %s", str(e)[:100])
         totals["hn"] = {"error": type(e).__name__}
