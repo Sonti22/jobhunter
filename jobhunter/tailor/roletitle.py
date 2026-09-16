@@ -26,6 +26,7 @@ _NOT_A_TITLE = re.compile(
 # A location or work-format line from an HN header is not a title either:
 # «Regarding the “ON SITE TORONTO MUST BE ON SITE. REMOTE WILL BE IGNORED” role»
 # and «Location: Florianopolis, Brazil» were about to be mailed on 16.09.
+_MAX_TITLE_LEN = 60
 _FORMAT_LINE = re.compile(
     r"^(?:location\s*:|remote\b|remote-first|fully\s+remote|on[\s-]?site\b|onsite\b|"
     r"hybrid\b|in[\s-]office\b|us-based|usa?\b|eu\b|worldwide|anywhere|https?://|www\.)",
@@ -41,7 +42,11 @@ def clean_title(raw: str) -> str:
     """Title without hashtags and noise, or "" when no job title is left."""
     role = _HASHTAG.sub(" ", raw or "")
     role = re.sub(r"[\s,;·|/–—-]+$", "", re.sub(r"\s{2,}", " ", role)).strip()
-    if len(role) < 3 or _MONEY_ONLY.match(role) or _NOT_A_TITLE.match(role):
+    # «Hiring principal and distinguished engineers to build…» is a sentence,
+    # not a title: quoted in a subject line it reads as careless bulk mail.
+    role = re.sub(r"^(?:we(?:'re|\s+are)\s+)?hiring\s+(?:for\s+)?", "", role, flags=re.I)
+    if len(role) < 3 or len(role) > _MAX_TITLE_LEN or _MONEY_ONLY.match(role) \
+            or _NOT_A_TITLE.match(role):
         return ""
     if _FORMAT_LINE.match(role) and not _ROLE_WORD.search(role):
         return ""

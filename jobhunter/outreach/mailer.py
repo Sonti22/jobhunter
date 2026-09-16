@@ -451,6 +451,9 @@ def _send_batch(limit: int, dry: bool) -> int:
                 cv_path, lang = app.cv_path, app.cv_lang or "ru"
                 job = sess.get(Job, it["job_id"])
                 subj = _subject(job, lang)
+            # Резюме реально уйдёт вложением — концовка не обещает его прислать.
+            from ..tailor.message import with_cv_attached
+            sent_text = with_cv_attached(text, lang) if cv_path and resolve_cv(cv_path) else text
 
             if dry:
                 print("  [dry-run] → %s | тема: %s | вложение: %s"
@@ -459,7 +462,7 @@ def _send_batch(limit: int, dry: bool) -> int:
                 continue
 
             mid = _stable_message_id(it["app_id"], is_followup)
-            msg = build_message(to=it["email"], subject=subj, body=text,
+            msg = build_message(to=it["email"], subject=subj, body=sent_text,
                                 cv_path=cv_path, app_id=it["app_id"],
                                 message_id=mid)
             # Lease и idempotency-ключ фиксируются ДО сетевого вызова. При падении
@@ -494,7 +497,7 @@ def _send_batch(limit: int, dry: bool) -> int:
                     Message.application_id == a.id,
                     Message.direction == "out",
                     Message.email_message_id == mid).limit(1)) is None:
-                    sess.add(Message(application_id=a.id, direction="out", body=text,
+                    sess.add(Message(application_id=a.id, direction="out", body=sent_text,
                                      is_auto=True, email_message_id=mid,
                                      email_from=s.smtp_user, email_subject=subj))
             try:
@@ -569,9 +572,9 @@ def _send_batch(limit: int, dry: bool) -> int:
                     Message.email_message_id == mid).limit(1))
                 if outbound is None:
                     outbound = Message(application_id=it["app_id"], direction="out",
-                                        body=text, email_message_id=mid)
+                                        body=sent_text, email_message_id=mid)
                     sess.add(outbound)
-                outbound.body = text
+                outbound.body = sent_text
                 outbound.sent_at = utcnow()
                 outbound.is_auto = True
                 outbound.email_from = s.smtp_user
@@ -587,7 +590,7 @@ def _send_batch(limit: int, dry: bool) -> int:
                         emp.last_contacted_at = utcnow()
                         emp.total_messages_sent += 1
             from . import archive
-            archive.record(it["app_id"], "email", it["email"], text,
+            archive.record(it["app_id"], "email", it["email"], sent_text,
                            job_title=it.get("title", ""),
                            company=it.get("company", ""), score=it.get("score", 0),
                            cv_path=it.get("cv_path", ""), kind="cold")

@@ -161,6 +161,45 @@ ASKS_SHORT_EN = [
 ]
 
 
+# Шаблонные концовки обещают «пришлю резюме», а по почте резюме уже во
+# вложении: письмо с PDF и фразой «I can send my CV right away» читается как
+# рассылка, собранная не глядя. Для Telegram обещание честное — файл уходит
+# следующим сообщением, поэтому правка только для писем с вложением.
+_CV_ATTACHED = {
+    "Happy to send my CV and discuss details — when works for you?":
+        "My CV is attached — happy to discuss details. When works for you?",
+    "If this looks relevant, I'll send my CV and we can hop on a call.":
+        "My CV is attached; if this looks relevant, we can hop on a call.",
+    "Is the position still open? I can send my CV right away.":
+        "Is the position still open? My CV is attached.",
+    "Still open? I'll send my CV.": "Still open? My CV is attached.",
+    "Актуально? Пришлю резюме.": "Актуально? Резюме во вложении.",
+    "Вакансия открыта? Готов прислать резюме.": "Вакансия открыта? Резюме во вложении.",
+    "Если интересно — пришлю резюме и созвонимся.": "Резюме во вложении — если интересно, созвонимся.",
+    "Готов прислать резюме и обсудить детали — когда удобно?":
+        "Резюме во вложении, готов обсудить детали — когда удобно?",
+    "Если интересно — пришлю резюме и созвонимся, подскажите удобное время.":
+        "Резюме во вложении. Если интересно — созвонимся, подскажите удобное время.",
+    "Могу прислать резюме и ответить на вопросы. Актуальна ли вакансия?":
+        "Резюме во вложении, отвечу на вопросы. Актуальна ли вакансия?",
+    "Подскажите, вакансия ещё открыта? Готов прислать резюме.":
+        "Подскажите, вакансия ещё открыта? Резюме во вложении.",
+}
+_CV_PROMISE = re.compile(
+    r"\bI(?:'ll| will| can)\s+send\s+(?:you\s+)?my\s+(?:CV|resume)(?:\s+right\s+away)?|"
+    r"(?:готов\s+)?пришл(?:ю|ю\s+вам)\s+(?:своё\s+)?резюме|готов\s+прислать\s+резюме", re.I)
+
+
+def with_cv_attached(text: str, lang: str = "ru") -> str:
+    """Текст письма, к которому резюме приложено: без обещания прислать его."""
+    out = text or ""
+    for promise, attached in _CV_ATTACHED.items():
+        out = out.replace(promise, attached)
+    if _CV_PROMISE.search(out):
+        out = _CV_PROMISE.sub("my CV is attached" if lang == "en" else "резюме во вложении", out)
+    return out
+
+
 def _clip(text: str, limit: int) -> str:
     """Обрезает по границе слова — «such as Docker &a» выглядит небрежно."""
     t = (text or "").strip()

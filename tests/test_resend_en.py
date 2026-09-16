@@ -147,3 +147,24 @@ def test_daily_limit_is_respected(db, monkeypatch):
     server = FakeSMTP()
     _smtp(monkeypatch, server)
     assert resend_en.send()["sent"] == resend_en.DAILY
+
+
+@pytest.mark.parametrize("text,lang,want", [
+    ("Regarding the role. Is the position still open? I can send my CV right away.", "en",
+     "Is the position still open? My CV is attached."),
+    ("Hi. If relevant, I can send my CV right away.", "en", "If relevant, my CV is attached."),
+    ("По вакансии. Подскажите, вакансия ещё открыта? Готов прислать резюме.", "ru",
+     "Подскажите, вакансия ещё открыта? Резюме во вложении."),
+])
+def test_email_with_attached_cv_does_not_promise_to_send_it(text, lang, want):
+    from jobhunter.tailor.message import ASKS, ASKS_EN, ASKS_SHORT, ASKS_SHORT_EN, with_cv_attached
+    assert want in with_cv_attached(text, lang)
+    for ask in ASKS + ASKS_SHORT + ASKS_EN + ASKS_SHORT_EN:
+        out = with_cv_attached(ask, "en" if ask in ASKS_EN + ASKS_SHORT_EN else "ru")
+        assert "send my CV" not in out and "прислать резюме" not in out and "пришлю резюме" not in out.lower(), out
+
+
+def test_sentence_header_is_not_a_subject_title():
+    from jobhunter.tailor.roletitle import clean_title
+    assert clean_title("Hiring principal and distinguished engineers to build net new products") == ""
+    assert clean_title("Hiring Senior Backend Engineer") == "Senior Backend Engineer"

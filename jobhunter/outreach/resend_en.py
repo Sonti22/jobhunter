@@ -100,7 +100,7 @@ def prepare_one(app_id: int) -> str:
     from ..match.scorer import score_job
     from ..pipeline import _recent_message_corpus, _uid
     from ..tailor.llm_writer import quality_problem
-    from ..tailor.message import generate, source_label
+    from ..tailor.message import generate, source_label, with_cv_attached
     from ..tailor.render import render_cv, verify_parsable
     from ..tailor.roletitle import display_role
     from ..tailor.select import tailor
@@ -129,7 +129,7 @@ def prepare_one(app_id: int) -> str:
             _save(app, skipped="гейт резюме не пройден")
             return "пропуск: гейт резюме"
         cv_path, _ = render_cv(res.render, s.cv_out,
-                               filename_hint="Hakobyan_%s_%s_en" % (res.cv_slug, _uid(job.external_uuid)),
+                               filename_hint="Hakobyan_%s_%s" % (res.cv_slug, _uid(job.external_uuid)),
                                unique_seed=job.external_uuid + ":en")
         if not verify_parsable(cv_path, res.render)["ok"]:
             _save(app, skipped="резюме не читается парсером")
@@ -139,7 +139,7 @@ def prepare_one(app_id: int) -> str:
                        seed_str=job.external_uuid + ":resend-en",
                        recent_corpus=_recent_message_corpus(sess),
                        source=source_label(job.source, lang="en"), lang="en")
-        body = OPENER + "\n\n" + msg.text
+        body = OPENER + "\n\n" + with_cv_attached(msg.text, "en")
         bad = quality_problem(msg.text)
         if not msg.ok or bad:
             _save(app, skipped="гейт письма: %s" % (bad or "не прошло")[:150])
