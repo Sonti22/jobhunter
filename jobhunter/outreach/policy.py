@@ -117,11 +117,68 @@ def email_sent_today(sess) -> int:
         SendLog.peer_id.contains("@"), ~SendLog.peer_id.startswith("@"))) or 0)
 
 
+def _email_log_days(sess, since: datetime) -> dict:
+    """{дата: [отправлено, отбивок]} по почтовым записям журнала."""
+    from sqlalchemy import select
+
+    from ..models import SendLog
+    out: dict = {}
+    for result, at in sess.execute(select(SendLog.result, SendLog.attempted_at).where(
+            SendLog.attempted_at >= since, SendLog.result.in_(("ok", "bounce")),
+            SendLog.peer_id.contains("@"), ~SendLog.peer_id.startswith("@"))).all():
+        day = out.setdefault(at.date(), [0, 0])
+        day[0 if result == "ok" else 1] += 1
+    return out
+
+
+def email_bounces_today(sess) -> int:
+    today = datetime.now(timezone.utc).replace(tzinfo=None, hour=0, minute=0,
+                                              second=0, microsecond=0)
+    return sum(b for _, b in _email_log_days(sess, today).values())
+
+
+def email_clean_days(sess) -> int:
+    """Подряд идущие прошлые дни с отправками и без отбивок.
+
+    Дни без писем серию не рвут (выходные, пустая очередь), отбивка — рвёт.
+    Сегодняшний день не считается: он ещё не закончился.
+    """
+    s = get_settings()
+    today = datetime.now(timezone.utc).replace(tzinfo=None, hour=0, minute=0,
+                                              second=0, microsecond=0)
+    try:
+        since = datetime.fromisoformat(s.email_warmup_since)
+    except ValueError:
+        since = today
+    since = max(since, today - timedelta(days=60))
+    streak = 0
+    for day, (ok, bounced) in sorted(_email_log_days(sess, since).items(), reverse=True):
+        if day >= today.date():
+            continue
+        if bounced:
+            break
+        if ok:
+            streak += 1
+    return streak
+
+
+def email_daily_cap(sess) -> int:
+    """Потолок писем на сегодня с учётом прогрева."""
+    s = get_settings()
+    if s.email_daily_limit <= s.email_warmup_start:
+        return s.email_daily_limit
+    return min(s.email_daily_limit,
+               s.email_warmup_start + s.email_warmup_step * email_clean_days(sess))
+
+
 def can_send_email(sess) -> Verdict:
     if kill_switch_active():
         return Verdict(False, "активен стоп-кран")
+    bounced = email_bounces_today(sess)
+    if bounced > get_settings().email_bounce_stop:
+        return Verdict(False, "отбивок сегодня %d — почта стоит до завтра" % bounced)
     sent = email_sent_today(sess)
-    cap = get_settings().email_daily_limit
+    cap = email_daily_cap(sess)
     if sent >= cap:
         return Verdict(False, "дневная квота email исчерпана (%d/%d)" % (sent, cap))
     return Verdict(True, "%d/%d email за сегодня" % (sent, cap))

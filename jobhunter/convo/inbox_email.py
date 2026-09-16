@@ -22,7 +22,7 @@ from ..config import get_settings
 from ..db import session_scope
 from ..models import Application, ContactKind, Job, Message, Status
 from ..textutil import clean_email_body
-from . import imapbox, mailmatch
+from . import bounce, imapbox, mailmatch
 from .engine import LIVE, finish_incoming, handle_message, store_incoming
 
 log = logging.getLogger("inbox_mail")
@@ -78,7 +78,7 @@ async def process(dry: bool = False) -> dict:
     from ..observability import record
     s = get_settings()
     stats = {"seen": 0, "matched": 0, "incoming": 0, "auto": 0, "escalated": 0,
-             "closed": 0, "skipped": 0, "bodies": 0, "by_rule": Counter(),
+             "closed": 0, "skipped": 0, "bodies": 0, "bounces": 0, "by_rule": Counter(),
              "ambiguous": 0, "processed": 0, "remaining": None,
              "folder": s.imap_folder, "lookback_days": s.inbox_lookback_days}
     if not dry:
@@ -120,7 +120,15 @@ async def _process(dry: bool, stats: dict) -> dict:
 
         ctx = build_context()
         matched = []                      # (app_id, uid, headers, rule)
+        bounces = []                      # (headers, тело отчёта о недоставке)
         for uid, headers in imapbox.fetch_headers(conn, uids):
+            if bounce.is_bounce(headers):
+                # Раньше отбрасывалось как «адрес автоматики» — и мёртвые
+                # адреса продолжали числиться живыми заявками.
+                body, _ = imapbox.fetch_body(conn, uid)
+                stats["bodies"] += 1
+                bounces.append((headers, body))
+                continue
             cand = mailmatch.match_by_headers(headers, ctx, _parse_plus)
             if cand.drop_reason:
                 stats["skipped"] += 1
@@ -159,6 +167,12 @@ async def _process(dry: bool, stats: dict) -> dict:
             conn.logout()
         except Exception:
             pass
+
+    for headers, body in bounces:
+        verdict = record_bounce(headers, body, dry=dry)
+        log.info("   отбивка %s: %s", (headers.get("subject", "") or "")[:60], verdict)
+        if verdict.startswith("отбивка"):
+            stats["bounces"] += 1
 
     for app_id, uid, headers, rule, text in matched:
         verdict = await _handle_one(app_id, uid, headers, rule, text, dry=dry)
@@ -224,6 +238,67 @@ async def _handle_one(app_id: int, uid: int, headers: dict, rule: str,
         raise
     finish_incoming(app_id, new_ids, channel="email", error=verdict if "не ушёл" in verdict else "")
     return verdict
+
+
+def _app_by_address(sess, addr: str) -> int:
+    """Последняя отправленная заявка на этот адрес."""
+    if not addr:
+        return 0
+    for app, job in sess.execute(
+            select(Application, Job).join(Job, Application.job_id == Job.id)
+            .where(Job.contact_kind == ContactKind.EMAIL.value,
+                   Application.sent_at.is_not(None))
+            .order_by(Application.sent_at.desc())).all():
+        if (job.contact_url or "").replace("mailto:", "").strip().lower() == addr:
+            return app.id
+    return 0
+
+
+def record_bounce(headers: dict, body: str, dry: bool = False) -> str:
+    """Постоянная отбивка: адрес «не писать», заявка закрыта, владелец знает."""
+    from .. import notify
+    from ..models import Employer, SendLog, utcnow
+    from ..outreach import policy
+
+    b = bounce.parse(body, headers.get("subject", "") or "", _parse_plus)
+    if not b.permanent:
+        return "временная задержка доставки — сервер повторит сам"
+    with session_scope() as sess:
+        app_id = b.app_id or _app_by_address(sess, b.recipient)
+        app = sess.get(Application, app_id) if app_id else None
+        if app is None:
+            return "отчёт не о наших письмах"
+        if sess.scalar(select(SendLog.id).where(SendLog.application_id == app.id,
+                                                SendLog.result == "bounce").limit(1)):
+            return "уже учтено"
+        job = sess.get(Job, app.job_id)
+        addr = b.recipient or (job.contact_url or "").replace("mailto:", "").strip().lower()
+        if dry:
+            return "отбивка (dry): #%d %s" % (app.id, addr)
+        reason = "отбивка: адрес %s не принимает почту" % addr
+        sess.add(SendLog(application_id=app.id, result="bounce", error_class="DSN",
+                         peer_id=addr, attempted_at=utcnow()))
+        app.followup_body = ""
+        if app.status in (Status.APPROVED.value, Status.SEND_FAILED.value):
+            app.advance(Status.WITHDRAWN, reason=reason)
+        else:
+            app.advance(Status.NO_REPLY_CLOSED, reason=reason)
+        emp = sess.get(Employer, app.employer_id) if app.employer_id else None
+        if emp is not None:
+            emp.do_not_contact = True
+        notify.push("mail_bounce",
+                    "📭 Письмо не доставлено: %s\n#%d · %s\nАдрес помечен «не писать»."
+                    % (addr, app.id, (job.title or job.tag or "")[:60]),
+                    dedup="bounce:%d" % app.id, sess=sess)
+        sess.flush()
+        today = policy.email_bounces_today(sess)
+        if today > get_settings().email_bounce_stop:
+            notify.push("error",
+                        "🛑 Отбивок за сегодня: %d. Почтовая отправка остановлена до "
+                        "завтра, прогрев лимита начнётся заново — это защита репутации "
+                        "ящика в Gmail." % today,
+                        dedup="bounce_stop:%s" % utcnow().date().isoformat(), sess=sess)
+    return "отбивка: #%d %s" % (app_id, addr)
 
 
 # Так помечались письма, чей автоответ заблокировала политика. Повтора у них

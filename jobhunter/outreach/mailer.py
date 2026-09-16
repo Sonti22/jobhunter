@@ -412,7 +412,7 @@ def _send_batch(limit: int, dry: bool) -> int:
             if not verdict.allowed:
                 print("Email: %s" % verdict.reason)
                 return 0
-            limit = min(limit, max(0, s.email_daily_limit - policy.email_sent_today(sess)))
+            limit = min(limit, max(0, policy.email_daily_cap(sess) - policy.email_sent_today(sess)))
     batch = pick_batch(limit)
     if not batch:
         print("Нет одобренных заявок с email-контактом.")

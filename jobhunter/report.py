@@ -82,7 +82,7 @@ def quota() -> dict:
         return {"sent": q.sent_count,
                 "cap": min(q.planned_cap or st.quota_ceiling, st.quota_ceiling),
                 "email_sent": email_sent,
-                "email_cap": get_settings().email_daily_limit,
+                "email_cap": policy.email_daily_cap(sess),
                 "clean_days": st.consecutive_clean_days,
                 "peerflood_total": st.peerflood_total,
                 "manual_only": st.manual_only,

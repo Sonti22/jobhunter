@@ -186,7 +186,15 @@ class Settings(BaseSettings):
     smtp_user: str = Field(default="")
     smtp_app_password: str = Field(default="")
     smtp_from_name: str = Field(default="Suren Hakobyan")
-    email_daily_limit: int = Field(default=40)
+    # Цель прогрева. Фактический потолок дня — policy.email_daily_cap: старт с
+    # email_warmup_start и +email_warmup_step за каждый день без отбивок.
+    email_daily_limit: int = Field(default=80)
+    email_warmup_start: int = Field(default=40)
+    email_warmup_step: int = Field(default=5)
+    # Отбивки до запуска прогрева не учитывались — те дни «чистыми» не считаем.
+    email_warmup_since: str = Field(default="2026-09-17")
+    # Больше стольких отбивок за день — почта стоит до завтра.
+    email_bounce_stop: int = Field(default=3)
 
     # ── Пути ────────────────────────────────────────────────────────────
     # В контейнере переопределяются переменными окружения: база и сессия
