@@ -53,6 +53,13 @@ ROLE_PATTERNS: dict[str, list[tuple[re.Pattern, float]]] = {
         (_rx(r"\bfastapi\b", r"\bdjango\b", r"\bflask\b", r"\basyncio\b",
              r"\bcelery\b", r"\bsqlalchemy\b"), 1.5),
         (_rx(r"rest\s*api", r"микросервис", r"microservice", r"\bgrpc\b"), 0.7),
+        # Общее «Software Engineer» — самый частый заголовок зарубежных
+        # вакансий, и он не называл никакого семейства: «Software Engineer II |
+        # AI & Agentic Systems» со скором 76 уходил в «роль не распознана».
+        # Вес 1.0: в заголовке этого хватает, но любой специфичный маркер
+        # (frontend, mobile, security…) перевешивает.
+        (_rx(r"software\s*(?:engineer|developer)", r"\bswe\b",
+             r"full-?\s*stack\s*(?:engineer|developer|swe)", r"founding\s*engineer"), 1.0),
     ],
     "devops": [
         (_rx(r"\bdevops\b", r"\bsre\b", r"site\s*reliability",

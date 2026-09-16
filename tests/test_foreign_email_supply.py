@@ -86,6 +86,18 @@ def test_hn_thread_lives_the_whole_month(monkeypatch):
         get_settings.cache_clear()
 
 
+@pytest.mark.parametrize("title,family", [
+    ("Software Engineer II | AI & Agentic Systems", "backend"),
+    ("Principal Software Engineer - Postgres", "backend"),
+    ("Fullstack SWE", "backend"),
+    ("Staff Frontend Engineer - Design Systems", "frontend"),
+    ("Senior iOS Software Engineer", "mobile"),
+])
+def test_generic_software_engineer_is_a_known_role(title, family):
+    from jobhunter.match.role import classify
+    assert classify(title, "", "").family == family
+
+
 def test_remote_only_board_is_remote_despite_relocation_word():
     text = "Senior Python Engineer. Benefits: relocation package optional, hybrid team offsites."
     assert workformat.detect(text) == workformat.ONSITE
