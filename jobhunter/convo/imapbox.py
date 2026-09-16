@@ -21,11 +21,14 @@
 from __future__ import annotations
 
 import email
+import email.utils
 import imaplib
 import logging
 import re
+import socket
 import ssl
 import sys
+import time
 from datetime import date, datetime, timedelta, timezone
 from email import policy as email_policy
 
@@ -64,23 +67,43 @@ def _save_state(uidvalidity: int, last_uid: int) -> None:
         st.imap_last_uid = last_uid
 
 
-def connect():
+# Обрывы, которые проходят сами: DNS не ответил, TLS-рукопожатие не
+# уложилось, соединение сбросили. За 12 дней на этой машине так падал каждый
+# восьмой проход почты (12%, 14.09 — три часа подряд); повтор через полминуты
+# спасает короткие провалы, длинные всё равно ждут следующего крона.
+_TRANSIENT = (socket.gaierror, TimeoutError, ConnectionError)
+CONNECT_RETRIES = 3
+CONNECT_BACKOFF = 20.0
+
+
+def _transient(exc: OSError) -> bool:
+    return isinstance(exc, _TRANSIENT) or "timed out" in str(exc).lower()
+
+
+def connect(retries: int = CONNECT_RETRIES, backoff: float = CONNECT_BACKOFF):
     """Соединение с ящиком. Бросает MailboxError с внятной причиной."""
     s = get_settings()
     if not (s.smtp_user and s.smtp_app_password):
         raise MailboxError("нет SMTP_USER / SMTP_APP_PASSWORD")
-    try:
-        conn = imaplib.IMAP4_SSL(s.imap_host, s.imap_port,
-                                 ssl_context=ssl.create_default_context(),
-                                 timeout=30)
-        conn.login(s.smtp_user, s.smtp_app_password)
-    except imaplib.IMAP4.error as e:
-        # Gmail отвечает «[ALERT] Web login required» и подобным — текст
-        # пробрасываем дословно, иначе диагностировать невозможно.
-        raise MailboxError("вход не удался: %s" % str(e)[:200]) from None
-    except OSError as e:
-        raise MailboxError("сеть: %s: %s" % (type(e).__name__, str(e)[:120])) from None
-    return conn
+    for attempt in range(1, max(1, retries) + 1):
+        try:
+            conn = imaplib.IMAP4_SSL(s.imap_host, s.imap_port,
+                                     ssl_context=ssl.create_default_context(),
+                                     timeout=30)
+            conn.login(s.smtp_user, s.smtp_app_password)
+            return conn
+        except imaplib.IMAP4.error as e:
+            # Gmail отвечает «[ALERT] Web login required» и подобным — текст
+            # пробрасываем дословно, иначе диагностировать невозможно.
+            raise MailboxError("вход не удался: %s" % str(e)[:200]) from None
+        except OSError as e:
+            if attempt < retries and _transient(e):
+                log.warning("IMAP: %s: %s — повтор %d/%d через %ds", type(e).__name__,
+                            str(e)[:80], attempt, retries - 1, int(backoff * attempt))
+                time.sleep(backoff * attempt)
+                continue
+            raise MailboxError("сеть: %s: %s" % (type(e).__name__, str(e)[:120])) from None
+    raise MailboxError("сеть: соединение не установлено")
 
 
 def _uidvalidity(conn, folder: str) -> int:

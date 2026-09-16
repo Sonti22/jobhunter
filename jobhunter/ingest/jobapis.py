@@ -27,6 +27,7 @@ import httpx
 
 from ..models import ContactKind
 from .base import RawJob, parse_ts
+from .reddit import RedditHiringSource
 
 UA = {"User-Agent": "jobhunter/0.1 (personal job search)",
       "Accept": "application/json"}
@@ -260,6 +261,9 @@ SOURCES = {
     "trudvsem": TrudvsemSource,
     "workable": WorkableSource,
     "muse": MuseSource,
+    # Единственный здесь с авторизацией: без REDDIT_CLIENT_ID/SECRET в .env
+    # отдаёт пустоту и не мешает остальным (решение владельца 16.09).
+    "reddit": RedditHiringSource,
 }
 
 

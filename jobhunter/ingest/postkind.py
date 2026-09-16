@@ -28,7 +28,9 @@ _HEAD = 1500          # маркеры тела ищем в начале: дал
 _S_TAG = re.compile(
     r"#(?:резюме|resume|cv|ищу_работу|ищуработу|поиск_работы|opentowork|"
     r"open_to_work|открыт_к_предложениям|lookingforjob|looking_for_job)\b", re.I)
-_S_FIRST = re.compile(r"^\W{0,3}(?:резюме|resume|cv)\b", re.I)
+# «[For Hire]» — самоописание автора на Reddit, той же силы, что «Резюме»
+# первым словом.
+_S_FIRST = re.compile(r"^\W{0,3}(?:(?:резюме|resume|cv)\b|for\s+hire\s*\])", re.I)
 _S_STRONG = re.compile(
     r"(ищу\s+(?:работу|проект|команду|вакансию|позицию|удал[её]нк|подработк)|"
     r"в\s+(?:активном\s+)?поиске\s+(?:работы|проекта|вакансии)|"

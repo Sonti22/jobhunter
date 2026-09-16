@@ -196,6 +196,13 @@ class Settings(BaseSettings):
     # Больше стольких отбивок за день — почта стоит до завтра.
     email_bounce_stop: int = Field(default=3)
 
+    # ── Reddit: официальный Data API, приложение типа «script» ─────────────
+    # Анонимный доступ закрыт (403/429). Без id/secret источник пропускается.
+    reddit_client_id: str = Field(default="")
+    reddit_client_secret: str = Field(default="")
+    reddit_subreddits: str = Field(
+        default="forhire,remotepython,pythonjobs,devopsjobs,MachineLearningJobs")
+
     # ── Пути ────────────────────────────────────────────────────────────
     # В контейнере переопределяются переменными окружения: база и сессия
     # уезжают в том Docker, а всё, что владелец открывает глазами, — в
