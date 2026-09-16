@@ -58,7 +58,7 @@ def _guess_tag(text: str) -> str:
 _ROLE_WORD = re.compile(
     r"\b(?:engineers?|developers?|programmers?|architects?|scientists?|researchers?|"
     r"analysts?|administrators?|designers?|managers?|leads?|head|director|vp|cto|"
-    r"founding|devops|sre|swe|mlops|trainer|builder|consultant|specialist|intern|"
+    r"founding|devops|sre|swe|mlops|trainer|builder|consultant|specialist|intern|hackers?|"
     r"roles|positions|openings)\b", re.I)
 # Длиннее — уже не заголовок, а приклеенный первый абзац («Full-time –
 # https://estuary.dev/ Estuary is building… hiring engineers»).

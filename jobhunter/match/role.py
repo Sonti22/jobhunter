@@ -119,7 +119,9 @@ ROLE_PATTERNS: dict[str, list[tuple[re.Pattern, float]]] = {
     "architect": [
         (_rx(r"архитектор", r"\barchitect\b", r"tech\s*lead", r"техлид",
              r"team\s*lead", r"тимлид", r"руководител\w*\s+разработ",
-             r"engineering\s*manager", r"\bcto\b", r"staff\s*engineer"), 3.0),
+             r"engineering\s*manager", r"\bcto\b", r"staff\s*engineer",
+             r"principal\s+(?:and\s+distinguished\s+|software\s+)?engineers?",
+             r"distinguished\s+engineers?"), 3.0),
         (_rx(r"проектирован\w*\s+систем", r"архитектурн", r"\badr\b",
              r"техническ\w*\s+долг"), 1.0),
     ],

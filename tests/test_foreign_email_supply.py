@@ -32,6 +32,8 @@ from jobhunter.match import workformat
     ("Purple Candor LLC — AI Engineer — Remote / US (Sub-contractor- 6 month+)",
      "Purple Candor LLC", "AI Engineer"),
     ("Software Engineer — Remote (US Only)", "", "Software Engineer"),
+    ("Democrance | https://democrance.com | Python/Django/Pyramid/Pydantic AI hacker | REMOTE",
+     "Democrance", "Python/Django/Pyramid/Pydantic AI hacker"),
     ("Turquoise|Senior Performance Engineer|FT| Remote USA | 172-195",
      "Turquoise", "Senior Performance Engineer"),
 ])
@@ -88,8 +90,10 @@ def test_hn_thread_lives_the_whole_month(monkeypatch):
 
 @pytest.mark.parametrize("title,family", [
     ("Software Engineer II | AI & Agentic Systems", "backend"),
-    ("Principal Software Engineer - Postgres", "backend"),
+    ("Principal Software Engineer - Postgres", "architect"),   # уровень staff+, как staff engineer
     ("Fullstack SWE", "backend"),
+    ("Python/Django/Pyramid/Pydantic AI hacker", "backend"),
+    ("Hiring principal and distinguished engineers to build net new products", "architect"),
     ("Staff Frontend Engineer - Design Systems", "frontend"),
     ("Senior iOS Software Engineer", "mobile"),
 ])
