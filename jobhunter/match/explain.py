@@ -325,15 +325,103 @@ def assessment_for(app, job) -> dict:
     return explain_job(job)
 
 
+_REQ_PREFIX = "обязательное требование требует проверки: "
+# The profile's own country: a restriction naming it is satisfied, not unknown.
+_OWN_COUNTRY = re.compile(r"(?<!\w)(?:РФ|RU)(?!\w)|Росси\w*|\bRussia\w*", re.I)
+# Contact details and links in a clause are not requirements at all.
+_CONTACT_NOISE = re.compile(
+    r"\S+@\S+|https?://\S+|t\.me/\S+|(?<!\w)@\w+|\+?\d[\d\s()\-]{6,}\d")
+# Protocols, formats and practices any backend engineer has. Named in a
+# posting, they are not a technology the profile could be missing.
+_GENERIC_TECH = frozenset("""
+    api apis json xml yaml csv http https tls ssl tcp udp ip dns ssh ftp smtp
+    oop solid dry kiss crud jwt oauth cors csrf orm mvc rpc ci cd cicd ci/cd
+    html html5 css css3 es6 utf-8 utf8 cli sdk ide ui ux url uri os vm vps
+    it qa ai ml llm b2b b2c saas mvp kpi sla pr mr code review
+    backend frontend fullstack devops sre mlops devsecops
+""".split())
+_PRODUCT_NAME = re.compile(r"[a-z][A-Z]|[A-Za-z]{2}\d|\d[A-Za-z]{2}")
+
+
+def _unknown_technologies(clause: str, profile: Profile) -> list[str]:
+    """Technologies the clause requires and the profile does not have.
+
+    A term from the gate's fixed lexicon, or a product-shaped name outside it
+    (AtlantisDB, LangGraph). Russian descriptive words, contact details and
+    generic protocols are not technologies and never block.
+    """
+    from ..tailor.gate import _find_terms
+
+    text = _CONTACT_NOISE.sub(" ", clause)
+    found = [t for t in sorted(_find_terms(text))
+             if t not in profile.allowed_terms and t not in _GENERIC_TECH]
+    seen = {w for t in found for w in t.split()}
+    for token in re.findall(r"(?<![\w.])[A-Za-z][\w.+#-]*[\w+#]", text):
+        low = token.lower()
+        if (low in seen or low in _GENERIC_TECH or low in profile.allowed_terms
+                or not _PRODUCT_NAME.search(token)):
+            continue
+        found.append(token)
+        seen.add(low)
+    return found
+
+
+def _blocking_requirement(clause: str, profile: Profile) -> str:
+    """What is actually wrong with a required clause, or "" if only unverifiable.
+
+    The review card treats every word the profile does not name as an
+    unverified condition. That is right for a human reading the card and wrong
+    for automatic approval: on 16.09 a stray "Контакты:", "API", "JSON", an
+    e-mail address or a phone number in the posting blocked all 58 fresh
+    candidates, and the e-mail queue starved. Automatic approval stops only on
+    what is known to be wrong or unconfirmed about the candidate himself.
+    """
+    gaps, unknowns = _requirement_problems(clause, profile)
+    if gaps:
+        return "; ".join(gaps)
+    for problem in unknowns:
+        if problem.startswith("подтверждено только знакомство"):
+            return problem
+    ml = _ml_problem(clause, profile)
+    if ml:
+        return ml
+    years = _YEARS.search(clause)
+    skills = _skill_hits(clause, profile)
+    if years and skills:
+        requested = float(years["n"].replace(",", "."))
+        short = [s.canonical for s in skills if (s.years or 0) < requested]
+        if short:
+            return "стаж меньше требуемого: " + ", ".join(short)
+    if (_GEO_RESTRICTION.search(clause) and not _OPTIONAL.search(clause)
+            and not _OWN_COUNTRY.search(clause)):
+        return "ограничение по географии или праву на работу"
+    unknown = _unknown_technologies(clause, profile)
+    if unknown:
+        return "нет в профиле: " + ", ".join(unknown)
+    return ""
+
+
 def approval_problem(app, job) -> str:
-    """Fresh advisory reason against NEW automatic approval, empty when clear.
+    """Fresh reason against NEW automatic approval, empty when clear.
 
     Deliberately ignores saved assessments. Does not revoke/override a previous
     owner decision and must not be installed as an unconditional send-time gate.
+    Stricter review reasons stay in explain_job for the owner's card; here a
+    required clause blocks only when _blocking_requirement finds a real problem.
     """
     if job is None:
         return "вакансия не найдена"
-    reasons = explain_job(job)["review_reasons"]
+    profile = get_profile()
+    reasons = []
+    for reason in explain_job(job, profile)["review_reasons"]:
+        if not reason.startswith(_REQ_PREFIX):
+            reasons.append(reason)
+            continue
+        clause = reason[len(_REQ_PREFIX):]
+        problem = _blocking_requirement(clause, profile)
+        if problem:
+            reasons.append("обязательное требование не выполнено: %s — %s"
+                           % (clause, problem))
     note = _value(app, "review_note")
     if note:
         reasons.append(str(note))
