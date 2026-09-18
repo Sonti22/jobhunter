@@ -506,7 +506,9 @@ class TelegramChannelSource:
                     if handle or email or bot_link:
                         stat["contacts"] += 1
                     fields = post_fields(text)
-                    referral = channel.lower() in REFERRAL_CHANNELS and bool(bot_link)
+                    # Автопоиск может принести новые реферальные каналы — узнаём их по имени.
+                    referral = bool(bot_link) and (channel.lower() in REFERRAL_CHANNELS
+                                                   or "refer" in channel.lower())
                     sal = _SALARY_RE.search(text)
                     # Дата поста лежит в <time datetime="..."> рядом с телом.
                     # Без неё все посты канала выглядели одинаково свежими, и

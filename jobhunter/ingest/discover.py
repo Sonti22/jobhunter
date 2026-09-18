@@ -62,6 +62,10 @@ QUERIES_RU = [
     "fastapi вакансии", "вакансии архитектор", "работа python удаленно",
     "вакансии аналитик данных", "ml engineer вакансии", "вакансии it кипр",
     "вакансии it сербия", "вакансии it казахстан", "вакансии it грузия",
+    # 18.09: реферальные каналы — отклик уходит сотруднику компании, и он подаёт
+    # кандидата по своей реферальной ссылке. Один такой (refer_me_it) уже в реестре.
+    "рефералки it", "реферальные вакансии", "реферал it", "зареферю",
+    "рекомендации в it компании",
 ]
 QUERIES_EN = [
     "python jobs", "backend jobs", "remote it jobs", "developer jobs",
@@ -71,6 +75,7 @@ QUERIES_EN = [
     "sre jobs", "tech lead jobs", "startup jobs remote", "backend remote",
     "software engineer jobs", "remote jobs europe", "it jobs armenia",
     "it jobs georgia", "it jobs serbia", "it jobs cyprus",
+    "it referrals", "referral jobs", "tech referrals",
 ]
 # Поиск по тексту постов — шумный и дорогой, поэтому запросов мало и они
 # максимально «вакансионные»: слово «вакансия» плюс роль.
@@ -83,7 +88,7 @@ GLOBAL_QUERIES = [
 # Слова, по которым канал считается вакансионным (в названии или описании).
 JOB_WORDS = re.compile(
     r"(ваканс|работа|job|hiring|career|карьер|рекрут|hr\b|найм|подбор|"
-    r"trud|занятост|remote|релокац)", re.I)
+    r"trud|занятост|remote|релокац|рефер|referral)", re.I)
 
 # Явный мусор: сливы курсов, крипта, ставки, «работа на дому» без IT.
 JUNK_WORDS = re.compile(
