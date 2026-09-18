@@ -71,6 +71,19 @@ def test_company_site_is_not_a_job_board(text, site):
     assert people.site_of(text) == site
 
 
+@pytest.mark.parametrize("company,text,site", [
+    ("scaleai", "Know your rights: https://www.eeoc.gov/poster More: https://scale.com/careers", "https://scale.com"),
+    ("Abnormalsecurity", "Logo https://assets.contentstack.io/v3/a.png", ""),
+    ("payabl.", "Visit https://payabl.com/about", "https://payabl.com"),
+    ("Capstoneinvestmentadvisors", "See https://www.capstoneco.com", "https://capstoneco.com"),
+    ("Doctolib", "Apply on https://careers.doctolib.com/jobs/1", "https://careers.doctolib.com"),
+    ("intercom", "Try our product https://fin.ai today", ""),
+])
+def test_company_site_must_match_company_name(company, text, site):
+    """Сухой прогон 18.09: eeoc.gov и CDN с картинками принимались за сайт работодателя."""
+    assert people.site_of(text, company=company) == site
+
+
 def _github(users: dict):
     def handler(request: httpx.Request) -> httpx.Response:
         if request.url.path == "/search/users":

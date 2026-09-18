@@ -80,15 +80,42 @@ class Contact:
     note: str = ""
 
 
-def site_of(*texts: str) -> str:
-    """Сайт компании из текста вакансии: первая ссылка не на борд, ATS или соцсеть."""
+# Хостинг картинок и файлов, госсайты и вузы: ссылки на них есть в каждой второй
+# вакансии (логотип, сноска про EEO), но сайтом работодателя они не являются.
+_NOT_A_SITE = re.compile(
+    r"(?:contentstack|cloudfront|amazonaws|googleapis|googleusercontent|cloudinary|imgix|"
+    r"akamai|fastly|cdn|static|assets|images?|media)\.|\.(?:gov|edu|mil)(?:\.[a-z]{2})?$", re.I)
+
+
+def _belongs(host: str, company: str) -> bool:
+    """Домен перекликается с названием компании: payabl.com ↔ «payabl.», capstoneco ↔ «Capstone…».
+
+    Без этого сайтом Scale AI считался eeoc.gov из юридической сноски, а
+    Abnormal Security — CDN с картинками (сухой прогон 18.09).
+    """
+    name = re.sub(r"[^a-z0-9]", "", (company or "").lower())
+    label = re.sub(r"[^a-z0-9]", "", (org_domain("x@" + host) or host).split(".")[0])
+    if len(name) < 3 or len(label) < 3:
+        return False
+    n = min(len(name), len(label), 5)
+    return name.startswith(label[:n]) or label.startswith(name[:n]) or label in name or name in label
+
+
+def site_of(*texts: str, company: str = "") -> str:
+    """Сайт компании из текста вакансии.
+
+    С company — первая ссылка, чей домен перекликается с названием компании;
+    без него — первая ссылка не на борд, ATS, соцсеть или хостинг файлов.
+    """
     for text in texts:
         for m in _URL.finditer(text or ""):
             host = (urlparse(m.group(0).rstrip(".,;:")).hostname or "").lower()
-            if not host or "." not in host or _NOT_COMPANY.search(host):
+            if not host or "." not in host or _NOT_COMPANY.search(host) or _NOT_A_SITE.search(host):
                 continue
             if host.startswith("www."):
                 host = host[4:]
+            if company and not _belongs(host, company):
+                continue
             return "https://" + host
     return ""
 

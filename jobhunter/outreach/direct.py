@@ -184,7 +184,10 @@ def company_targets(sess, limit: int = 30) -> list:
     for job in rows:
         links = " ".join(str(x.get("value", "") if isinstance(x, dict) else x)
                          for x in (job.all_links_json or []))
-        site = people.site_of(job.description_raw or "", links)
+        # Без названия компании ссылку не с чем сверить — такую вакансию пропускаем.
+        if not (job.company_name or "").strip():
+            continue
+        site = people.site_of(job.description_raw or "", links, company=job.company_name)
         key = org_domain("x@" + site.split("//", 1)[-1]) if site else ""
         if not key or key in seen:
             continue
