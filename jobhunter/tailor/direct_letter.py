@@ -143,6 +143,13 @@ def compose(kind: str, *, company: str, role: str = "", person: str = "", jd_tex
         stack = _stack_line(p, score_job(role, "", jd_text, p).matched_skills, lang)
     body = " ".join(x for x in (why.format(**fmt), intro, stack) if x)
     text = "\n\n".join([greet, body, ask, TAIL_EN if en else TAIL_RU, OPTOUT_EN if en else OPTOUT_RU])
-    gate = check(DocModel(lang=lang, kind="message", free_text=text, rendered_bullets=[]),
+    # Гейт правды проверяет, что владелец не приписал себе лишнего. Название компании
+    # и имя адресата — не заявления о навыках, но совпадают с технологиями из словаря:
+    # письмо в Kong падало на «kong», а «Hi Ruby,» упало бы на «ruby» (проверка 18.09).
+    checked = text
+    for word, stub in ((company, "the company" if en else "компании"), (name, "")):
+        if word:
+            checked = re.sub(r"(?<![\w-])%s(?![\w-])" % re.escape(word), stub, checked)
+    gate = check(DocModel(lang=lang, kind="message", free_text=checked, rendered_bullets=[]),
                  jd_text=jd_text or "", profile=p)
     return DirectLetter(text=text, lang=lang, gate=gate, problem=quality_problem(text))

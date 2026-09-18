@@ -117,10 +117,16 @@ def test_github_skips_recruiters_service_mailboxes_and_stops_on_rate_limit(monke
                    "bio": "We're hiring! Recruiting agency for Python devs"},
         "support": {"login": "corp", "email": "support@corp.dev", "bio": "CTO. We're hiring"},
         "hr": {"login": "kate", "email": "kate@corp.dev", "bio": "HR at Corp, hiring backend"},
-        "good": {"login": "good", "name": "Lee", "email": "lee@corp.dev", "bio": "CTO. We're hiring"},
+        "good": {"login": "good", "name": "Lee", "email": "lee@corp.dev", "bio": "CTO. We're hiring",
+                 "company": "https://linktr.ee/corplabs"},
+        # площадки найма по названию компании и домену — тоже мимо
+        "bighire": {"login": "vince", "email": "vince@bighire.io", "company": "Bighire.io LLC",
+                    "bio": "Founder. We're hiring engineers"},
+        "talento": {"login": "emma", "email": "emma@talentoit.org", "company": "Talento IT",
+                    "bio": "CEO, hiring"},
     }
     found = people.github_people(limit=10, fetcher=_github(users), queries=("hiring in:bio",))
-    assert [c.email for c in found] == ["lee@corp.dev"]
+    assert [(c.email, c.company) for c in found] == [("lee@corp.dev", "corplabs")]
 
     calls = []
 

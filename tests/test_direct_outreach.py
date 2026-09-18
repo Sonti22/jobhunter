@@ -123,6 +123,18 @@ def test_address_no_longer_published_is_never_sent(db):
         assert sess.get(Application, app_id).status == "WITHDRAWN"
 
 
+def test_company_or_person_named_like_a_technology_passes_truth_gate(db):
+    """Письмо в Kong падало на «kong»: гейт принял название компании за навык (18.09)."""
+    from jobhunter.tailor.direct_letter import compose
+    letter = compose("exec", company="Kong", person="Ruby Stone", lang="en", seed="a")
+    assert letter.ok and "Kong" in letter.text and "Ruby" in letter.text
+    # а приписанный себе навык гейт по-прежнему ловит: маскируется только адресат
+    from jobhunter.tailor.gate import DocModel, check
+    bad = check(DocModel(lang="en", kind="message", rendered_bullets=[],
+                         free_text="I have 5 years of production Kong and Haskell experience."))
+    assert not bad.passed
+
+
 def test_general_inbox_waits_for_owner(db):
     """hello@/info@ читает поддержка: такое письмо само не уходит (сухой прогон 18.09)."""
     from jobhunter.models import Application

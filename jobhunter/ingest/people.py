@@ -346,6 +346,19 @@ _RECRUITER = re.compile(
     r"human\s+resources|outsourc|outstaff|agency|рекрут|кадров|подбор\s+персонал", re.I)
 
 
+# То же по названию компании и домену: «Bighire.io», «Talento IT» (сухой прогон 18.09).
+# К био не применяется — «we hire remotely» пишет и обычный основатель.
+_RECRUITER_NAME = re.compile(r"hire|hiring|talent|staff|recruit|jobs?\b|career|hunt|кадр|персонал", re.I)
+
+
+def _company_name(raw: str) -> str:
+    """Поле company из профиля: «@acme», «Acme | Beta», а иногда ссылка на linktr.ee."""
+    name = (raw or "").strip().lstrip("@").strip()
+    if "://" in name or name.lower().startswith("www."):
+        name = urlparse(name if "://" in name else "https://" + name).path.strip("/").split("/")[-1]
+    return name.split("|")[0].strip()[:60]
+
+
 def _gh_get(url: str, fetcher: Fetcher | None = None, params: dict | None = None):
     """JSON ответа GitHub; {RATE_LIMITED: True} на 403/429 — дальше ходить бесполезно."""
     http = (fetcher or Fetcher()).http
@@ -395,6 +408,8 @@ def _person_contact(u: dict, *, company: str = "", need_hiring: bool = True,
     if _RECRUITER.search(" ".join([bio, u.get("login") or "", u.get("company") or "",
                                    u.get("name") or "", email.rsplit("@", 1)[-1]])):
         return None
+    if _RECRUITER_NAME.search(" ".join([u.get("company") or "", email.rsplit("@", 1)[-1]])):
+        return None
     if need_hiring:
         # Человек сам пишет, что нанимает: должность — его собственные слова о себе.
         found = _EXEC_ROLE.search(bio)
@@ -410,7 +425,7 @@ def _person_contact(u: dict, *, company: str = "", need_hiring: bool = True,
     return Contact(
         email=email, kind=EXEC if role else REFERRAL,
         source_url="https://api.github.com/users/" + login,
-        company=company or (u.get("company") or "").lstrip("@").strip(),
+        company=company or _company_name(u.get("company") or ""),
         person=(u.get("name") or login).strip(),
         person_role=role, note=bio[:200])
 
