@@ -196,6 +196,19 @@ class Settings(BaseSettings):
     # Больше стольких отбивок за день — почта стоит до завтра.
     email_bounce_stop: int = Field(default=3)
 
+    # ── Прямые письма руководителям и рефералам (outreach/direct.py) ───────
+    # Решение владельца 18.09: адреса только опубликованные, 10 в день,
+    # отправка автоматическая. Первые дни — половинный темп; две отбивки
+    # прямых писем за день ставят канал на паузу до решения владельца.
+    direct_enabled: bool = Field(default=False)
+    direct_daily_limit: int = Field(default=10)
+    direct_rampup_days: int = Field(default=2)
+    direct_rampup_limit: int = Field(default=5)
+    direct_company_cooldown_days: int = Field(default=30)
+    direct_bounce_stop: int = Field(default=2)
+    # Необязателен: без токена GitHub даёт 60 запросов в час — на день хватает.
+    github_token: str = Field(default="")
+
     # ── Reddit: официальный Data API, приложение типа «script» ─────────────
     # Анонимный доступ закрыт (403/429). Без id/secret источник пропускается.
     reddit_client_id: str = Field(default="")
