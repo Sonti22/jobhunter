@@ -48,6 +48,19 @@ _BODY_PREFIX = re.compile(
 _BODY_TAIL = re.compile(r"\s+[|—–-]\s+|\s+в\s+(?:гк|компани\w+|ооо|ао|зао)\b|\s+(?:at|@)\s+", re.I)
 
 
+_LABEL = re.compile(r"^(?:должность|позиция|вакансия|роль|position|role|job\s+title|title)\s*[:\-–—]\s*", re.I)
+
+
+def strip_label(text: str) -> str:
+    """«️Позиция: Data Science (Senior)» → «Data Science (Senior)».
+
+    Убирает и невидимый хвост эмодзи (U+FE0F) в начале строки: он проходил
+    все проверки и попадал в тему письма.
+    """
+    s = re.sub(r"^[^\w«\"(]+", "", text or "")
+    return _LABEL.sub("", s, count=1).strip()
+
+
 def has_role_word(text: str) -> bool:
     """Есть ли в строке слово-должность (engineer, разработчик, аналитик…)."""
     return bool(_ROLE_WORD.search(text or ""))
@@ -55,7 +68,7 @@ def has_role_word(text: str) -> bool:
 
 def clean_title(raw: str) -> str:
     """Title without hashtags and noise, or "" when no job title is left."""
-    role = _HASHTAG.sub(" ", raw or "")
+    role = strip_label(_HASHTAG.sub(" ", raw or ""))
     role = re.sub(r"[\s,;·|/–—-]+$", "", re.sub(r"\s{2,}", " ", role)).strip()
     # «Hiring principal and distinguished engineers to build…» is a sentence,
     # not a title: quoted in a subject line it reads as careless bulk mail.

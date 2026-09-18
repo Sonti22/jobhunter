@@ -163,21 +163,29 @@ def _first_line(text: str) -> str:
     «москва» и «limassol», а скорер не видел роли: за подписью прятались
     «BDM», «Head of Growth» и «QA Lead» — и проходили отбор как бэкенд (18.09).
     """
-    from ..tailor.roletitle import has_role_word
-    caption = ""
+    from ..tailor.roletitle import has_role_word, strip_label
+    cands = []
     for raw in (text or "").splitlines():
         s = _LEAD_JUNK.sub("", raw).strip()
         s = _TITLE_PREFIX.sub("", s)
-        s = _LEAD_JUNK.sub("", s).strip()
+        s = strip_label(_LEAD_JUNK.sub("", s).strip())
         if len(s) < 6:
             continue
         if _META_LINE.match(s) or _GREETING.match(s):
             continue
-        if "#" in raw and not has_role_word(s):
-            caption = caption or s[:180]
-            continue
-        return s[:180]
-    return caption
+        cands.append((raw, s))
+        if len(cands) >= 5:
+            break
+    if not cands:
+        return ""
+    raw0, first = cands[0]
+    if "#" in raw0 and not has_role_word(first):
+        # После подписи заголовком считаем только строку с должностью: иначе им
+        # становилась служебная «Employment: fulltime» или название компании.
+        for _, s in cands[1:]:
+            if has_role_word(s) and len(s) <= 100:
+                return s[:180]
+    return first[:180]
 
 
 def _guess_tag(text: str) -> str:

@@ -162,3 +162,14 @@ def test_telegram_title_skips_hashtag_caption():
     # подпись с должностью остаётся заголовком; пост из одних хештегов не теряет заголовок совсем
     assert _first_line("Senior Python Engineer #remote\nWe build things") == "Senior Python Engineer #remote"
     assert _first_line("#вакансия #москва #офис") != ""
+
+
+def test_title_labels_and_emoji_tail_are_stripped():
+    from jobhunter.ingest.tgchannels import _first_line
+    assert clean_title("️Позиция: Data Science (Senior)") == "Data Science (Senior)"
+    assert clean_title("Должность: Middle software engineer") == "Middle software engineer"
+    # после подписи служебная строка заголовком не становится
+    post = "#vacancy #python #poland\nEmployment: fulltime\nSenior Python Developer\nStack: Django"
+    assert _first_line(post) == "Senior Python Developer"
+    # должности в посте нет вовсе — остаётся прежний запасной заголовок из подписи
+    assert _first_line("#vacancy #python\nEmployment: fulltime\nStack: Django, DRF") == "python"
