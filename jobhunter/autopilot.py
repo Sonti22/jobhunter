@@ -974,6 +974,10 @@ def run_daemon() -> int:
     sched.add_job(step_prepare, "cron", hour=10, minute=0, id="prepare", **opts)
     sched.add_job(step_auto_approve, "cron", hour=10, minute=15, id="approve", **opts)
     sched.add_job(step_send_email, "cron", hour=10, minute=30, id="email", **opts)
+    # Второй проход: 18.09 сбор затянулся до 11:06, почта в 10:30 сработала раньше
+    # одобрения, и одобренное в 11:09 ждало бы сутки. Отправщик берёт только ещё не
+    # отправленное и в пределах дневного потолка — повторов не бывает.
+    sched.add_job(step_send_email, "cron", hour=13, minute=0, id="email_late", **opts)
     sched.add_job(step_resend_en, "cron", hour=11, minute=0, id="resend_en", **opts)
     sched.add_job(step_direct, "cron", hour=9, minute=50, id="direct", **opts)
     # Анкеты Ashby: stage вечером готовит кандидатов к утреннему prepare,
