@@ -174,11 +174,14 @@ def _classify(local: str, context: str) -> tuple:
     return "", ""                     # адрес рядового сотрудника — не контакт для отклика
 
 
-def contacts_from_html(page: str, page_url: str, company: str = "") -> list:
-    """Опубликованные на странице адреса компании, пригодные для отклика."""
+def contacts_from_html(page: str, page_url: str, company: str = "", org: str = "") -> list:
+    """Опубликованные на странице адреса компании, пригодные для отклика.
+
+    org — домен компании, когда страница чужая (интервью, сайт конференции).
+    """
     from ..outreach.mailer import _mailbox_ok
 
-    site_org = org_domain("x@" + (urlparse(page_url).hostname or ""))
+    site_org = org or org_domain("x@" + (urlparse(page_url).hostname or ""))
     text = _html.unescape(_TAG.sub(" ", page or ""))
     found: dict = {}
     spots = [(m.group(1), m.start()) for m in _MAILTO.finditer(page or "")]
@@ -220,6 +223,11 @@ def find_company_contacts(site: str, company: str = "", fetcher: Fetcher | None 
     fetcher = fetcher or Fetcher()
     out: dict = {}
     fetched = 0
+    # Ссылка в вакансии часто ведёт на поддомен (careers.doctolib.com), а страницы
+    # команды и контактов живут на основном домене — обходим его.
+    root = org_domain("x@" + (urlparse(site).hostname or ""))
+    if root and root != (urlparse(site).hostname or ""):
+        site = "https://" + root
     for path in PAGES[:MAX_ATTEMPTS]:
         if fetched >= MAX_PAGES:
             break
@@ -259,13 +267,54 @@ def _gh_headers() -> dict:
     return head
 
 
-def github_user(login: str, fetcher: Fetcher | None = None) -> dict:
+RATE_LIMITED = "_rate_limited"
+
+# Кадровые агентства и HR-аккаунты заводят профили с «hiring» в био ради сбора
+# откликов. Сухой прогон 18.09: organichire, brovate — три адресата из трёх.
+_RECRUITER = re.compile(
+    r"recruit|staffing|talent\s+(?:acquisition|partner|sourc)|head\s?hunt|\bhr\b|"
+    r"human\s+resources|outsourc|outstaff|agency|рекрут|кадров|подбор\s+персонал", re.I)
+
+
+def _gh_get(url: str, fetcher: Fetcher | None = None, params: dict | None = None):
+    """JSON ответа GitHub; {RATE_LIMITED: True} на 403/429 — дальше ходить бесполезно."""
     http = (fetcher or Fetcher()).http
     try:
-        r = http.get("https://api.github.com/users/" + login, headers=_gh_headers())
+        r = http.get(url, params=params, headers=_gh_headers())
     except Exception:                                      # noqa: BLE001
         return {}
+    if r.status_code in (403, 429):
+        return {RATE_LIMITED: True}
     return r.json() if r.status_code == 200 else {}
+
+
+def github_user(login: str, fetcher: Fetcher | None = None) -> dict:
+    return _gh_get("https://api.github.com/users/" + login, fetcher) or {}
+
+
+def _person_contact(u: dict, *, company: str = "", need_hiring: bool = True) -> Contact | None:
+    """Профиль GitHub → адресат: email открыт самим человеком, ящик не служебный, не рекрутёр."""
+    from ..outreach.mailer import _mailbox_ok
+
+    email = (u.get("email") or "").strip().lower()
+    bio = u.get("bio") or ""
+    if not email or not _valid_email(email) or not is_hiring_mailbox(email) or not _mailbox_ok(email):
+        return None
+    if _RECRUITER.search(" ".join([bio, u.get("login") or "", u.get("company") or "",
+                                   u.get("name") or "", email.rsplit("@", 1)[-1]])):
+        return None
+    role = _EXEC_ROLE.search(bio)
+    if need_hiring and not _HIRING_BIO.search(bio):
+        return None
+    if not need_hiring and not role and not _HIRING_BIO.search(bio):
+        return None                       # рядовой участник организации — не адресат
+    login = u.get("login") or ""
+    return Contact(
+        email=email, kind=EXEC if role else REFERRAL,
+        source_url="https://api.github.com/users/" + login,
+        company=company or (u.get("company") or "").lstrip("@").strip(),
+        person=(u.get("name") or login).strip(),
+        person_role=role.group(0) if role else "", note=bio[:200])
 
 
 def github_people(limit: int = 10, fetcher: Fetcher | None = None,
@@ -277,35 +326,118 @@ def github_people(limit: int = 10, fetcher: Fetcher | None = None,
     for q in queries:
         if len(out) >= limit:
             break
-        try:
-            r = fetcher.http.get("https://api.github.com/search/users",
-                                 params={"q": q, "per_page": "20", "sort": "joined"},
-                                 headers=_gh_headers())
-        except Exception:                                  # noqa: BLE001
+        # Сортировка по подписчикам: свежие аккаунты (sort=joined) — почти сплошь агентства.
+        found = _gh_get("https://api.github.com/search/users", fetcher,
+                        {"q": q + " type:user", "per_page": "20", "sort": "followers"})
+        if not found or found.get(RATE_LIMITED):
             break
-        if r.status_code != 200:
-            break
-        for item in (r.json().get("items") or []):
+        for item in (found.get("items") or []):
             login = item.get("login") or ""
             if not login or login in seen or len(out) >= limit:
                 continue
             seen.add(login)
             time.sleep(fetcher.throttle)
             u = github_user(login, fetcher=fetcher)
-            email = (u.get("email") or "").strip().lower()
-            bio = u.get("bio") or ""
-            if not email or not _valid_email(email) or not is_hiring_mailbox(email):
-                continue
-            if not _HIRING_BIO.search(bio):
-                continue
-            role = _EXEC_ROLE.search(bio)
-            out.append(Contact(
-                email=email, kind=EXEC if role else REFERRAL,
-                source_url="https://api.github.com/users/" + login,
-                company=(u.get("company") or "").lstrip("@").strip(),
-                person=(u.get("name") or login).strip(),
-                person_role=role.group(0) if role else "", note=bio[:200]))
+            if u.get(RATE_LIMITED):
+                return out                                 # лимит исчерпан — не долбим дальше
+            c = _person_contact(u)
+            if c:
+                out.append(c)
     return out
+
+
+# ── GitHub-организация целевой компании: её публичные участники ──
+
+ORG_MEMBERS = 15          # сколько профилей участников смотрим на одну компанию
+
+
+def github_org_people(company: str, site: str = "", fetcher: Fetcher | None = None,
+                      limit: int = 3) -> list:
+    """Адресаты внутри самой компании: публичные участники её GitHub-организации.
+
+    Организация принимается, только если её сайт совпадает с сайтом компании либо
+    логин перекликается с названием. Берём руководителей и тех, у кого в био «hiring»,
+    с открытым email; рядовых участников не трогаем.
+    """
+    fetcher = fetcher or Fetcher()
+    name = re.sub(r"[^A-Za-z0-9 .-]", " ", company or "").strip()
+    if len(name) < 3:
+        return []
+    found = _gh_get("https://api.github.com/search/users", fetcher,
+                    {"q": name + " type:org", "per_page": "5"})
+    if not found or found.get(RATE_LIMITED):
+        return []
+    site_org = org_domain("x@" + (urlparse(site).hostname or "")) if site else ""
+    out: list = []
+    for item in (found.get("items") or [])[:3]:
+        login = item.get("login") or ""
+        time.sleep(fetcher.throttle)
+        org = _gh_get("https://api.github.com/orgs/" + login, fetcher)
+        if not org or org.get(RATE_LIMITED):
+            return out
+        blog = (org.get("blog") or "").strip()
+        if blog and "//" not in blog:
+            blog = "https://" + blog
+        blog_org = org_domain("x@" + (urlparse(blog).hostname or "")) if blog else ""
+        same_site = bool(site_org) and blog_org == site_org
+        if not same_site and not (not site_org and _belongs(login + ".x", company)):
+            continue
+        members = _gh_get("https://api.github.com/orgs/%s/public_members" % login, fetcher,
+                          {"per_page": str(ORG_MEMBERS)})
+        if isinstance(members, dict):                      # лимит или ошибка
+            return out
+        for m in members[:ORG_MEMBERS]:
+            if len(out) >= limit:
+                return out
+            time.sleep(fetcher.throttle)
+            u = github_user(m.get("login") or "", fetcher=fetcher)
+            if u.get(RATE_LIMITED):
+                return out
+            c = _person_contact(u, company=company, need_hiring=False)
+            if c:
+                out.append(c)
+        break                                              # организация найдена — другие не смотрим
+    return sorted(out, key=lambda c: (_RANK[c.kind], c.email))
+
+
+# ── Поиск по вебу через официальный API: адрес опубликован вне сайта компании ──
+
+BRAVE_URL = "https://api.search.brave.com/res/v1/web/search"
+SEARCH_PAGES = 4
+
+
+def search_people(company: str, site: str, api_key: str, fetcher: Fetcher | None = None) -> list:
+    """Страницы с опубликованным адресом руководителя: интервью, доклады, пресс-релизы.
+
+    Поисковик только подсказывает страницу. Адрес берётся лишь тогда, когда он
+    реально стоит на ней, принадлежит домену компании и рядом указана должность.
+    """
+    domain = org_domain("x@" + (urlparse(site).hostname or "")) if site else ""
+    if not api_key or not domain:
+        return []
+    fetcher = fetcher or Fetcher()
+    try:
+        r = fetcher.http.get(
+            BRAVE_URL, params={"q": '"@%s" CEO OR founder OR CTO OR "head of engineering"' % domain,
+                               "count": "10"},
+            headers={"X-Subscription-Token": api_key, "Accept": "application/json"})
+    except Exception:                                      # noqa: BLE001
+        return []
+    if r.status_code != 200:
+        return []
+    out: dict = {}
+    for hit in (((r.json().get("web") or {}).get("results")) or [])[:SEARCH_PAGES]:
+        url = hit.get("url") or ""
+        host = (urlparse(url).hostname or "").lower()
+        if not url.startswith("http") or _NOT_COMPANY.search(host):
+            continue                                       # соцсети и борды — за логином
+        page = fetcher.get(url)
+        if not page:
+            continue
+        for c in contacts_from_html(page, url, company, org=domain):
+            if c.kind == EXEC:
+                out.setdefault(c.email, c)
+    return sorted(out.values(), key=lambda c: c.email)
 
 
 def main() -> int:

@@ -109,6 +109,92 @@ def test_github_takes_only_self_published_email_with_hiring_bio(monkeypatch):
     assert found[0].source_url == "https://api.github.com/users/founder1"
 
 
+def test_github_skips_recruiters_service_mailboxes_and_stops_on_rate_limit(monkeypatch):
+    """Сухой прогон 18.09: три адресата из трёх — кадровые агентства, один — support@."""
+    monkeypatch.setattr(people.time, "sleep", lambda *a: None)
+    users = {
+        "agency": {"login": "organichire", "email": "hello@organichire.co",
+                   "bio": "We're hiring! Recruiting agency for Python devs"},
+        "support": {"login": "corp", "email": "support@corp.dev", "bio": "CTO. We're hiring"},
+        "hr": {"login": "kate", "email": "kate@corp.dev", "bio": "HR at Corp, hiring backend"},
+        "good": {"login": "good", "name": "Lee", "email": "lee@corp.dev", "bio": "CTO. We're hiring"},
+    }
+    found = people.github_people(limit=10, fetcher=_github(users), queries=("hiring in:bio",))
+    assert [c.email for c in found] == ["lee@corp.dev"]
+
+    calls = []
+
+    def limited(request: httpx.Request) -> httpx.Response:
+        calls.append(request.url.path)
+        if request.url.path == "/search/users":
+            return httpx.Response(200, json={"items": [{"login": "u%d" % i} for i in range(20)]})
+        return httpx.Response(403, json={"message": "API rate limit exceeded"})
+    f = people.Fetcher(http=httpx.Client(transport=httpx.MockTransport(limited)), throttle=0)
+    assert people.github_people(limit=10, fetcher=f) == []
+    assert len(calls) == 2                               # поиск + первый отказ, дальше не ходим
+
+
+def _org_api(org: dict, members: dict):
+    def handler(request: httpx.Request) -> httpx.Response:
+        path = request.url.path
+        if path == "/search/users":
+            return httpx.Response(200, json={"items": [{"login": org["login"]}]})
+        if path == "/orgs/" + org["login"]:
+            return httpx.Response(200, json=org)
+        if path.endswith("/public_members"):
+            return httpx.Response(200, json=[{"login": k} for k in members])
+        login = path.rsplit("/", 1)[-1]
+        return httpx.Response(200, json=members[login]) if login in members else httpx.Response(404)
+    return people.Fetcher(http=httpx.Client(transport=httpx.MockTransport(handler)), throttle=0)
+
+
+def test_github_org_gives_leaders_of_the_target_company_only(monkeypatch):
+    monkeypatch.setattr(people.time, "sleep", lambda *a: None)
+    members = {
+        "cto": {"login": "cto", "name": "Mia Wong", "email": "mia@acme.io", "bio": "CTO at Acme"},
+        "dev": {"login": "dev", "email": "dev@gmail.com", "bio": "I like Rust"},
+        "lead": {"login": "lead", "name": "Raj", "email": "raj@gmail.com",
+                 "bio": "Engineering at Acme — we're hiring!"},
+        "quiet": {"login": "quiet", "email": None, "bio": "CEO"},
+    }
+    f = _org_api({"login": "acme", "blog": "https://www.acme.io"}, members)
+    found = people.github_org_people("Acme", "https://acme.io", f)
+    assert [(c.email, c.kind, c.company) for c in found] == \
+        [("mia@acme.io", "exec", "Acme"), ("raj@gmail.com", "referral", "Acme")]
+    # организация с чужим сайтом — не наша компания, её участников не трогаем
+    f = _org_api({"login": "acme", "blog": "https://acme-tools.org"}, members)
+    assert people.github_org_people("Acme", "https://acme.io", f) == []
+
+
+def test_web_search_only_points_at_pages_address_must_be_on_the_page():
+    interview = """<p>Interview with Anna Lee, CEO of Acme. Reach her at anna@acme.io</p>
+    <p>Editor: bob@techblog.com. Acme support: help@acme.io, intern tom@acme.io</p>"""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.host == "api.search.brave.com":
+            assert request.headers["X-Subscription-Token"] == "key"
+            return httpx.Response(200, json={"web": {"results": [
+                {"url": "https://techblog.com/anna"}, {"url": "https://linkedin.com/in/anna"},
+                {"url": "https://empty.com/x"}]}})
+        if request.url.path == "/robots.txt":
+            return httpx.Response(404)
+        if request.url.host == "techblog.com":
+            return httpx.Response(200, text=interview, headers={"content-type": "text/html"})
+        assert request.url.host != "linkedin.com"          # за логином — не ходим вовсе
+        return httpx.Response(200, text="<p>nothing</p>", headers={"content-type": "text/html"})
+    f = people.Fetcher(http=httpx.Client(transport=httpx.MockTransport(handler)), throttle=0)
+    found = people.search_people("Acme", "https://acme.io", "key", f)
+    assert [(c.email, c.kind, c.source_url) for c in found] == \
+        [("anna@acme.io", "exec", "https://techblog.com/anna")]
+    assert people.search_people("Acme", "https://acme.io", "", f) == []      # без ключа молчит
+
+
+def test_crawl_goes_to_root_domain_not_careers_subdomain():
+    fetcher, calls = _fetcher({"/team": TEAM_PAGE})
+    people.find_company_contacts("https://careers.acme.io", "Acme", fetcher)
+    assert calls and all("//acme.io/" in u for u in calls)
+
+
 def test_provenance_recheck(monkeypatch):
     fetcher, _ = _fetcher({"/team": TEAM_PAGE})
     assert people.page_publishes("anna@acme.io", "https://acme.io/team", fetcher)

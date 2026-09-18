@@ -257,6 +257,7 @@ def _create(sess, contact, *, role: str = "", jd_text: str = "", linked: list | 
 def discover(limit: int = 10, fetcher=None, dry: bool = False) -> dict:
     """Найти до limit новых адресатов: сайты компаний, затем GitHub."""
     fetcher = fetcher or people.Fetcher()
+    brave_key = get_settings().brave_api_key
     found: list = []
     stats = {"companies": 0, "sites_without_contact": 0, "created": 0, "github": 0}
     with session_scope() as sess:
@@ -267,6 +268,13 @@ def discover(limit: int = 10, fetcher=None, dry: bool = False) -> dict:
             break
         stats["companies"] += 1
         contacts = people.find_company_contacts(t["site"], t["company"], fetcher)
+        # Сайт не назвал человека — смотрим публичных участников GitHub-организации
+        # компании и страницы вне её сайта, где адрес руководителя опубликован.
+        if not any(c.kind in (people.EXEC, people.HIRING) for c in contacts):
+            contacts = contacts + people.github_org_people(t["company"], t["site"], fetcher)
+        if not any(c.kind == people.EXEC for c in contacts) and brave_key:
+            contacts = contacts + people.search_people(t["company"], t["site"], brave_key, fetcher)
+        contacts = sorted(contacts, key=lambda c: (people._RANK[c.kind], c.email))
         if not contacts:
             stats["sites_without_contact"] += 1
             continue
@@ -381,6 +389,9 @@ def prepare_one(app_id: int, fetcher=None) -> str:
         emp = sess.get(Employer, app.employer_id) if app.employer_id else None
         if emp is not None and emp.do_not_contact:
             return _hold(app, "контакт отмечен «не писать»")
+        # hello@/info@ читает поддержка, а не тот, кто нанимает: без владельца не уходит.
+        if meta.get("contact_kind") == people.GENERAL:
+            return _hold(app, "общий ящик компании — решает владелец")
         app.review_note = ""
         app.transition(Status.APPROVED)
         app.approved_at = utcnow()
@@ -553,6 +564,7 @@ def main() -> int:
     ap.add_argument("--digest", action="store_true")
     args = ap.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(message)s")
+    logging.getLogger("httpx").setLevel(logging.WARNING)   # по строке на запрос — шум
     if args.pause:
         pause(args.pause)
     if args.resume:

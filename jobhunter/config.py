@@ -206,8 +206,12 @@ class Settings(BaseSettings):
     direct_rampup_limit: int = Field(default=5)
     direct_company_cooldown_days: int = Field(default=30)
     direct_bounce_stop: int = Field(default=2)
-    # Необязателен: без токена GitHub даёт 60 запросов в час — на день хватает.
+    # Без токена GitHub даёт 60 запросов в час — хватает на 2–3 компании. Токен без
+    # прав (только публичные данные) поднимает лимит до 5000.
     github_token: str = Field(default="")
+    # Brave Search API (есть бесплатный тариф): страницы вне сайта компании, где
+    # опубликован адрес руководителя. Пусто — источник пропускается.
+    brave_api_key: str = Field(default="")
 
     # ── Reddit: официальный Data API, приложение типа «script» ─────────────
     # Анонимный доступ закрыт (403/429). Без id/secret источник пропускается.

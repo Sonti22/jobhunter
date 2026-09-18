@@ -123,6 +123,21 @@ def test_address_no_longer_published_is_never_sent(db):
         assert sess.get(Application, app_id).status == "WITHDRAWN"
 
 
+def test_general_inbox_waits_for_owner(db):
+    """hello@/info@ читает поддержка: такое письмо само не уходит (сухой прогон 18.09)."""
+    from jobhunter.models import Application
+    from jobhunter.outreach import direct
+    _vacancy(db)
+    fetcher = FakeFetcher({"https://acme.io/contact":
+                           '<p>Say hi: <a href="mailto:hello@acme.io">hello@acme.io</a></p>'})
+    assert direct.discover(limit=1, fetcher=fetcher)["created"] == 1
+    with db.session_scope() as sess:
+        app_id = sess.scalar(select(Application.id).where(Application.status == "DISCOVERED"))
+    assert direct.prepare_one(app_id, fetcher=fetcher).startswith("удержано: общий ящик")
+    with db.session_scope() as sess:
+        assert sess.get(Application, app_id).status == "PENDING_APPROVAL"
+
+
 def test_irrelevant_or_onsite_company_is_not_a_target(db):
     from jobhunter.outreach import direct
     _vacancy(db, company="Sales Inc", body="Account Executive. https://salesinc.com Quota, cold calls.")
