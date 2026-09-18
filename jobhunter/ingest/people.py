@@ -11,11 +11,16 @@ URL, где он опубликован. Так решил владелец 18.0
   - расшифровки адресов, которые сайт спрятал от роботов (Cloudflare
     email-protection) — человек явно не хотел, чтобы адрес собирали.
 
-Источники:
-  сайт компании   страницы /team, /about, /leadership, /contact, /careers, /press —
-                  с уважением к robots.txt, не больше четырёх страниц;
-  GitHub          публичный профиль, где человек сам открыл email и пишет
-                  в био, что нанимает.
+Источники (первые три — без ключей и подписок):
+  сайт компании   страницы команды, руководства, контактов, прессы и Impressum;
+                  адреса страниц берём из sitemap.xml, а не угадываем. robots.txt
+                  уважается, не больше четырёх страниц;
+  Hacker News     комментарии с адресом на домене компании (официальный поиск
+                  hn.algolia.com) — автор сам опубликовал адрес для откликов;
+  GitHub          публичный профиль, где человек сам открыл email: участники
+                  организации компании и те, кто пишет в био, что нанимает;
+  Tavily          поиск по вебу (1000 запросов в месяц бесплатно, без карты):
+                  только подсказывает страницу, адрес обязан стоять на ней.
 
     python -m jobhunter.ingest.people --site https://example.com
 """
@@ -37,9 +42,11 @@ from .base import _EMAIL, _valid_email, is_hiring_mailbox
 
 UA = "jobhunter/0.1 (personal job search)"
 PAGES = ("", "/team", "/about", "/leadership", "/contact", "/careers",
-         "/about-us", "/company", "/jobs", "/press")
+         "/about-us", "/company", "/impressum", "/imprint", "/jobs", "/press")
 MAX_PAGES = 4
-MAX_ATTEMPTS = 8
+MAX_ATTEMPTS = 10
+SITEMAP_PAGES = 6         # сколько адресов страниц берём из карты сайта
+SITEMAP_FILES = 3         # сколько файлов карты читаем (индекс + вложенные)
 MAX_BYTES = 600_000
 
 EXEC, HIRING, GENERAL, REFERRAL = "exec", "hiring", "general", "referral"
@@ -62,7 +69,8 @@ _GENERAL_LOCAL = re.compile(r"^(?:hello|hi|hey|team|contact|info|mail|say)\b", r
 _EXEC_ROLE = re.compile(
     r"\b(?:co-?founder|founder|ceo|chief\s+executive(?:\s+officer)?|cto|chief\s+technology\s+officer|"
     r"vp\s+(?:of\s+)?engineering|head\s+of\s+engineering|director\s+of\s+engineering|"
-    r"engineering\s+manager)\b|генеральн\w+\s+директор|основател\w+|техническ\w+\s+директор|"
+    r"engineering\s+manager|managing\s+director|gesch[äa]ftsf[üu]hrer(?:in)?)\b|"
+    r"генеральн\w+\s+директор|основател\w+|техническ\w+\s+директор|"
     r"руководител\w+\s+разработк\w+", re.I)
 _HIRING_BIO = re.compile(r"\bhiring\b|нанимаем|ищем\s+в\s+команду", re.I)
 _TAG = re.compile(r"<(script|style)\b.*?</\1>|<[^>]+>", re.S | re.I)
@@ -146,7 +154,7 @@ class Fetcher:
             self._robots[root] = rp
         return rp.can_fetch(UA, url)
 
-    def get(self, url: str) -> str:
+    def get(self, url: str, kinds: tuple = ("html",)) -> str:
         if not self.allowed(url):
             return ""
         time.sleep(self.throttle)
@@ -154,9 +162,60 @@ class Fetcher:
             r = self.http.get(url)
         except Exception:                                  # noqa: BLE001
             return ""
-        if r.status_code != 200 or "html" not in (r.headers.get("content-type") or "html"):
+        ctype = (r.headers.get("content-type") or kinds[0]).lower()
+        if r.status_code != 200 or not any(k in ctype for k in kinds):
             return ""
         return r.text[:MAX_BYTES]
+
+    def sitemaps(self, site: str) -> list:
+        """Карты сайта: те, что владелец сам указал в robots.txt, иначе /sitemap.xml."""
+        root = site.rstrip("/")
+        self.allowed(root + "/")                           # читает robots.txt, если ещё не читали
+        parts = urlparse(root)
+        rp = self._robots.get("%s://%s" % (parts.scheme, parts.netloc))
+        listed = (rp.site_maps() or []) if rp is not None else []
+        return list(listed)[:SITEMAP_FILES] or [root + "/sitemap.xml"]
+
+
+# Страницы, где компании публикуют людей и адреса; порядок — от самых полезных.
+_PEOPLE_PATH = (
+    re.compile(r"/(?:team|people|leadership|management|founders?|our-team|who-we-are|команда|руководство)(?:/|$)", re.I),
+    re.compile(r"/(?:about|about-us|company|о-компании|o-kompanii|about_us)(?:/|$)", re.I),
+    re.compile(r"/(?:contacts?|contact-us|impressum|imprint|legal-notice|контакты|kontakty)(?:/|$)", re.I),
+    re.compile(r"/(?:press|media|newsroom|careers?|jobs|join(?:-us)?|vacancies|вакансии)(?:/|$)", re.I),
+)
+_LOC = re.compile(r"<loc>\s*(?:<!\[CDATA\[)?\s*([^<\]\s]+)", re.I)
+# Вложенные карты блога, товаров и тегов — тысячи адресов и ни одного человека.
+_SITEMAP_NOISE = re.compile(r"post|blog|product|tag|categor|news|article|image|video|author", re.I)
+
+
+def sitemap_pages(site: str, fetcher) -> list:
+    """Адреса страниц с людьми и контактами из карты сайта — вместо угадывания путей."""
+    root_org = org_domain("x@" + (urlparse(site).hostname or ""))
+    listed = getattr(fetcher, "sitemaps", None)
+    queue = list(listed(site)) if listed else [site.rstrip("/") + "/sitemap.xml"]
+    ranked: dict = {}
+    read = 0
+    while queue and read < SITEMAP_FILES:
+        body = fetcher.get(queue.pop(0), kinds=("xml", "text/plain"))
+        read += 1
+        if not body:
+            continue
+        locs = [_html.unescape(u) for u in _LOC.findall(body)]
+        if "<sitemapindex" in body.lower():
+            nested = [u for u in locs if not _SITEMAP_NOISE.search(urlparse(u).path)]
+            queue = nested[:SITEMAP_FILES] + queue
+            continue
+        for u in locs:
+            p = urlparse(u)
+            path = p.path.rstrip("/")
+            if org_domain("x@" + (p.hostname or "")) != root_org or path.count("/") > 3:
+                continue
+            for rank, rx in enumerate(_PEOPLE_PATH):
+                if rx.search(path + "/"):
+                    ranked.setdefault(u, (rank, path.count("/"), len(path)))
+                    break
+    return sorted(ranked, key=lambda u: ranked[u])[:SITEMAP_PAGES]
 
 
 def _classify(local: str, context: str) -> tuple:
@@ -174,10 +233,13 @@ def _classify(local: str, context: str) -> tuple:
     return "", ""                     # адрес рядового сотрудника — не контакт для отклика
 
 
-def contacts_from_html(page: str, page_url: str, company: str = "", org: str = "") -> list:
+def contacts_from_html(page: str, page_url: str, company: str = "", org: str = "",
+                       fallback_kind: str = "") -> list:
     """Опубликованные на странице адреса компании, пригодные для отклика.
 
     org — домен компании, когда страница чужая (интервью, сайт конференции).
+    fallback_kind — вид для именного адреса без должности рядом: в посте о найме
+    автор оставил адрес именно для откликов, на странице команды — нет.
     """
     from ..outreach.mailer import _mailbox_ok
 
@@ -211,6 +273,7 @@ def contacts_from_html(page: str, page_url: str, company: str = "", org: str = "
             nxt = _EMAIL.search(after)
             context = before + " " + (after[:nxt.start()] if nxt else after)
         kind, role = _classify(addr.split("@")[0], context)
+        kind = kind or fallback_kind
         if not kind:
             continue
         found[addr] = Contact(email=addr, kind=kind, source_url=page_url, company=company,
@@ -228,10 +291,14 @@ def find_company_contacts(site: str, company: str = "", fetcher: Fetcher | None 
     root = org_domain("x@" + (urlparse(site).hostname or ""))
     if root and root != (urlparse(site).hostname or ""):
         site = "https://" + root
-    for path in PAGES[:MAX_ATTEMPTS]:
+    # Сначала страницы, которые сайт сам перечислил в sitemap, потом привычные пути.
+    unique: dict = {}
+    for url in sitemap_pages(site, fetcher) + [urljoin(site.rstrip("/") + "/", p.lstrip("/"))
+                                               for p in PAGES]:
+        unique.setdefault(url.rstrip("/").lower(), url)    # /team и /team/ — одна страница
+    for url in list(unique.values())[:MAX_ATTEMPTS]:
         if fetched >= MAX_PAGES:
             break
-        url = urljoin(site.rstrip("/") + "/", path.lstrip("/"))
         page = fetcher.get(url)
         if not page:
             continue
@@ -248,6 +315,9 @@ def page_publishes(email: str, source_url: str, fetcher: Fetcher | None = None) 
     if source_url.startswith("https://api.github.com/users/"):
         return email.lower() == (github_user(source_url.rsplit("/", 1)[-1],
                                              fetcher=fetcher).get("email") or "").lower()
+    if source_url.startswith(HN_ITEM):
+        item = _json_get(HN_API + "/items/" + source_url[len(HN_ITEM):], fetcher)
+        return email.lower() in _html.unescape(item.get("text") or "").lower()
     page = (fetcher or Fetcher()).get(source_url)
     return bool(page) and email.lower() in _html.unescape(page).lower()
 
@@ -400,9 +470,56 @@ def github_org_people(company: str, site: str = "", fetcher: Fetcher | None = No
     return sorted(out, key=lambda c: (_RANK[c.kind], c.email))
 
 
+# ── Hacker News: автор комментария сам оставил адрес на домене компании ──
+
+HN_API = "https://hn.algolia.com/api/v1"
+HN_ITEM = "https://news.ycombinator.com/item?id="
+HN_MAX_AGE_DAYS = 540      # адрес из комментария старше полутора лет мог умереть → отбивка
+_HIRING_TEXT = re.compile(r"\bhiring\b|\bapply\b|\bresume\b|\bcv\b|\bemail\s+me\b|\breach\s+out\b|"
+                          r"\bopen\s+roles?\b|\bwe(?:'re| are)\s+looking\b", re.I)
+
+
+def _json_get(url: str, fetcher: Fetcher | None = None, params: dict | None = None) -> dict:
+    try:
+        r = (fetcher or Fetcher()).http.get(url, params=params)
+    except Exception:                                      # noqa: BLE001
+        return {}
+    try:
+        data = r.json() if r.status_code == 200 else {}
+    except ValueError:
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def hn_people(company: str, site: str, fetcher: Fetcher | None = None, limit: int = 3) -> list:
+    """Комментарии HN с адресом на домене компании. Ключ не нужен — это открытый поиск HN.
+
+    Именной адрес без должности принимается, только если комментарий про найм:
+    тогда автор оставил его именно для откликов.
+    """
+    domain = org_domain("x@" + (urlparse(site).hostname or "")) if site else ""
+    if not domain:
+        return []
+    since = int(time.time()) - HN_MAX_AGE_DAYS * 86400
+    data = _json_get(HN_API + "/search_by_date", fetcher,
+                     {"query": '"@%s"' % domain, "tags": "comment", "hitsPerPage": "20",
+                      "numericFilters": "created_at_i>%d" % since})
+    out: dict = {}
+    for hit in data.get("hits") or []:
+        text = hit.get("comment_text") or ""
+        hiring = bool(_HIRING_TEXT.search(_TAG.sub(" ", text))) or \
+            "who is hiring" in (hit.get("story_title") or "").lower()
+        for c in contacts_from_html(text, HN_ITEM + str(hit.get("objectID") or ""), company,
+                                    org=domain, fallback_kind=REFERRAL if hiring else ""):
+            if c.kind != GENERAL:
+                c.person = c.person or (hit.get("author") or "")
+                out.setdefault(c.email, c)                 # свежие идут первыми — их и оставляем
+    return sorted(out.values(), key=lambda c: (_RANK[c.kind], c.email))[:limit]
+
+
 # ── Поиск по вебу через официальный API: адрес опубликован вне сайта компании ──
 
-BRAVE_URL = "https://api.search.brave.com/res/v1/web/search"
+TAVILY_URL = "https://api.tavily.com/search"
 SEARCH_PAGES = 4
 
 
@@ -411,22 +528,23 @@ def search_people(company: str, site: str, api_key: str, fetcher: Fetcher | None
 
     Поисковик только подсказывает страницу. Адрес берётся лишь тогда, когда он
     реально стоит на ней, принадлежит домену компании и рядом указана должность.
+    Tavily: 1000 запросов в месяц бесплатно, без карты; один поиск — один кредит.
     """
     domain = org_domain("x@" + (urlparse(site).hostname or "")) if site else ""
     if not api_key or not domain:
         return []
     fetcher = fetcher or Fetcher()
     try:
-        r = fetcher.http.get(
-            BRAVE_URL, params={"q": '"@%s" CEO OR founder OR CTO OR "head of engineering"' % domain,
-                               "count": "10"},
-            headers={"X-Subscription-Token": api_key, "Accept": "application/json"})
+        r = fetcher.http.post(
+            TAVILY_URL, headers={"Authorization": "Bearer " + api_key},
+            json={"query": '"@%s" email CEO OR founder OR CTO OR "head of engineering"' % domain,
+                  "search_depth": "basic", "max_results": 8})
     except Exception:                                      # noqa: BLE001
         return []
     if r.status_code != 200:
         return []
     out: dict = {}
-    for hit in (((r.json().get("web") or {}).get("results")) or [])[:SEARCH_PAGES]:
+    for hit in (r.json().get("results") or [])[:SEARCH_PAGES]:
         url = hit.get("url") or ""
         host = (urlparse(url).hostname or "").lower()
         if not url.startswith("http") or _NOT_COMPANY.search(host):

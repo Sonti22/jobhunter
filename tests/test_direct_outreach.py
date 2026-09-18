@@ -24,7 +24,7 @@ class FakeFetcher:
     def __init__(self, pages):
         self.pages = pages
 
-    def get(self, url):
+    def get(self, url, **kw):
         return self.pages.get(url, "")
 
 

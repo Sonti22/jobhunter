@@ -171,11 +171,12 @@ def test_web_search_only_points_at_pages_address_must_be_on_the_page():
     <p>Editor: bob@techblog.com. Acme support: help@acme.io, intern tom@acme.io</p>"""
 
     def handler(request: httpx.Request) -> httpx.Response:
-        if request.url.host == "api.search.brave.com":
-            assert request.headers["X-Subscription-Token"] == "key"
-            return httpx.Response(200, json={"web": {"results": [
+        if request.url.host == "api.tavily.com":
+            assert request.method == "POST" and request.headers["Authorization"] == "Bearer key"
+            assert b"@acme.io" in request.content
+            return httpx.Response(200, json={"results": [
                 {"url": "https://techblog.com/anna"}, {"url": "https://linkedin.com/in/anna"},
-                {"url": "https://empty.com/x"}]}})
+                {"url": "https://empty.com/x"}]})
         if request.url.path == "/robots.txt":
             return httpx.Response(404)
         if request.url.host == "techblog.com":
@@ -187,6 +188,69 @@ def test_web_search_only_points_at_pages_address_must_be_on_the_page():
     assert [(c.email, c.kind, c.source_url) for c in found] == \
         [("anna@acme.io", "exec", "https://techblog.com/anna")]
     assert people.search_people("Acme", "https://acme.io", "", f) == []      # без ключа молчит
+
+
+SITEMAP_INDEX = """<?xml version="1.0"?><sitemapindex>
+<sitemap><loc>https://acme.io/sitemap-posts.xml</loc></sitemap>
+<sitemap><loc>https://acme.io/sitemap-pages.xml</loc></sitemap></sitemapindex>"""
+SITEMAP_PAGES = """<?xml version="1.0"?><urlset>
+<url><loc>https://acme.io/pricing</loc></url>
+<url><loc>https://acme.io/en/company/leadership/</loc></url>
+<url><loc>https://acme.io/blog/2024/our-team-offsite/photos/day-one</loc></url>
+<url><loc>https://cdn.other.com/team</loc></url>
+<url><loc>https://acme.io/legal/impressum</loc></url></urlset>"""
+
+
+def test_sitemap_shows_where_the_people_pages_really_are():
+    """Сухой прогон 18.09: восемь угаданных путей на сайт — и ни одной страницы с людьми."""
+    def handler(request: httpx.Request) -> httpx.Response:
+        path = request.url.path
+        xml = {"/sitemap.xml": SITEMAP_INDEX, "/sitemap-pages.xml": SITEMAP_PAGES}
+        if path == "/robots.txt":
+            return httpx.Response(404)
+        if path in xml:
+            return httpx.Response(200, text=xml[path], headers={"content-type": "application/xml"})
+        assert path != "/sitemap-posts.xml"                  # карту блога не читаем
+        if path == "/en/company/leadership/":
+            return httpx.Response(200, text=TEAM_PAGE, headers={"content-type": "text/html"})
+        return httpx.Response(404)
+    f = people.Fetcher(http=httpx.Client(transport=httpx.MockTransport(handler)), throttle=0)
+    assert people.sitemap_pages("https://acme.io", f) == \
+        ["https://acme.io/en/company/leadership/", "https://acme.io/legal/impressum"]
+    found = people.find_company_contacts("https://acme.io", "Acme", f)
+    assert found[0].email == "anna@acme.io"
+    assert found[0].source_url == "https://acme.io/en/company/leadership/"
+
+
+def _hn(hits: list, items: dict | None = None):
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.host == "hn.algolia.com"
+        if request.url.path.endswith("/search_by_date"):
+            assert request.url.params["tags"] == "comment"
+            assert "created_at_i>" in request.url.params["numericFilters"]
+            return httpx.Response(200, json={"hits": hits})
+        return httpx.Response(200, json=(items or {}).get(request.url.path.rsplit("/", 1)[-1], {}))
+    return people.Fetcher(http=httpx.Client(transport=httpx.MockTransport(handler)), throttle=0)
+
+
+def test_hn_comment_gives_address_the_author_left_for_applicants():
+    hits = [
+        {"objectID": "101", "author": "mia", "story_title": "Ask HN: Who is hiring? (August 2026)",
+         "comment_text": "Acme | Backend | Remote<p>We&#x27;re hiring. Email me: mia@acme.io"},
+        {"objectID": "102", "author": "rnd", "story_title": "Show HN: a thing",
+         "comment_text": "I once got spam from tom@acme.io and sales@acme.io, write hello@acme.io"},
+        {"objectID": "103", "author": "cto", "story_title": "Some thread",
+         "comment_text": "I&#x27;m the CTO of Acme — reach me at lee@acme.io or lee at gmail"},
+    ]
+    found = people.hn_people("Acme", "https://www.acme.io", _hn(hits))
+    got = {c.email: (c.kind, c.source_url) for c in found}
+    assert got == {"lee@acme.io": ("exec", "https://news.ycombinator.com/item?id=103"),
+                   "mia@acme.io": ("referral", "https://news.ycombinator.com/item?id=101")}
+    assert people.hn_people("Acme", "", _hn(hits)) == []              # без сайта домен не известен
+    # перепроверка перед отправкой: адрес всё ещё стоит в комментарии
+    live = _hn([], {"101": {"text": "Email me: mia@acme.io"}, "103": {"text": "[removed]"}})
+    assert people.page_publishes("mia@acme.io", "https://news.ycombinator.com/item?id=101", live)
+    assert not people.page_publishes("lee@acme.io", "https://news.ycombinator.com/item?id=103", live)
 
 
 def test_crawl_goes_to_root_domain_not_careers_subdomain():

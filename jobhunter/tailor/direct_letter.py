@@ -125,8 +125,10 @@ def compose(kind: str, *, company: str, role: str = "", person: str = "", jd_tex
     company = (company or "").strip()
     fmt = {"role": (role or "").strip(), "company": company or ("your company" if en else "вашей компании"),
            "at_company": ((" at " if en else " в ") + company) if company else "",
-           # где человек сам написал, что нанимает: профиль GitHub или пост в канале
-           "where": (where if en else {"profile": "профиле", "post": "посте"}.get(where, "профиле"))}
+           # где человек сам написал, что нанимает: профиль GitHub, пост в канале, Hacker News
+           "where": ({"profile": "profile", "post": "post", "hn": "Hacker News comment"} if en else
+                     {"profile": "профиле", "post": "посте", "hn": "комментарии на Hacker News"}
+                     ).get(where, "profile" if en else "профиле")}
     if kind == REFERRAL:
         why = rng.choice(WHY_REFERRAL_EN if en else WHY_REFERRAL_RU)
         ask = rng.choice(ASK_REFERRAL_EN if en else ASK_REFERRAL_RU)

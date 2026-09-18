@@ -257,7 +257,7 @@ def _create(sess, contact, *, role: str = "", jd_text: str = "", linked: list | 
 def discover(limit: int = 10, fetcher=None, dry: bool = False) -> dict:
     """Найти до limit новых адресатов: сайты компаний, затем GitHub."""
     fetcher = fetcher or people.Fetcher()
-    brave_key = get_settings().brave_api_key
+    search_key = get_settings().tavily_api_key
     found: list = []
     stats = {"companies": 0, "sites_without_contact": 0, "created": 0, "github": 0}
     with session_scope() as sess:
@@ -268,12 +268,15 @@ def discover(limit: int = 10, fetcher=None, dry: bool = False) -> dict:
             break
         stats["companies"] += 1
         contacts = people.find_company_contacts(t["site"], t["company"], fetcher)
-        # Сайт не назвал человека — смотрим публичных участников GitHub-организации
-        # компании и страницы вне её сайта, где адрес руководителя опубликован.
-        if not any(c.kind in (people.EXEC, people.HIRING) for c in contacts):
+        # Сайт не назвал человека — идём от дешёвого к дорогому: комментарии Hacker News
+        # (один запрос, без ключа), участники GitHub-организации компании, поиск по вебу.
+        named = (people.EXEC, people.HIRING, people.REFERRAL)
+        if not any(c.kind in named for c in contacts):
+            contacts = contacts + people.hn_people(t["company"], t["site"], fetcher)
+        if not any(c.kind in named for c in contacts):
             contacts = contacts + people.github_org_people(t["company"], t["site"], fetcher)
-        if not any(c.kind == people.EXEC for c in contacts) and brave_key:
-            contacts = contacts + people.search_people(t["company"], t["site"], brave_key, fetcher)
+        if not any(c.kind == people.EXEC for c in contacts) and search_key:
+            contacts = contacts + people.search_people(t["company"], t["site"], search_key, fetcher)
         contacts = sorted(contacts, key=lambda c: (people._RANK[c.kind], c.email))
         if not contacts:
             stats["sites_without_contact"] += 1
@@ -286,8 +289,9 @@ def discover(limit: int = 10, fetcher=None, dry: bool = False) -> dict:
         with session_scope() as sess:
             if _company_key(best.email) in _contacted_domains(sess):
                 continue
+            where = "hn" if best.source_url.startswith(people.HN_ITEM) else "profile"
             if _create(sess, best, role=t["role"], jd_text=t["jd_text"], linked=[t["job_id"]],
-                       score=t["score"]):
+                       score=t["score"], where=where):
                 stats["created"] += 1
     left = limit - stats["created"]
     if left > 0:
