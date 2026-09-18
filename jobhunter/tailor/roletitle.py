@@ -34,8 +34,18 @@ _FORMAT_LINE = re.compile(
 _ROLE_WORD = re.compile(
     r"\b(?:engineers?|developers?|programmers?|architects?|scientists?|researchers?|"
     r"analysts?|administrators?|managers?|leads?|head|director|cto|founding|devops|"
-    r"sre|swe|mlops|consultant|specialist)\b|разработчик|инженер|аналитик|архитектор|"
-    r"программист|тимлид|техлид|руководител", re.I)
+    r"sre|swe|mlops|consultant|specialist|sysadmin|testers?|qa)\b|разработчик|инженер|"
+    r"аналитик|архитектор|программист|тимлид|техлид|руководител|администратор|"
+    r"тестировщик|менеджер|специалист|девопс", re.I)
+# The second line of a Telegram post is the real title, wrapped in noise:
+# «🚀 We’re hiring a Senior System Administrator | Cyprus»,
+# «Middle DevOps Engineer ×2 - Emerging Travel Group».
+_BODY_PREFIX = re.compile(
+    r"^(?:we(?:'|’)?re\s+hiring|we\s+are\s+hiring|we(?:'|’)?re\s+looking\s+for|"
+    r"we\s+are\s+looking\s+for|looking\s+for|hiring|мы\s+ищем|ищем|требуется|нужен|нужна|"
+    r"в\s+поиске|вакансия|позиция|должность|position|role|job\s+title)"
+    r"\s*[:\-–—]?\s*(?:an?\s+|the\s+)?", re.I)
+_BODY_TAIL = re.compile(r"\s+[|—–-]\s+|\s+в\s+(?:гк|компани\w+|ооо|ао|зао)\b|\s+(?:at|@)\s+", re.I)
 
 
 def clean_title(raw: str) -> str:
@@ -50,7 +60,43 @@ def clean_title(raw: str) -> str:
         return ""
     if _FORMAT_LINE.match(role) and not _ROLE_WORD.search(role):
         return ""
+    # A caption, not a title: «limassol #cyprus #fintech #sysadmin» produced the
+    # letter «“limassol” (your post in @cyithr)» — it sat in the Telegram queue
+    # on 18.09. Without a role word, a hashtag caption or a single word
+    # («воронеж», «астана») is not a job title.
+    if not _ROLE_WORD.search(role) and ("#" in (raw or "") or len(role.split()) == 1):
+        return ""
     return role
+
+
+def _decap(s: str) -> str:
+    """«РУКОВОДИТЕЛЬ ИТ-ОТДЕЛА» → «Руководитель ИТ-отдела»: all caps shouts in a letter."""
+    words = []
+    for w in s.split():
+        parts = [x if 1 < len(x) <= 3 and x.isalpha() else x.lower() for x in w.split("-")]
+        words.append("-".join(parts))
+    out = " ".join(words)
+    return out[:1].upper() + out[1:]
+
+
+def role_from_body(description: str) -> str:
+    """Job title from the first lines of a post whose headline is a hashtag caption."""
+    lines = [ln.strip() for ln in (description or "").splitlines() if ln.strip()][:5]
+    for ln in lines:
+        cand = re.sub(r"^[^\w«\"(]+", "", _HASHTAG.sub(" ", ln)).strip()
+        cand = _BODY_PREFIX.sub("", cand, count=1).strip()
+        cand = _BODY_TAIL.split(cand, maxsplit=1)[0].strip()
+        cand = re.sub(r"\s*[×xх]\s*\d+$", "", cand).strip()              # «Engineer ×2»
+        if len(cand) > _MAX_TITLE_LEN:                                   # «… (Python Backend + AI-агенты)»
+            cand = re.sub(r"\s*\([^)]*\)\s*$", "", cand).strip()
+        if not cand or len(cand.split()) > 8 or re.search(r"[.!?:]\s|[?:]$", cand):
+            continue
+        if cand.isupper():
+            cand = _decap(cand)
+        role = clean_title(cand)
+        if role and _ROLE_WORD.search(role):
+            return role
+    return ""
 
 
 def display_role(title: str, tag: str, description: str, lang: str) -> str:
@@ -66,7 +112,13 @@ def display_role(title: str, tag: str, description: str, lang: str) -> str:
         "data": "Data Engineer" if en else "Data-инженер",
         "fullstack": "Full-Stack Engineer" if en else "Fullstack-разработчик",
     }
-    for raw in (title or "", tag or ""):
+    sources = [title or ""]
+    if not clean_title(title or "") and _HASHTAG.sub(" ", title or "").strip().lower() not in generic:
+        # The channel tag lies more often than the post's second line: a «Python
+        # Backend + AI-агенты» vacancy from @program_job was called «DevOps-инженер».
+        sources.append(role_from_body(description))
+    sources.append(tag or "")
+    for raw in sources:
         role = raw.strip()
         # Some sources keep the prefix literally: «Текст вакансии: Python Backend».
         if re.match(r"^текст\s+вакансии\s*:", role, re.I):

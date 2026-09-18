@@ -121,3 +121,33 @@ def test_followup_quotes_job_title_not_hashtags(tmp_path, monkeypatch):
         get_settings.cache_clear()
         dbmod._engine = None
         dbmod._Session = None
+
+
+# ── 18.09: подписи с хештегами и должность из второй строки поста ──
+
+@pytest.mark.parametrize("raw", ["limassol #cyprus #fintech #sysadmin", "воронеж", "астана #оффлайн #workITkz"])
+def test_captions_and_locations_are_not_titles(raw):
+    assert clean_title(raw) == ""
+
+
+@pytest.mark.parametrize("title,tag,body,lang,want", [
+    ("удаленно #fulltime #senior #python #backend #ai #финтех", "DevOps",
+     "#вакансия #удаленно #fulltime\nИнженер-разработчик полного цикла (Python Backend + AI-агенты)\nОплата: 180 000",
+     "ru", "Инженер-разработчик полного цикла"),          # хвост в скобках срезан: длиннее 60
+    ("limassol #cyprus #fintech #sysadmin", "Python",
+     "#vacancy #limassol #cyprus\n🚀 We’re hiring a Senior System Administrator | Cyprus\nWe’re looking for a strong admin.",
+     "en", "Senior System Administrator"),
+    ("devops #kubernetes #postgresql #middle #remote", "DevOps",
+     "#вакансия #devops\nMiddle DevOps Engineer ×2 - Emerging Travel Group (RateHawk / Ostrovok)\nМеждународный travel-tech.",
+     "ru", "DevOps-инженер"),                       # «devops» — известная короткая роль, тело не нужно
+    ("воронеж", "DevOps", "#воронеж\nРУКОВОДИТЕЛЬ ИТ-ОТДЕЛА В ГК \"ПОРЯДОК\"\nОбязанности", "ru",
+     "Руководитель ИТ-отдела"),
+])
+def test_role_comes_from_post_body_not_channel_tag(title, tag, body, lang, want):
+    assert display_role(title, tag, body, lang) == want
+
+
+def test_sentence_in_body_is_not_a_role():
+    from jobhunter.tailor.roletitle import role_from_body
+    assert role_from_body("Ищем DevOps-инженера. Требования: Kubernetes, Docker, Python.") == ""
+    assert role_from_body("Middle DevOps Engineer ×2 - Emerging Travel Group") == "Middle DevOps Engineer"

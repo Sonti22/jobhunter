@@ -17,6 +17,9 @@ from sqlalchemy import func, select
 def db(tmp_path_factory):
     os.environ["DB_PATH"] = str(tmp_path_factory.mktemp("db") / "ashby.db")
     os.environ["LLM_ENABLED"] = "false"
+    # Лимит задаём сами: в рабочем .env автоподача выключена (ATS_DAILY_LIMIT=0),
+    # и локальный прогон иначе видел бы «дневной лимит исчерпан» в каждом тесте.
+    os.environ["ATS_DAILY_LIMIT"] = "5"
     from jobhunter.config import get_settings
     get_settings.cache_clear()
     import jobhunter.db as dbmod
