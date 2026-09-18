@@ -48,6 +48,11 @@ _BODY_PREFIX = re.compile(
 _BODY_TAIL = re.compile(r"\s+[|—–-]\s+|\s+в\s+(?:гк|компани\w+|ооо|ао|зао)\b|\s+(?:at|@)\s+", re.I)
 
 
+def has_role_word(text: str) -> bool:
+    """Есть ли в строке слово-должность (engineer, разработчик, аналитик…)."""
+    return bool(_ROLE_WORD.search(text or ""))
+
+
 def clean_title(raw: str) -> str:
     """Title without hashtags and noise, or "" when no job title is left."""
     role = _HASHTAG.sub(" ", raw or "")

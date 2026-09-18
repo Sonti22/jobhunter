@@ -156,6 +156,15 @@ _LEAD_JUNK = re.compile(r"^[\s*#—\-•·\t -㌀\U0001F000-\U0001FAFF]+")
 
 
 def _first_line(text: str) -> str:
+    """Заголовок поста: первая содержательная строка, но не подпись из хештегов.
+
+    Посты открываются строкой «#вакансия #удаленно #fulltime #senior…», а
+    должность стоит следом. Пока заголовком была подпись, письма цитировали
+    «москва» и «limassol», а скорер не видел роли: за подписью прятались
+    «BDM», «Head of Growth» и «QA Lead» — и проходили отбор как бэкенд (18.09).
+    """
+    from ..tailor.roletitle import has_role_word
+    caption = ""
     for raw in (text or "").splitlines():
         s = _LEAD_JUNK.sub("", raw).strip()
         s = _TITLE_PREFIX.sub("", s)
@@ -164,8 +173,11 @@ def _first_line(text: str) -> str:
             continue
         if _META_LINE.match(s) or _GREETING.match(s):
             continue
+        if "#" in raw and not has_role_word(s):
+            caption = caption or s[:180]
+            continue
         return s[:180]
-    return ""
+    return caption
 
 
 def _guess_tag(text: str) -> str:

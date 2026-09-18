@@ -151,3 +151,14 @@ def test_sentence_in_body_is_not_a_role():
     from jobhunter.tailor.roletitle import role_from_body
     assert role_from_body("Ищем DevOps-инженера. Требования: Kubernetes, Docker, Python.") == ""
     assert role_from_body("Middle DevOps Engineer ×2 - Emerging Travel Group") == "Middle DevOps Engineer"
+
+
+def test_telegram_title_skips_hashtag_caption():
+    from jobhunter.ingest.tgchannels import _first_line
+    post = ("#вакансия #удаленно #fulltime #senior #python #backend\n"
+            "Инженер-разработчик полного цикла (Python Backend + AI-агенты)\nОплата: 180 000 – 250 000 ₽")
+    assert _first_line(post).startswith("Инженер-разработчик полного цикла")
+    assert "РУКОВОДИТЕЛЬ ИТ-ОТДЕЛА" in _first_line("#воронеж\nРУКОВОДИТЕЛЬ ИТ-ОТДЕЛА В ГК \"ПОРЯДОК\"\nОбязанности")
+    # подпись с должностью остаётся заголовком; пост из одних хештегов не теряет заголовок совсем
+    assert _first_line("Senior Python Engineer #remote\nWe build things") == "Senior Python Engineer #remote"
+    assert _first_line("#вакансия #москва #офис") != ""
