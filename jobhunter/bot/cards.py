@@ -136,7 +136,7 @@ def strip_hints(question: str) -> str:
     return "\n".join(lines)
 
 
-def manual_keyboard(app_id: int, url: str = "") -> dict:
+def manual_keyboard(app_id: int, url: str = "", referral: bool = False) -> dict:
     """Кнопки под вакансией из очереди ручных откликов.
 
     Ссылка отдельной кнопкой, а не в тексте: в мобильном Telegram по кнопке
@@ -145,7 +145,8 @@ def manual_keyboard(app_id: int, url: str = "") -> dict:
     """
     rows = []
     if url:
-        rows.append([{"text": "🔗 Открыть вакансию", "url": url}])
+        rows.append([{"text": "🤝 Откликнуться через реферала" if referral
+                      else "🔗 Открыть вакансию", "url": url}])
     rows.append([{"text": "✅ Откликнулся", "callback_data": cb("m", app_id, "applied")},
                  {"text": "🚫 Не подходит", "callback_data": cb("m", app_id, "not_fit")}])
     rows.append([{"text": "📋 Письмо", "callback_data": cb("m", app_id, "letter")},

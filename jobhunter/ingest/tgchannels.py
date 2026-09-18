@@ -270,10 +270,14 @@ class _PostParser(HTMLParser):
 
     def handle_starttag(self, tag, attrs):
         attrs = dict(attrs)
+        if tag == "a" and self.current is not None and self.text_depth and attrs.get("href"):
+            # Отклик бывает кнопкой-ссылкой, а не @хендлом в тексте: реферальные
+            # каналы ведут на своего бота с номером вакансии.
+            self.current["links"].append(attrs["href"])
         if tag == "div":
             self.depth += 1
             if attrs.get("data-post"):
-                self.current = {"id": attrs["data-post"], "text": "", "date": ""}
+                self.current = {"id": attrs["data-post"], "text": "", "date": "", "links": []}
                 self.posts.append(self.current)
                 self.post_depth = self.depth
                 self.text_depth = 0
@@ -302,6 +306,47 @@ def parse_posts(page: str) -> list[dict]:
     parser = _PostParser()
     parser.feed(page)
     return parser.posts
+
+
+# Отклик через бота: ссылка на бота С параметром start — это кнопка «откликнуться»
+# под конкретной вакансией. Голая ссылка на бота — реклама или «предложка» канала.
+_APPLY_BOT = re.compile(
+    r"^https?://(?:t|telegram)\.me/([A-Za-z][\w]{3,31}bot)\?start=([\w-]{4,128})$", re.I)
+# Каналы-посредники: сотрудник компании получает резюме и подаёт кандидата по
+# своей внутренней реферальной ссылке. Это лучший вид отклика после прямого контакта.
+REFERRAL_CHANNELS = {"refer_me_it"}
+_FIELD = re.compile(r"^[^\w\n]{0,6}(должность|позиция|вакансия|position|role|компания|company)\s*[:—–-]\s*"
+                    r"(.{2,120}?)\s*$", re.I | re.M)
+
+
+def apply_bot_link(links: list) -> str:
+    """Ссылка «откликнуться через бота» среди ссылок поста, иначе пусто."""
+    for href in links or []:
+        m = _APPLY_BOT.match((href or "").strip())
+        if m:
+            return "https://t.me/%s?start=%s" % (m.group(1), m.group(2))
+    return ""
+
+
+def _title(text: str, fields: dict) -> str:
+    """Заголовок: поле «Должность», если в нём роль; иначе первая содержательная строка."""
+    from ..tailor.roletitle import has_role_word
+    field, first = fields.get("title", ""), _first_line(text)
+    if field and (has_role_word(field) or not has_role_word(first)):
+        return field[:180]
+    return first
+
+
+def post_fields(text: str) -> dict:
+    """Поля анкетного поста: «Должность: Java Lead», «Компания: Дом.РФ»."""
+    out: dict = {}
+    for m in _FIELD.finditer(text or ""):
+        key = "company" if m.group(1).lower() in ("компания", "company") else "title"
+        value = m.group(2).strip(" .*_")
+        if key == "company" and len(value) > 60:
+            continue                       # «Компания: мы делаем…» — описание, а не название
+        out.setdefault(key, value)
+    return out
 
 
 def _is_vacancy(text: str) -> bool:
@@ -453,11 +498,15 @@ class TelegramChannelSource:
                     handle = extract_telegram_handle(
                         text, denylist=[channel] + list(self.channels) + CROSS_PROMO)
                     email = extract_email(text)
+                    bot_link = "" if (handle or email) else apply_bot_link(post.get("links"))
                     kind = (ContactKind.USER_HANDLE.value if handle
                             else ContactKind.EMAIL.value if email
+                            else ContactKind.BOT.value if bot_link
                             else ContactKind.UNKNOWN.value)
-                    if handle or email:
+                    if handle or email or bot_link:
                         stat["contacts"] += 1
+                    fields = post_fields(text)
+                    referral = channel.lower() in REFERRAL_CHANNELS and bool(bot_link)
                     sal = _SALARY_RE.search(text)
                     # Дата поста лежит в <time datetime="..."> рядом с телом.
                     # Без неё все посты канала выглядели одинаково свежими, и
@@ -467,8 +516,8 @@ class TelegramChannelSource:
                     yield RawJob(
                         source="tg:%s" % channel,
                         external_uuid="tg:%s" % post_id,
-                        title=_first_line(text),
-                        company="",
+                        title=_title(text, fields),
+                        company=fields.get("company", ""),
                         tag=_guess_tag(text),
                         content=text,
                         mode="full",
@@ -476,13 +525,15 @@ class TelegramChannelSource:
                         salary_raw=sal.group(0).strip() if sal else "",
                         contact_kind=kind,
                         contact_handle=handle,
-                        contact_url="https://t.me/%s" % handle if handle else "",
+                        contact_url="https://t.me/%s" % handle if handle else bot_link,
                         contact_email=email,
                         all_links=[{"key": "telegram", "value": "https://t.me/%s" % handle}]
-                                  if handle else [],
+                                  if handle else
+                                  [{"key": "apply_bot", "value": bot_link}] if bot_link else [],
                         raw={"channel": channel, "post": post_id,
                              "post_url": "https://t.me/%s" % post_id,
-                             "parser_version": 2},
+                             "referral": referral,
+                             "parser_version": 3},
                     )
                     produced += 1
                     if limit and produced >= limit:

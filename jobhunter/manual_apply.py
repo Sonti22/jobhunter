@@ -211,10 +211,12 @@ def listing(top: int = 30, source: str = "", pending_only: bool = True) -> list:
                 "cv_path": a.cv_path or "",
                 "source": j.source,
                 "outcome": a.outcome or OUTCOME_NEW,
+                # Отклик уходит сотруднику компании, и он подаёт кандидата по своей
+                # реферальной ссылке — такие вакансии показываем первыми.
+                "referral": bool((j.raw_json or {}).get("referral")),
             })
-            if len(rows) >= top:
-                break
-    return rows
+    rows.sort(key=lambda r: (not r["referral"], -r["score"]))
+    return rows[:top]
 
 
 def mark(app_id: int, outcome: str, snooze_days: int = 3) -> str:

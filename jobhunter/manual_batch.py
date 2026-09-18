@@ -31,9 +31,12 @@ BATCH_SIZE = 15
 
 
 def _card(row: dict) -> str:
-    lines = ["🖐 %s" % (row["title"] or "вакансия")[:70]]
+    lines = ["%s %s" % ("🤝" if row.get("referral") else "🖐", (row["title"] or "вакансия")[:70])]
     if row["company"]:
         lines.append(row["company"][:60])
+    if row.get("referral"):
+        lines.append("Отклик через реферала: резюме получит сотрудник компании "
+                     "и подаст тебя по своей реферальной ссылке.")
     meta = ["скор %.0f" % row["score"]]
     if row["salary"]:
         meta.append(row["salary"][:40])
@@ -70,7 +73,8 @@ def run(limit: int = BATCH_SIZE, now: datetime | None = None) -> dict:
         notify.push("manual_item",
                     "[%d/%d] %s" % (i, len(rows), _card(row)),
                     dedup="manual:%d" % row["id"],
-                    markup=manual_keyboard(row["id"], row["url"]))
+                    markup=manual_keyboard(row["id"], row["url"],
+                                           referral=bool(row.get("referral"))))
         sent += 1
     log.info("ручные отклики: пачка из %d", sent)
     return {"sent": sent}
