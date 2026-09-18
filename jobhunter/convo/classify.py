@@ -100,6 +100,11 @@ _PATTERNS = [
     (APPLY_LINK, 0.9, r"(\bapply\b[^.!?\n]{0,40}\b(?:directly|here|via|through|using|"
                       r"on\s+our|at\s+our|on\s+the\s+(?:link|website|site|portal))\b|"
                       r"(?:application|careers?)\s+(?:link|portal|page|form)\b|"
+                      # Zapier 17.09: «all candidate journeys start with an application
+                      # through our jobs page… apply to any roles that match»
+                      r"application\s+(?:through|via|on)\s+our\b|\b(?:jobs|careers?)\s+page\b|"
+                      r"\bapply\s+(?:to|for)\s+any\s+(?:roles?|positions?|openings?)\b|"
+                      r"current\s+openings\b|"
                       r"откликн\w+\s+(?:через|на\s+сайте|по\s+ссылке)|"
                       r"подайте\s+(?:заявку|отклик)|"
                       r"(?:отклик|заявк\w+)[^.!?\n]{0,30}(?:через\s+сайт|по\s+ссылке))"),

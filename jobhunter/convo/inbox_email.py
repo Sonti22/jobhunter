@@ -156,7 +156,7 @@ async def _process(dry: bool, stats: dict) -> dict:
                     if unresolved:
                         stats["ambiguous"] += 1
                         if not dry:
-                            _notify_ambiguous(headers, unresolved)
+                            _notify_ambiguous(headers, unresolved, by_domain=True)
                     else:
                         stats["skipped"] += 1
                     continue
@@ -355,18 +355,31 @@ def _notify_network(error: str) -> None:
                 dedup="mail_net:%s" % utcnow().date().isoformat())
 
 
-def _notify_ambiguous(headers: dict, apps: list) -> None:
+def _notify_ambiguous(headers: dict, apps: list, by_domain: bool = False) -> None:
     """Несколько заявок в одну компанию — решает владелец, а не эвристика.
 
     Гадать нельзя: цена ошибки — подтверждение интервью не по той вакансии.
+
+    by_domain — совпал только домен компании. HR-платформа Сбера шлёт
+    «Пройдите AI-интервью» по откликам владельца с hh.ru; к заявкам бота они
+    не относятся, а 17.09 таких уведомлений пришло пять за день. Для домена —
+    одно в сутки на отправителя и честная формулировка.
     """
     from .. import notify
+    from ..models import utcnow
+    sender = mailmatch.addr_of(headers.get("from", "")) or "?"
+    subject = (headers.get("subject", "") or "")[:120]
+    ids = ", ".join("#%d" % a for a in apps[:6])
+    if by_domain:
+        notify.push("mail_ambiguous",
+                    "📧 Письмо от %s — с домена компании, куда бот откликался (%s), но по "
+                    "теме к этим заявкам не относится. Возможно, это твой отклик с другого "
+                    "сайта — посмотри в почте.\nТема: %s" % (sender, ids, subject),
+                    dedup="ambig_domain:%s:%s" % (sender, utcnow().date().isoformat()))
+        return
     notify.push("mail_ambiguous",
                 "📧 Письмо от %s не удалось привязать однозначно.\n"
-                "Тема: %s\nПодходят заявки: %s"
-                % (mailmatch.addr_of(headers.get("from", "")) or "?",
-                   (headers.get("subject", "") or "")[:120],
-                   ", ".join("#%d" % a for a in apps[:6])),
+                "Тема: %s\nПодходят заявки: %s" % (sender, subject, ids),
                 dedup="ambig:%s" % (headers.get("message-id", "") or "")[:120])
 
 

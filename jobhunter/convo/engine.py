@@ -450,6 +450,27 @@ async def handle_message(client, app_id: int, text: str,
     return "без действий (%s)" % plan.reason
 
 
+_URL = re.compile(r"https?://[^\s<>\"')\]]+")
+_BARE_URL = re.compile(r"(?<![\w@/.])((?:[a-z0-9-]+\.)+(?:com|io|ai|co|org|net|dev|app|jobs|careers)"
+                       r"/[^\s<>\"')\]]+)", re.I)
+
+
+def find_apply_url(text: str) -> str:
+    """Ссылка «подать отклик» из письма работодателя.
+
+    Gmail заворачивает ссылки в google.com/url?q=…, а рекрутёры пишут адрес и
+    без схемы («check out our openings at zapier.com/jobs») — кнопка в
+    карточке должна вести на сам сайт, а не на редирект.
+    """
+    from urllib.parse import unquote
+    for m in _URL.finditer(text or ""):
+        url = m.group(0).rstrip(".,;:")
+        wrapped = re.search(r"[?&]q=(https?[^&\s]+)", url) if "google.com/url" in url else None
+        return unquote(wrapped.group(1)) if wrapped else url
+    bare = _BARE_URL.search(text or "")
+    return "https://" + bare.group(1).rstrip(".,;:") if bare else ""
+
+
 async def _escalate(client, app_id: int, text: str, history: list,
                     title: str, jd_text: str, intent: str, reason: str,
                     dry: bool = False) -> str:
@@ -465,8 +486,7 @@ async def _escalate(client, app_id: int, text: str, history: list,
     d = draft_reply(title, jd_text, text, history, intent=intent)
     apply_url = ""
     if intent == C.APPLY_LINK:
-        m = re.search(r"https?://[^\s<>\"')\]]+", text or "")
-        apply_url = m.group(0).rstrip(".,;:") if m else ""
+        apply_url = find_apply_url(text)
         reason = "просят подать отклик на сайте"
     elif intent == C.TASK_REQUEST:
         reason = "работодатель просит материалы или задание — следующий этап"

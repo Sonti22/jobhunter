@@ -228,3 +228,58 @@ def test_build_context_indexes_company_domain(db):
     cand = mailmatch.match_by_headers({"from": "hrplatform@sberbank.ru",
                                        "subject": "Пройдите AI-интервью"}, ctx)
     assert (cand.app_id, cand.rule) == (app_id, "domain")
+
+
+# ── находки 18.09 ──
+
+ZAPIER = """Hi Suren,
+
+Thanks so much for reaching out and for your interest in Zapier! We really
+appreciate the initiative.
+
+At Zapier, all candidate journeys start with an application through our
+jobs page. I'd encourage you to check out our current openings at
+zapier.com/jobs
+<https://www.google.com/url?q=https://zapier.com/jobs&source=gmail&ust=1789736726823000&sa=E>
+and apply to any roles that match your background and interests.
+
+From there, the hiring team will review your application and reach out with
+next steps if there's a fit.
+
+Best,
+Raluca"""
+
+
+def test_apply_through_jobs_page_is_apply_link_not_a_task():
+    assert classify(ZAPIER).label == "apply_link"
+
+
+def test_apply_url_unwraps_google_redirect_and_bare_domain():
+    from jobhunter.convo.engine import find_apply_url
+    assert find_apply_url(ZAPIER) == "https://zapier.com/jobs"
+    assert find_apply_url("Please apply at acme.io/careers/backend.") == "https://acme.io/careers/backend"
+    assert find_apply_url("Apply here: https://jobs.acme.com/1.") == "https://jobs.acme.com/1"
+    assert find_apply_url("Write to hr@acme.com (acme.com)") == ""
+
+
+def test_email_step_follows_caught_up_approval():
+    """18.09: почта сработала в 10:30 по пустой очереди, пока догон ещё собирал вакансии."""
+    from jobhunter.autopilot import email_after_approve
+    assert email_after_approve(["ingest", "prepare", "approve", "manual_prep"]) == \
+        ["ingest", "prepare", "approve", "email", "manual_prep"]
+    assert email_after_approve(["ingest", "approve", "email"]) == ["ingest", "approve", "email"]
+    assert email_after_approve(["manual_prep"]) == ["manual_prep"]
+
+
+def test_domain_only_mail_notifies_once_per_sender_per_day(monkeypatch):
+    from jobhunter import notify
+    from jobhunter.convo import inbox_email
+    keys = []
+    monkeypatch.setattr(notify, "push", lambda kind, text, **kw: keys.append((kw.get("dedup"), text)))
+    for mid in ("<a@x>", "<b@x>"):
+        inbox_email._notify_ambiguous({"from": "hrplatform@sberbank.ru", "message-id": mid,
+                                       "subject": "Пройдите AI-интервью"}, [6030, 9789], by_domain=True)
+    assert keys[0][0] == keys[1][0] and keys[0][0].startswith("ambig_domain:hrplatform@sberbank.ru:")
+    assert "не относится" in keys[0][1]
+    inbox_email._notify_ambiguous({"from": "hr@acme.com", "message-id": "<c@x>", "subject": "Hi"}, [1, 2])
+    assert keys[2][0] == "ambig:<c@x>"

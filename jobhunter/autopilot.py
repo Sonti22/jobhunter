@@ -425,6 +425,21 @@ def step_send_email() -> dict:
     return {"error": "почтовая партия завершилась с ошибкой"} if rc else {"ok": True}
 
 
+def email_after_approve(missed: list) -> list:
+    """Порядок догона: почта идёт ПОСЛЕ догнавшего одобрения.
+
+    18.09 машина включилась в 10:19: сбор, подготовка и одобрение ушли в
+    догон, а почта сработала штатно в 10:30 — по пустой очереди, потому что
+    цепочка ещё качала вакансии. Всё одобренное в тот день ждало бы до завтра.
+    Повторный запуск безопасен: партию держит файловый лок, письма —
+    дневной потолок и проверка «уже отправлено».
+    """
+    if "approve" in missed and "email" not in missed:
+        i = missed.index("approve") + 1
+        return missed[:i] + ["email"] + missed[i:]
+    return missed
+
+
 def step_resend_en() -> dict:
     """Повтор на английском тем HN-компаниям, кому ушло русское письмо (до 4 в день)."""
     from .outreach import resend_en
@@ -1080,6 +1095,7 @@ def run_daemon() -> int:
              else missed_default).append(job_id)
             log.info("догоняю пропущенный шаг %s (план был %02d:%02d)",
                      job_id, hh, mm)
+        missed_default = email_after_approve(missed_default)
 
         def start_tg():
             if missed_tg:
