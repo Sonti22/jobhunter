@@ -210,6 +210,39 @@ def test_stuck_emails_are_reprocessed_into_cards(db):
     assert asyncio.run(inbox_email.retry_stuck()) == 0
 
 
+def test_stuck_telegram_reply_becomes_card_while_telegram_is_manual_only(db, monkeypatch):
+    """19.09: «Пришлите свое резюме» от 8.09 висело 11 дней — повтор был только у почты."""
+    from jobhunter.convo import engine, inbox_email
+    monkeypatch.setattr(engine, "within_reply_window", lambda: True)
+    monkeypatch.setattr(engine, "reply_delay_seconds", lambda: 0)
+    from jobhunter.models import Application, ContactKind, Job, Message, OwnerRequest, utcnow
+    from jobhunter.outreach import policy
+
+    with db.session_scope() as sess:
+        job = Job(external_uuid="tg:devops/1", source="tg:devops", title="Teamlead DevOps",
+                  description_raw="DevOps, MLOps", contact_kind=ContactKind.USER_HANDLE.value,
+                  contact_handle="recruiter_anna", contact_url="https://t.me/recruiter_anna")
+        sess.add(job)
+        sess.flush()
+        app = Application(job_id=job.id, status="REPLIED", score=80, gate_passed=True, cv_lang="ru",
+                          message_body="Здравствуйте", sent_at=utcnow() - timedelta(days=12))
+        sess.add(app)
+        sess.flush()
+        app_id = app.id
+        sess.add(Message(application_id=app_id, direction="in", received_at=utcnow(),
+                         body="Пришлите свое резюме на рассмотрение, пожалуйста", processing_pending=True,
+                         processing_error="автоответ не ушёл: stop:ручной режим после двух PeerFlood"))
+    # Telegram работает штатно — зависшее не трогаем: его разберёт обычный проход с клиентом
+    assert asyncio.run(inbox_email.retry_stuck()) == 0
+    with db.session_scope() as sess:
+        policy.get_state(sess).manual_only = True
+    assert asyncio.run(inbox_email.retry_stuck()) == 1
+    with db.session_scope() as sess:
+        assert sess.scalar(select(OwnerRequest)).application_id == app_id
+        assert not sess.scalars(select(Message).where(Message.processing_pending.is_(True))).all()
+        assert sess.get(Application, app_id).status == "NEEDS_HUMAN"
+
+
 def test_apply_link_card_has_url_button():
     from types import SimpleNamespace
 

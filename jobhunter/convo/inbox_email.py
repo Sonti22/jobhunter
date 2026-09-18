@@ -310,15 +310,27 @@ STUCK_MARK = "автоответ не ушёл"
 
 
 async def retry_stuck(dry: bool = False, limit: int = 10) -> int:
-    """Прогнать зависшие почтовые письма заново. Возвращает число заявок."""
+    """Прогнать зависшие ответы заново. Возвращает число заявок.
+
+    Телеграм-ответы берём, только пока Telegram в ручном режиме: тогда повтор не
+    отправляет ничего, а даёт владельцу карточку. Проверка 19.09: рекрутёр 8.09
+    попросил резюме, автоответ упёрся в ручной режим, и сообщение 11 дней висело
+    «в обработке» без карточки — повтор был только у почтовых вакансий.
+    """
+    from . import route
+    from .send import can_reply
+
     with session_scope() as sess:
+        kinds = [ContactKind.EMAIL.value]
+        if not can_reply(sess, route.TELEGRAM)[0]:
+            kinds.append(ContactKind.USER_HANDLE.value)
         rows = sess.execute(
             select(Message.id, Message.application_id, Message.body)
             .join(Application, Message.application_id == Application.id)
             .join(Job, Application.job_id == Job.id)
             .where(Message.direction == "in", Message.processing_pending.is_(True),
                    Message.processing_error.startswith(STUCK_MARK),
-                   Job.contact_kind == ContactKind.EMAIL.value)
+                   Job.contact_kind.in_(kinds))
             .order_by(Message.id)).all()
     by_app: dict = {}
     for msg_id, app_id, body in rows:
