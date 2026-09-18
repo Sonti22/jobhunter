@@ -72,6 +72,12 @@ def prepare_application(app_id: int,
         app = sess.get(Application, app_id)
         if app is None:
             raise ValueError("нет заявки %d" % app_id)
+        direct_job = sess.get(Job, app.job_id)
+        if direct_job is not None and (direct_job.source or "").startswith("direct:"):
+            # Прямое письмо руководителю — не отклик на вакансию: скорить нечего,
+            # письмо и гейты у него свои (outreach/direct.py).
+            return Prepared(app.id, app.status, app.score,
+                            reason="прямое письмо готовит outreach.direct")
         # Preparation must never replace approval/outreach history, including
         # legacy rows reset to DISCOVERED after an attempt recorded only in logs.
         preparable = {Status.DISCOVERED.value, Status.SCORED.value,

@@ -172,6 +172,26 @@ def _callback(cbq: dict, chat_id: int) -> list:
                 {"do": "screen", "chat_id": chat_id, "name": "queue",
                  "msg_id": msg_id}]
 
+    if data["kind"] == "queue" and data["action"].startswith("d"):
+        # Прямые письма: пауза/возобновление канала, ручное одобрение удержанного,
+        # «не писать этой компании».
+        from ..outreach import direct
+        action = data["action"]
+        if action == "dpause":
+            direct.pause("остановлено владельцем из бота")
+            note = "Канал на паузе"
+        elif action == "dresume":
+            direct.resume()
+            note = "Канал возобновлён"
+        elif action.startswith("dappr") and action[5:].isdigit():
+            note = direct.approve_held(int(action[5:]))
+        elif action.startswith("ddnc") and action[4:].isdigit():
+            note = direct.block_company(int(action[4:]))
+        else:
+            note = "неизвестное действие"
+        return [{"do": "answer", "cb_id": cb_id, "text": note[:180]},
+                {"do": "screen", "chat_id": chat_id, "name": "direct", "msg_id": msg_id}]
+
     if data["kind"] == "manual_telegram":
         from .. import manual_telegram as manual_tg
         aid, action = data["app_id"], data["action"]

@@ -21,6 +21,7 @@ from ..models import Application, Job, Status
 from ..textutil import max_similarity
 
 FIRST_AFTER_HOURS = 72
+DIRECT_AFTER_DAYS = 7         # руководителю напоминаем через неделю, не через три дня
 SECOND_AFTER_DAYS = 7
 # Ровно одно напоминание. Ветка второго была сломана насквозь: mailer
 # опознаёт follow-up по пустому followup_sent_at, у второго оно уже занято
@@ -73,7 +74,9 @@ def due(sess) -> list:
             age = (now - datetime.utcfromtimestamp(job.posted_at)).days
             if age > STALE_JOB_DAYS:
                 continue
-        if now - a.sent_at >= timedelta(hours=FIRST_AFTER_HOURS):
+        direct = bool(job and (job.source or "").startswith("direct:"))
+        wait = timedelta(days=DIRECT_AFTER_DAYS) if direct else timedelta(hours=FIRST_AFTER_HOURS)
+        if now - a.sent_at >= wait:
             out.append((a, job, 1))
     return out
 

@@ -99,6 +99,7 @@ def _nav(active: str = "") -> list:
          {"text": "🖐 Ручные", "callback_data": cb("s", "manual")}],
         [{"text": "📡 Каналы", "callback_data": cb("s", "ch")},
          {"text": "🧠 Входящие", "callback_data": cb("s", "intents")}],
+        [{"text": "✉️ Прямые письма", "callback_data": cb("s", "direct")}],
     ]
     if q["kill_switch"]:
         rows.append([{"text": "▶️ СНЯТЬ СТОП", "callback_data": cb("k", "off")},
@@ -338,7 +339,40 @@ def intents() -> tuple:
     return "\n".join(lines), _kb(_nav("intents"))
 
 
-SCREENS = {"main": main, "stats": stats, "funnel": funnel, "queue": queue,
+def direct() -> tuple:
+    """Прямые письма руководителям и рефералам: состояние канала, очередь, удержанные."""
+    from ..outreach import direct as d
+    lines = ["✉️ ПРЯМЫЕ ПИСЬМА · %s" % _now(), "", d.status_text(), ""]
+    fn = d.funnel()
+    if fn:
+        lines.append("Воронка: " + " · ".join(
+            "%s — ушло %d, ответов %d, отбивок %d" % (k, v["sent"], v["replied"], v["bounced"])
+            for k, v in sorted(fn.items())))
+        lines.append("")
+    up = d.upcoming(6)
+    lines.append("Уйдут следующими:" if up else "Очередь пуста — адресаты ищутся в 09:50.")
+    for r in up:
+        lines.append("  #%d %s · %s" % (r["id"], r["company"][:26], r["email"]))
+        if r["source"]:
+            lines.append("      источник адреса: %s" % r["source"][:70])
+    hold = d.held(5)
+    kb = _nav("direct")
+    if hold:
+        lines += ["", "Удержаны гейтами (сами не уйдут):"]
+        for r in hold:
+            lines.append("  #%d %s — %s" % (r["id"], r["company"][:24], r["reason"][:60]))
+            row = [{"text": "🚫 Не писать #%d" % r["id"], "callback_data": cb("q", "ddnc%d" % r["id"])}]
+            if r["can_approve"]:
+                row.insert(0, {"text": "✅ Одобрить #%d" % r["id"],
+                               "callback_data": cb("q", "dappr%d" % r["id"])})
+            kb.insert(0, row)
+    paused = d.is_paused()
+    kb.insert(0, [{"text": "▶️ Возобновить канал" if paused else "⏸ Пауза канала",
+                   "callback_data": cb("q", "dresume" if paused else "dpause")}])
+    return "\n".join(lines), _kb(kb)
+
+
+SCREENS = {"main": main, "stats": stats, "funnel": funnel, "queue": queue, "direct": direct,
            "iv": interviews, "cards": cards, "ch": channels, "manual": manual,
            "intents": intents}
 

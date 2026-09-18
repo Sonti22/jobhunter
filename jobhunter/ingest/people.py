@@ -245,7 +245,8 @@ def github_people(limit: int = 10, fetcher: Fetcher | None = None,
                   queries: tuple = GITHUB_QUERIES) -> list:
     """Профили с открытым email и «hiring» в био. 403/429 — молча прекращаем."""
     fetcher = fetcher or Fetcher()
-    out, seen = [], set()
+    out: list = []
+    seen: set = set()
     for q in queries:
         if len(out) >= limit:
             break

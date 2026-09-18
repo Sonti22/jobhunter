@@ -270,6 +270,7 @@ async def handle_message(client, app_id: int, text: str,
         title = display_role(job.title or "", job.tag or "", job.description_raw or "",
                              app.cv_lang or "ru")
         jd_text = job.description_raw or ""
+        direct_thread = (job.source or "").startswith("direct:")
         history = [(m.direction, m.body) for m in sess.scalars(
             select(Message).where(Message.application_id == app_id)
             .order_by(Message.id.desc()).limit(8)).all()][::-1]
@@ -368,6 +369,12 @@ async def handle_message(client, app_id: int, text: str,
     with session_scope() as sess:
         app = sess.get(Application, app_id)
         plan = plan_reply(app, text, intent=intent, history=history)
+
+    if plan.should_reply and direct_thread:
+        # Разговор с руководителем или рефералом ведёт человек: шаблонное
+        # «спасибо, жду» в ответ основателю компании стоит дороже молчания.
+        return await _escalate(client, app_id, text, history, title, jd_text, plan.intent,
+                               "ответ на прямое письмо — отвечает владелец", dry)
 
     if plan.should_reply:
         if not within_reply_window():

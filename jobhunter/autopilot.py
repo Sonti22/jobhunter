@@ -299,6 +299,8 @@ def step_auto_approve() -> int:
                 if a.advance(Status.WITHDRAWN, reason="вакансия удалена"):
                     log.info("заявка #%d закрыта: вакансия не найдена", a.id)
                 continue
+            if (job.source or "").startswith("direct:"):
+                continue          # у прямых писем свои гейты и своё одобрение (outreach/direct.py)
             problem = approval_problem(a, job)
             if problem:
                 log.info("заявка #%d ждет проверки требований: %s", a.id, problem)
@@ -422,6 +424,16 @@ def step_send_email() -> dict:
                     dedup="email_fail:%s" % datetime.now(timezone.utc)
                                                     .strftime("%Y-%m-%d"))
         raise
+    try:
+        # Прямые письма уходят без просмотра — владелец видит их постфактум.
+        from . import notify
+        from .outreach import direct
+        text = direct.digest_text()
+        if text:
+            notify.push("direct_sent", text,
+                        dedup="direct_digest:%s" % datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    except Exception as e:                                  # noqa: BLE001
+        log.warning("сводка прямых писем: %s", str(e)[:120])
     return {"error": "почтовая партия завершилась с ошибкой"} if rc else {"ok": True}
 
 
@@ -436,8 +448,23 @@ def email_after_approve(missed: list) -> list:
     """
     if "approve" in missed and "email" not in missed:
         i = missed.index("approve") + 1
+        if i < len(missed) and missed[i] == "direct":
+            i += 1                # прямые письма готовятся до отправки, иначе уйдут только завтра
         return missed[:i] + ["email"] + missed[i:]
     return missed
+
+
+def step_direct() -> dict:
+    """Прямые письма руководителям и рефералам: найти адресатов, подготовить, одобрить.
+
+    Отправляет их штатный шаг почты — под общим дневным потолком и своим лимитом.
+    """
+    from .outreach import direct
+    if policy.kill_switch_active():
+        return {"blocked": "активен стоп-кран"}
+    stats = direct.run()
+    log.info("прямые письма: %s", stats)
+    return stats
 
 
 def step_resend_en() -> dict:
@@ -948,6 +975,7 @@ def run_daemon() -> int:
     sched.add_job(step_auto_approve, "cron", hour=10, minute=15, id="approve", **opts)
     sched.add_job(step_send_email, "cron", hour=10, minute=30, id="email", **opts)
     sched.add_job(step_resend_en, "cron", hour=11, minute=0, id="resend_en", **opts)
+    sched.add_job(step_direct, "cron", hour=9, minute=50, id="direct", **opts)
     # Анкеты Ashby: stage вечером готовит кандидатов к утреннему prepare,
     # подача — после авто-одобрения. Свой дневной лимит (ATS_DAILY_LIMIT),
     # телеграмную квоту не трогает.
@@ -1034,7 +1062,8 @@ def run_daemon() -> int:
     # проверяет маркеры: плановое время прошло, прогона не было — шаг
     # ставится на ближайшую минуту, в исходном порядке конвейера.
     daily = [("discover", 9, 0), ("ingest", 9, 30), ("prepare", 10, 0),
-             ("approve", 10, 15), ("email", 10, 30), ("resend_en", 11, 0), ("tg1", 11, 15),
+             ("approve", 10, 15), ("direct", 9, 50), ("email", 10, 30), ("resend_en", 11, 0),
+             ("tg1", 11, 15),
              ("manual_prep", 9, 40), ("manual_batch", 9, 45),
              ("followups", 12, 0), ("tg2", 16, 40)]
 

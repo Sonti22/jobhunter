@@ -197,6 +197,15 @@ def _subject_role(job: Job, lang: str) -> str:
 
 
 def _subject(job: Job, lang: str) -> str:
+    if (job.source or "").startswith("direct:"):
+        # Письмо человеку, а не в форму отклика: «Application:» тут неуместно.
+        company = (job.company_name or "").strip()
+        role = _clean_role(job.title or "")
+        if lang == "en":
+            about = ("%s at %s" % (role, company)) if role and company else (role or company or "your team")
+            return "%s — Suren Hakobyan (backend / tech lead, 7+ yrs)" % about[:80]
+        about = ("%s в %s" % (role, company)) if role and company else (role or company or "ваша команда")
+        return "%s — Сурен Акопян (backend / tech lead, 7+ лет)" % about[:80]
     role = _subject_role(job, lang)
     if lang == "en":
         return "Application: %s — Suren Hakobyan (7+ yrs, backend/tech lead)" % role[:70]
@@ -351,13 +360,23 @@ def pick_batch(limit: int) -> list:
                                         ) -> float:
                 return 0.0
         pairs = [(app, sess.get(Job, app.job_id)) for app in rows]
+        from . import direct as direct_channel
+        # Отклики на вакансии идут первыми: прямые письма руководителям берут
+        # то, что осталось от дневного потолка, и не больше своего лимита.
         pairs.sort(key=lambda pair: (
+            not direct_channel.is_direct(pair[1]),
             (pair[0].score - source_priority_penalty(
                 pair[1].source if pair[1] else "", source_rates)),
             pair[0].id), reverse=True)
+        direct_left = -1                  # -1: потолок прямых писем ещё не спрашивали
         for app, job in pairs:
             if not job or job.is_closed or job.contact_kind != ContactKind.EMAIL.value:
                 continue
+            if direct_channel.is_direct(job):
+                if direct_left < 0:
+                    direct_left = direct_channel.room(sess)
+                if direct_left <= 0:
+                    continue
             addr = (job.contact_url or "").replace("mailto:", "").strip()
             if not addr or "@" not in addr:
                 continue
@@ -376,6 +395,8 @@ def pick_batch(limit: int) -> list:
             if not eligibility.check(app, job, emp).allowed:
                 continue
             seen.add(key)
+            if direct_channel.is_direct(job):
+                direct_left -= 1
             out.append({"app_id": app.id, "email": addr, "lang": app.cv_lang or "ru",
                         "title": job.title or job.tag, "score": app.score,
                         "company": job.company_name, "cv_path": app.cv_path,
