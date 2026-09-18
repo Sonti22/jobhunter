@@ -362,7 +362,29 @@ def github_user(login: str, fetcher: Fetcher | None = None) -> dict:
     return _gh_get("https://api.github.com/users/" + login, fetcher) or {}
 
 
-def _person_contact(u: dict, *, company: str = "", need_hiring: bool = True) -> Contact | None:
+_FORMER = re.compile(r"\b(?:ex|former(?:ly)?|previously|prev\.?|past|бывш\w*|экс)\W*$", re.I)
+
+
+def _role_at(bio: str, *names: str) -> str:
+    """Должность, которую человек занимает ИМЕННО в этой компании: «CTO at Acme».
+
+    Живая проверка 18.09: инженер PostHog с био «Engineer, Founder. Building
+    products @PostHog» размечался как основатель PostHog. Слово «Founder» в био —
+    ещё не должность в компании, куда мы пишем.
+    """
+    keys = [k for k in (re.sub(r"[^a-z0-9а-яё]+", "", (n or "").lower()) for n in names)
+            if len(k) >= 3]
+    for m in _EXEC_ROLE.finditer(bio or ""):
+        if _FORMER.search(bio[max(0, m.start() - 14): m.start()]):
+            continue
+        after = re.sub(r"[^a-z0-9а-яё]+", "", bio[m.end(): m.end() + 30].lower())
+        if any(k in after for k in keys):
+            return m.group(0)
+    return ""
+
+
+def _person_contact(u: dict, *, company: str = "", need_hiring: bool = True,
+                    aliases: tuple = ()) -> Contact | None:
     """Профиль GitHub → адресат: email открыт самим человеком, ящик не служебный, не рекрутёр."""
     from ..outreach.mailer import _mailbox_ok
 
@@ -373,18 +395,24 @@ def _person_contact(u: dict, *, company: str = "", need_hiring: bool = True) -> 
     if _RECRUITER.search(" ".join([bio, u.get("login") or "", u.get("company") or "",
                                    u.get("name") or "", email.rsplit("@", 1)[-1]])):
         return None
-    role = _EXEC_ROLE.search(bio)
-    if need_hiring and not _HIRING_BIO.search(bio):
-        return None
-    if not need_hiring and not role and not _HIRING_BIO.search(bio):
-        return None                       # рядовой участник организации — не адресат
+    if need_hiring:
+        # Человек сам пишет, что нанимает: должность — его собственные слова о себе.
+        found = _EXEC_ROLE.search(bio)
+        role = found.group(0) if found else ""
+        if not _HIRING_BIO.search(bio):
+            return None
+    else:
+        # Участник организации целевой компании: должность должна быть в ней самой.
+        role = _role_at(bio, company, *aliases)
+        if not role and not _HIRING_BIO.search(bio):
+            return None                   # рядовой участник организации — не адресат
     login = u.get("login") or ""
     return Contact(
         email=email, kind=EXEC if role else REFERRAL,
         source_url="https://api.github.com/users/" + login,
         company=company or (u.get("company") or "").lstrip("@").strip(),
         person=(u.get("name") or login).strip(),
-        person_role=role.group(0) if role else "", note=bio[:200])
+        person_role=role, note=bio[:200])
 
 
 def github_people(limit: int = 10, fetcher: Fetcher | None = None,
@@ -463,7 +491,7 @@ def github_org_people(company: str, site: str = "", fetcher: Fetcher | None = No
             u = github_user(m.get("login") or "", fetcher=fetcher)
             if u.get(RATE_LIMITED):
                 return out
-            c = _person_contact(u, company=company, need_hiring=False)
+            c = _person_contact(u, company=company, need_hiring=False, aliases=(login,))
             if c:
                 out.append(c)
         break                                              # организация найдена — другие не смотрим

@@ -156,6 +156,10 @@ def test_github_org_gives_leaders_of_the_target_company_only(monkeypatch):
         "lead": {"login": "lead", "name": "Raj", "email": "raj@gmail.com",
                  "bio": "Engineering at Acme — we're hiring!"},
         "quiet": {"login": "quiet", "email": None, "bio": "CEO"},
+        # живая проверка 18.09: инженер с таким био размечался как основатель компании
+        "eng": {"login": "eng", "name": "Charles", "email": "me@charles.dev", "company": "@Acme",
+                "bio": "Minecraft OG, Engineer, Founder. Building self-driving products @Acme"},
+        "gone": {"login": "gone", "email": "old@acme.io", "bio": "Former CTO at Acme, now sailing"},
     }
     f = _org_api({"login": "acme", "blog": "https://www.acme.io"}, members)
     found = people.github_org_people("Acme", "https://acme.io", f)
