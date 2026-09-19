@@ -36,7 +36,7 @@ def check(now: float | None = None) -> str:
     if name and not _state["down_since"]:
         _state["down_since"] = now - age
         what = "телеграм-очередь" if name == "autopilot_tg" else "планировщик"
-        notify.push("autopilot_down",
+        notify.push_once("autopilot_down",
                     "🛑 Автопилот стоит: %s молчит %d мин. Шаги дня не выполняются — ни сбор, "
                     "ни отправка, ни разбор ответов.\nЧаще всего это сеть или VPN. Сторож сам "
                     "перезапустит его в течение часа; быстрее — docker compose restart autopilot"
@@ -46,7 +46,7 @@ def check(now: float | None = None) -> str:
     if not name and _state["down_since"]:
         idle = int((now - _state["down_since"]) // 60)
         _state["down_since"] = 0.0
-        notify.push("autopilot_up",
+        notify.push_once("autopilot_up",
                     "✅ Автопилот снова работает, простой был около %d мин. Пропущенные шаги дня "
                     "он догоняет сам." % idle,
                     dedup="autopilot_up:%s" % time.strftime("%Y-%m-%d-%H-%M", time.gmtime(now)))

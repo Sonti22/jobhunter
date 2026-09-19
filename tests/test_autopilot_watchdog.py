@@ -39,7 +39,7 @@ def test_bot_tells_the_owner_when_autopilot_stalls_and_when_it_is_back(monkeypat
     """19.09: три часа простоя — владелец узнал, только спросив. Бот живёт отдельно и видит пульс."""
     from jobhunter.bot import watch
     sent = []
-    monkeypatch.setattr(watch.notify, "push", lambda kind, text, **kw: sent.append((kind, text)))
+    monkeypatch.setattr(watch.notify, "push_once", lambda kind, text, **kw: sent.append((kind, text)))
     ages = {"autopilot": 30.0, "autopilot_tg": 120.0}
     monkeypatch.setattr(watch.health, "age", lambda name: ages[name])
     watch._state.update(down_since=0.0, checked=0.0)

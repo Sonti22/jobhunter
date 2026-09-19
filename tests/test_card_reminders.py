@@ -129,3 +129,23 @@ def test_send_decision_in_telegram_manual_mode_hands_the_text_to_the_owner(db):
         assert len(out) == 1 and "@recruiter_anna" in out[0].text and "Резюме во вложении" in out[0].text
         url = out[0].markup_json["inline_keyboard"][0][0]["url"]
         assert url.startswith("https://t.me/recruiter_anna?text=")
+
+
+def test_reminders_do_not_repeat_after_delivery(db):
+    """19.09 вживую: сводка пришла трижды за час, напоминание про Zapier — дважды. Ключ dedup у
+    push() защищает только недоставленные копии; доставленное сообщение ключ освобождало."""
+    from jobhunter import owner
+    from jobhunter.models import BotOutbox, utcnow
+    noon = datetime(2026, 9, 19, 9, 0)
+    _card(db, "Zapier", noon - timedelta(hours=10), noon + timedelta(hours=38))
+    assert owner.remind_pending(now=noon) == 1
+    with db.session_scope() as sess:                      # бот всё доставил
+        for o in sess.scalars(select(BotOutbox)):
+            o.sent_at = utcnow()
+    before = len(_texts(db))
+    assert owner.remind_pending(now=noon + timedelta(minutes=30)) == 0
+    assert owner.remind_pending(now=noon + timedelta(hours=1)) == 0
+    assert len(_texts(db)) == before
+    # на следующий день сводка приходит снова — ключ у неё по дате
+    owner.remind_pending(now=noon + timedelta(hours=24))
+    assert len([t for t in _texts(db) if t.startswith("📬")]) == 2

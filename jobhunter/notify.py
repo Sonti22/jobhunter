@@ -74,6 +74,25 @@ def push(kind: str, text: str, *, chat_id: int = 0, dedup: str = "",
         s.add(BotOutbox(**values))
 
 
+def push_once(kind: str, text: str, *, dedup: str, sess=None, **kw) -> bool:
+    """Уведомление, которое приходит один раз за всю историю ключа. True — поставлено.
+
+    У push() ключ dedup защищает только от двух НЕДОСТАВЛЕННЫХ копий: уникальный индекс
+    частичный (sent_at IS NULL). Доставленное сообщение ключ освобождает, и «раз в день»
+    превращается в «раз в каждый проход»: 19.09 утренняя сводка карточек пришла трижды за
+    час, напоминание про Zapier — дважды.
+    """
+    if not enabled():
+        return False
+    key = dedup[:200]
+    ctx = nullcontext(sess) if sess is not None else session_scope()
+    with ctx as s:
+        if s.scalar(select(BotOutbox.id).where(BotOutbox.dedup_key == key).limit(1)) is not None:
+            return False
+        push(kind, text, dedup=key, sess=s, **kw)
+        return True
+
+
 def push_card(req: OwnerRequest, markup: dict | None = None,
               text: str = "", sess=None) -> None:
     """Карточка на решение — в бот.

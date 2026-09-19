@@ -581,10 +581,11 @@ def remind_pending(now: datetime | None = None) -> int:
                     % (max(1, round(left)), title)) if stage == "last" else \
                    ("🔔 «%s» ждёт твоего решения уже %d ч. Рекрутёр ответил — не дай разговору "
                     "остыть.\n/cards" % (title, round(age)))
-            notify.push("card_reminder", text, dedup="card_remind:%d:%s" % (r.id, stage), sess=sess)
-            sent += 1
+            if notify.push_once("card_reminder", text,
+                                dedup="card_remind:%d:%s" % (r.id, stage), sess=sess):
+                sent += 1
         if local.hour >= DIGEST_HOUR:
-            notify.push("cards_digest",
+            notify.push_once("cards_digest",
                         "📬 Ждут твоего ответа: %d\n%s\n\nКаждый второй ответ рекрутёра раньше "
                         "пропадал именно здесь. /cards" % (len(rows), "\n".join(lines[:12])),
                         dedup="cards_digest:%s" % local.strftime("%Y-%m-%d"), sess=sess)
