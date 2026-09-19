@@ -96,3 +96,36 @@ def test_human_card_lives_two_days(db):
         req = owner.create_human_request(sess, app, job, "Пришлите резюме", "не понял")
         ttl = req.expires_at - datetime.now(timezone.utc).replace(tzinfo=None)
         assert ttl > timedelta(hours=47)
+
+
+def test_send_decision_in_telegram_manual_mode_hands_the_text_to_the_owner(db):
+    """Проверка 19.09: владелец дважды нажал «отправить», бот ответил «отложено» и крутил
+    повтор каждые 15 минут. Рекрутёр ничего не получил."""
+    import asyncio
+
+    from jobhunter import decisions
+    from jobhunter.models import Application, BotOutbox, Job, OwnerRequest, utcnow
+    from jobhunter.outreach import policy
+    with db.session_scope() as sess:
+        policy.get_state(sess).manual_only = True
+        job = Job(external_uuid="tg:x/9", source="tg:x", title="Teamlead DevOps", company_name="Acme",
+                  contact_kind="user_handle", contact_handle="recruiter_anna",
+                  contact_url="https://t.me/recruiter_anna")
+        sess.add(job)
+        sess.flush()
+        app = Application(job_id=job.id, status="NEEDS_HUMAN", score=80, sent_at=utcnow())
+        sess.add(app)
+        sess.flush()
+        req = OwnerRequest(application_id=app.id, kind="needs_human", decision="say",
+                           decision_arg="Здравствуйте! Резюме во вложении.", answered_at=utcnow())
+        sess.add(req)
+        sess.flush()
+        req_id = req.id
+    assert asyncio.run(decisions.apply_one(None, req_id)) == "manual"
+    with db.session_scope() as sess:
+        req = sess.get(OwnerRequest, req_id)
+        assert req.applied_at is not None and req.next_try_at is None      # повтор больше не крутится
+        out = [o for o in sess.scalars(select(BotOutbox)) if o.kind == "manual_reply"]
+        assert len(out) == 1 and "@recruiter_anna" in out[0].text and "Резюме во вложении" in out[0].text
+        url = out[0].markup_json["inline_keyboard"][0][0]["url"]
+        assert url.startswith("https://t.me/recruiter_anna?text=")

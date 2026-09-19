@@ -138,6 +138,36 @@ def finish(req_id: int, ok: bool, note: str, error: str = "") -> None:
                     chat_id=chat_id, target_msg_id=msg_id, req_id=req_id)
 
 
+def _hand_over_manual_reply(req_id: int, decision: str, arg: str, lease: dict, job, why: str) -> bool:
+    """Telegram в ручном режиме: отдать владельцу готовый ответ, а не откладывать навсегда.
+
+    Проверка 19.09: владелец дважды нажал «отправить», бот ответил «отложено: ручной режим»
+    и повторял попытку каждые 15 минут без конца. Владелец считал, что ответил, рекрутёр
+    ничего не получил. Сам бот в ручном режиме писать не будет — антиспам Telegram не
+    обходим, — но текст и кнопка «открыть чат» превращают отправку в два касания.
+    """
+    from urllib.parse import quote
+
+    from . import notify
+    if "ручной режим" not in (why or "") or decision not in ("send", "say") or job is None:
+        return False
+    handle = (job.contact_handle or "").strip().lstrip("@")
+    text = (arg if decision == "say" else lease["payload"].get("draft", "") or "").strip()
+    if not handle or not text:
+        return False
+    url = "https://t.me/%s?text=%s" % (handle, quote(text))
+    if len(url) > 1900:                        # предел длины ссылки в кнопке — текст скопируют
+        url = "https://t.me/%s" % handle
+    notify.push("manual_reply",
+                "✍️ Telegram в ручном режиме — этот ответ отправь сам.\n"
+                "Кому: @%s · %s\n\n%s" % (handle, (job.company_name or job.title or "")[:60], text),
+                markup={"inline_keyboard": [[{"text": "💬 Открыть чат с готовым текстом",
+                                              "url": url}]]},
+                dedup="manual_reply:%d" % req_id)
+    finish(req_id, True, "Telegram в ручном режиме: текст передан тебе, отправь сам (кнопка ниже)")
+    return True
+
+
 def _already_answered(app_id: int, since) -> bool:
     """Не ушло ли сообщение по этой заявке уже после принятия решения.
 
@@ -222,6 +252,8 @@ async def apply_one(client, req_id: int, dry: bool = False) -> str:
             allowed, why = can_reply(sess, route.channel_for(current, job)[0]
                                      if current else route.TELEGRAM)
         if not allowed:
+            if _hand_over_manual_reply(req_id, decision, arg, lease, job, why):
+                return "manual"
             finish(req_id, False, "ожидает разрешения отправки", "stop:" + why)
             return "stop:" + why
 
