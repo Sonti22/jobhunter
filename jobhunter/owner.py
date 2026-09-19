@@ -144,8 +144,10 @@ def create_human_request(sess, app: Application, job: Job, incoming: str,
         payload_json={"incoming": (incoming or "")[:900], "draft": draft_text,
                       "reason": reason, "handle": job.contact_handle,
                       "apply_url": apply_url},
+        # Двое суток, а не сутки: половина карточек истекала без ответа (проверка 19.09),
+        # а поздний ответ рекрутёру лучше, чем никакого.
         expires_at=(datetime.now(timezone.utc).replace(tzinfo=None)
-                    + timedelta(hours=_ttl_hours(job, max(24, s.owner_decision_ttl_hours)))))
+                    + timedelta(hours=_ttl_hours(job, max(48, s.owner_decision_ttl_hours)))))
     sess.add(req)
     sess.flush()
     _to_bot(req, sess)
@@ -528,6 +530,65 @@ def _confirm_text(dt_utc: datetime, tz_name: str, meet_link: str = "") -> str:
     if meet_link:
         line += " Ссылка на встречу с моей стороны: %s" % meet_link
     return line
+
+
+REMIND_AFTER_HOURS = 8        # карточка висит без решения — первое напоминание
+REMIND_BEFORE_HOURS = 3       # и последнее: скоро истечёт
+DIGEST_HOUR = 9               # утренняя сводка «кто ждёт ответа», по часам владельца
+
+
+def _card_title(sess, req: OwnerRequest) -> str:
+    app = sess.get(Application, req.application_id) if req.application_id else None
+    job = sess.get(Job, app.job_id) if app else None
+    return ((job.company_name or job.title or job.tag) if job else "") or "заявка #%s" % req.application_id
+
+
+def remind_pending(now: datetime | None = None) -> int:
+    """Напомнить владельцу о карточках без решения. Возвращает число напоминаний.
+
+    Проверка 19.09: из 25 карточек 12 истекли без ответа, медиана решения — 24 часа,
+    ровно срок жизни карточки. Бот получал ответ рекрутёра, а дальше разговор умирал в
+    ожидании: карточка приходила один раз и тонула в ленте. Теперь — напоминание через
+    восемь часов, ещё одно за три часа до истечения и утренняя сводка. Повторов нет:
+    у каждого напоминания свой ключ дедупликации.
+    """
+    from zoneinfo import ZoneInfo
+
+    from . import notify
+    now = now or datetime.now(timezone.utc).replace(tzinfo=None)
+    local = now.replace(tzinfo=timezone.utc).astimezone(ZoneInfo(get_settings().owner_tz))
+    sent = 0
+    with session_scope() as sess:
+        rows = sess.scalars(
+            select(OwnerRequest).where(OwnerRequest.decision == "",
+                                       OwnerRequest.expires_at.is_not(None),
+                                       OwnerRequest.expires_at > now)
+            .order_by(OwnerRequest.expires_at)).all()
+        if not rows:
+            return 0
+        lines = []
+        for r in rows:
+            left = (r.expires_at - now).total_seconds() / 3600
+            age = (now - r.created_at).total_seconds() / 3600
+            title = _card_title(sess, r)[:40]
+            lines.append("• %s — осталось %d ч" % (title, max(1, round(left))))
+            stage = "last" if left <= REMIND_BEFORE_HOURS else \
+                "first" if age >= REMIND_AFTER_HOURS else ""
+            # ночью не будим: напоминание придёт утром, сводкой
+            if not stage or not 8 <= local.hour < 23:
+                continue
+            text = ("⏰ Истекает через %d ч: «%s» ждёт твоего ответа рекрутёру.\n/cards"
+                    % (max(1, round(left)), title)) if stage == "last" else \
+                   ("🔔 «%s» ждёт твоего решения уже %d ч. Рекрутёр ответил — не дай разговору "
+                    "остыть.\n/cards" % (title, round(age)))
+            notify.push("card_reminder", text, dedup="card_remind:%d:%s" % (r.id, stage), sess=sess)
+            sent += 1
+        if local.hour >= DIGEST_HOUR:
+            notify.push("cards_digest",
+                        "📬 Ждут твоего ответа: %d\n%s\n\nКаждый второй ответ рекрутёра раньше "
+                        "пропадал именно здесь. /cards" % (len(rows), "\n".join(lines[:12])),
+                        dedup="cards_digest:%s" % local.strftime("%Y-%m-%d"), sess=sess)
+    return sent
 
 
 def expire_stale() -> int:

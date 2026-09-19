@@ -735,8 +735,17 @@ def step_interview_reminders() -> dict:
     этой системе, и там же лежит контекст встречи.
     """
     from .schedule.remind import run as remind_run
+    # Карточки без решения — здесь же: этот шаг не зависит от Telegram, а истечение
+    # карточек жило внутри шага входящих и вставало вместе с ним.
+    cards = 0
     try:
-        return remind_run()
+        from . import owner
+        cards = owner.remind_pending()
+        owner.expire_stale()
+    except Exception as e:
+        log.error("напоминания о карточках: %s: %s", type(e).__name__, str(e)[:120])
+    try:
+        return dict(remind_run() or {}, card_reminders=cards)
     except Exception as e:
         log.error("напоминания: %s: %s", type(e).__name__, str(e)[:120])
         return {"error": type(e).__name__}
