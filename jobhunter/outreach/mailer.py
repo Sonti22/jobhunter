@@ -369,8 +369,13 @@ def pick_batch(limit: int) -> list:
                 pair[1].source if pair[1] else "", source_rates)),
             pair[0].id), reverse=True)
         direct_left = -1                  # -1: потолок прямых писем ещё не спрашивали
+        # Отключённый источник не только не собирается, но и не тратит дневной потолок почты
+        # на уже собранное: trudvsem — 12 писем, 0 ответов (проверка 19.09).
+        off = {x.strip().lower() for x in (get_settings().disabled_sources or "").split(",") if x.strip()}
         for app, job in pairs:
             if not job or job.is_closed or job.contact_kind != ContactKind.EMAIL.value:
+                continue
+            if (job.source or "").split(":")[0].lower() in off:
                 continue
             if direct_channel.is_direct(job):
                 if direct_left < 0:

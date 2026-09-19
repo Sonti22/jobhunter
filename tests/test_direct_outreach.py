@@ -300,3 +300,26 @@ def test_owner_can_block_company_and_screen_renders(db):
     with db.session_scope() as sess:
         app = sess.get(Application, app_id)
         assert app.status == "WITHDRAWN" and sess.get(Employer, app.employer_id).do_not_contact
+
+
+def test_disabled_source_is_neither_sent_nor_collected(db, monkeypatch):
+    """Проверка 19.09: trudvsem — 12 писем и ни одного ответа; ergodotisi — всё отсеяно."""
+    from jobhunter import autopilot
+    from jobhunter.models import Application, ContactKind, Job
+    from jobhunter.outreach import mailer
+    assert {"trudvsem", "ergodotisi"} <= autopilot.disabled_sources()
+    with db.session_scope() as sess:
+        for src, addr in (("trudvsem", "hr@zavod.ru"), ("hn", "jobs@startup.dev")):
+            job = Job(external_uuid=src + "1", source=src, title="Backend Engineer", company_name=src,
+                      description_raw="We are hiring a backend engineer. Remote.",
+                      contact_kind=ContactKind.EMAIL.value, contact_url=addr)
+            sess.add(job)
+            sess.flush()
+            sess.add(Application(job_id=job.id, status="APPROVED", score=70, gate_passed=True,
+                                 cv_lang="en", message_body="Hello"))
+    assert [b["email"] for b in mailer.pick_batch(10)] == ["jobs@startup.dev"]
+    monkeypatch.setenv("DISABLED_SOURCES", "")
+    from jobhunter.config import get_settings
+    get_settings.cache_clear()
+    assert autopilot.disabled_sources() == set()
+    assert len(mailer.pick_batch(10)) == 2

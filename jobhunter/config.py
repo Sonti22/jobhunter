@@ -206,6 +206,11 @@ class Settings(BaseSettings):
     direct_rampup_limit: int = Field(default=5)
     direct_company_cooldown_days: int = Field(default=30)
     direct_bounce_stop: int = Field(default=2)
+    # Источники, которые собирать незачем (через запятую). Проверка 19.09: trudvsem —
+    # 12 писем и ни одного ответа за всё время (госпортал, офисные вакансии), ergodotisi —
+    # 27 вакансий из 27 отсеяны по баллу. Пустая строка включает всё обратно.
+    disabled_sources: str = Field(default="trudvsem,ergodotisi")
+
     # Без токена GitHub даёт 60 запросов в час — хватает на 2–3 компании. Токен без
     # прав (только публичные данные) поднимает лимит до 5000.
     github_token: str = Field(default="")

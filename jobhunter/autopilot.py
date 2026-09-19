@@ -101,8 +101,10 @@ def step_ingest() -> dict:
         log.warning("ATS: %s", str(e)[:100])
         totals["ats"] = {"error": type(e).__name__}
     try:
+        from .ingest.boards import SOURCES as BOARD_SOURCES
         from .ingest.boards import BoardsSource
-        totals["boards"] = save_jobs(BoardsSource().iter_jobs(), verbose=False)
+        boards = [n for n in BOARD_SOURCES if n not in disabled_sources()]
+        totals["boards"] = save_jobs(BoardsSource(only=boards).iter_jobs(), verbose=False)
     except Exception as e:
         log.warning("job-борды: %s", str(e)[:100])
         totals["boards"] = {"error": type(e).__name__}
@@ -119,6 +121,9 @@ def step_ingest() -> dict:
         totals["jobapis"] = {"error": type(e).__name__}
         API_SOURCES = {}
     for api_name, api_cls in API_SOURCES.items():
+        if api_name in disabled_sources():
+            totals[api_name] = {"skipped": "источник отключён (DISABLED_SOURCES)"}
+            continue
         try:
             totals[api_name] = save_jobs(api_cls().iter_jobs(), verbose=False)
         except Exception as e:
@@ -957,6 +962,11 @@ def step_mail_digest() -> None:
     log.info("почтовый дайджест отправлен в бот")
 
 
+def disabled_sources() -> set:
+    """Источники, выключенные владельцем или проверкой (config.disabled_sources)."""
+    return {x.strip().lower() for x in (get_settings().disabled_sources or "").split(",") if x.strip()}
+
+
 # Одна сессия отправки легально держит телеграм-пул до ~25 минут, healthcheck ждёт 40.
 # Час без пульса — это уже не работа, а зависший вызов.
 TG_WEDGE_SECONDS = 3600
@@ -1029,9 +1039,25 @@ def run_daemon() -> int:
     sched.add_job(step_send_telegram, "cron", hour=16, minute=40, id="tg2", **tg)
     # Сбор вакансий не должен ждать следующего утра. Тот же однопоточный
     # tg-пул не допускает пересечения с Telethon-сессией отправки.
-    sched.add_job(step_ingest_telegram, "cron", hour=13, minute=30,
+    def _ingest_tg_then_send():
+        """Дневной и вечерний сбор сразу доводится до отправки.
+
+        Раньше подготовка, одобрение и почта шли раз в день утром: собранное в 13:30 и
+        18:30 ждало 10:00 следующего дня и старело на сутки при допустимом возрасте
+        вакансии в семь дней (проверка 19.09). Цепочка уходит в общий пул — телеграм-пул
+        из одного потока нельзя занимать рендером резюме. Отправщик берёт только ещё не
+        отправленное в пределах дневного потолка, повторов не бывает.
+        """
+        stats = step_ingest_telegram()
+        if isinstance(stats, dict) and stats.get("new"):
+            sched.add_job(_chain(["prepare", "approve", "email"]), "date", id="after_tg_ingest",
+                          replace_existing=True,
+                          run_date=datetime.now() + timedelta(seconds=20), **opts)
+        return stats
+
+    sched.add_job(_ingest_tg_then_send, "cron", hour=13, minute=30,
                   id="ingest_tg_midday", **tg)
-    sched.add_job(step_ingest_telegram, "cron", hour=18, minute=30,
+    sched.add_job(_ingest_tg_then_send, "cron", hour=18, minute=30,
                   id="ingest_tg_evening", **tg)
     # Входящие — каждые 20 минут днём: рекрутёру, назвавшему время, нельзя
     # отвечать на следующий день, а чаще — лишний трафик по MTProto.
