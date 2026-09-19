@@ -519,9 +519,9 @@ class TelegramChannelSource:
                     handle = extract_telegram_handle(
                         text, denylist=[channel] + list(self.channels) + CROSS_PROMO)
                     email = extract_email(text)
-                    bot_link = "" if (handle or email) else apply_bot_link(post.get("links"))
+                    bot_link = "" if (handle or email) else apply_bot_link(post.get("links") or [])
                     site_link = "" if (handle or email or bot_link) \
-                        else apply_site_link(post.get("links"))
+                        else apply_site_link(post.get("links") or [])
                     kind = (ContactKind.USER_HANDLE.value if handle
                             else ContactKind.EMAIL.value if email
                             else ContactKind.BOT.value if bot_link

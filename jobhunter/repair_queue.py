@@ -40,7 +40,7 @@ def reset_email_language(dry: bool = True) -> dict:
     """
     from .tailor.select import _pick_lang
 
-    stats = Counter()
+    stats: Counter = Counter()
     with session_scope() as sess:
         rows = sess.scalars(
             select(Application).where(
@@ -96,7 +96,7 @@ def reset_email_language(dry: bool = True) -> dict:
 
 
 def reset(dry: bool = True) -> dict:
-    stats = Counter()
+    stats: Counter = Counter()
     with session_scope() as sess:
         # sent_at IS NULL — не украшение, а суть: без него пересборка
         # откатывала УЖЕ ОТПРАВЛЕННЫЕ заявки в дозаявочный статус. Так
@@ -140,6 +140,69 @@ def reset(dry: bool = True) -> dict:
             app.gate_failures_json = []
             app.updated_at = utcnow()
             stats["сброшено"] += 1
+    return dict(stats)
+
+
+TELEGRAM_STALE_DAYS = 14
+
+
+def sweep_dead_approved(dry: bool = False) -> dict:
+    """Закрыть одобренные заявки, которые уже никогда не уйдут. Возвращает счётчики по причинам.
+
+    Проверка 19.09: «одобрено 187», а к отправке готово ноль — вакансии устарели, вместо
+    адреса лежит ссылка на сайт, ящик служебный. Счётчик в боте врал, а владелец думал,
+    что очередь полна. Прямые письма и заявки с попытками отправки не трогаем; «этому
+    работодателю недавно писали» — причина временная, такие остаются ждать.
+    """
+    from .models import Employer
+    from .outreach import eligibility
+    from .outreach.mailer import _mailbox_ok
+
+    stats: Counter = Counter()
+    now = utcnow().replace(tzinfo=None)
+    with session_scope() as sess:
+        ids = [a.id for a in sess.scalars(select(Application).where(
+            Application.status == Status.APPROVED.value, Application.sent_at.is_(None)))]
+    for app_id in ids:
+        with session_scope() as sess:
+            app = sess.get(Application, app_id)
+            if app is None or app.status != Status.APPROVED.value or app.sent_at is not None:
+                continue
+            job = sess.get(Job, app.job_id)
+            if job is not None and (job.source or "").startswith("direct:"):
+                continue
+            why, to_manual = "", False
+            if job is None or job.is_closed:
+                why = "вакансия закрыта"
+            elif job.contact_kind == ContactKind.EMAIL.value:
+                addr = (job.contact_url or "").replace("mailto:", "").strip()
+                if "@" not in addr:
+                    why, to_manual = "вместо адреса ссылка на сайт — отклик вручную", addr.startswith("http")
+                elif not _mailbox_ok(addr):
+                    why = "служебный ящик, не про наём"
+                else:
+                    emp = sess.get(Employer, app.employer_id) if app.employer_id else None
+                    verdict = eligibility.check(app, job, emp)
+                    if not verdict.allowed and str(verdict.reason).startswith("Вакансии"):
+                        why = "вакансия устарела: " + str(verdict.reason)[:60]
+            elif job.contact_kind == ContactKind.USER_HANDLE.value and job.posted_at:
+                from datetime import datetime
+                age = (now - datetime.utcfromtimestamp(job.posted_at)).days
+                if age > TELEGRAM_STALE_DAYS:
+                    why = "вакансия устарела: %d дней" % age
+            if not why:
+                continue
+            stats[why.split(":")[0]] += 1
+            if dry:
+                continue
+            if to_manual:
+                # Это настоящая вакансия с формой отклика — ей место в ручной очереди.
+                job.contact_kind = ContactKind.EXTERNAL_URL.value
+                app.status = Status.HANDLE_MISSING.value
+            elif not app.advance(Status.WITHDRAWN, reason=why):
+                continue
+            app.review_note = ("автозакрытие: " + why)[:200]
+            app.updated_at = utcnow()
     return dict(stats)
 
 

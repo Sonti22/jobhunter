@@ -691,6 +691,16 @@ def step_manual_prepare() -> dict:
             log.info("ручная очередь: сброшено писем из-за языка %d",
                      lang_fix["сброшено"])
 
+        # Одобренное, которое уже никогда не уйдёт, закрываем с причиной: иначе счётчик
+        # «одобрено» в боте обещает очередь, которой нет.
+        try:
+            from .repair_queue import sweep_dead_approved
+            dead = sweep_dead_approved()
+            if dead:
+                log.info("одобренные без шансов на отправку закрыты: %s", dead)
+        except Exception as e:                                  # noqa: BLE001
+            log.warning("уборка одобренных: %s: %s", type(e).__name__, str(e)[:120])
+
         # Уборка до скоринга: незачем оценивать то, по чему нельзя
         # откликнуться.
         swept = sweep_unreachable(apply=True)

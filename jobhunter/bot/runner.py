@@ -197,6 +197,8 @@ def run_forever() -> int:
         own = httpx.Client(timeout=30, trust_env=False)
         while not stop.is_set():
             try:
+                from . import watch
+                watch.check()                     # автопилот встал или поднялся — скажем владельцу
                 n = outbox.drain(http=own)
                 if n:
                     log.info("доставлено уведомлений: %d", n)

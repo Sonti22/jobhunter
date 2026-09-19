@@ -323,3 +323,43 @@ def test_disabled_source_is_neither_sent_nor_collected(db, monkeypatch):
     get_settings.cache_clear()
     assert autopilot.disabled_sources() == set()
     assert len(mailer.pick_batch(10)) == 2
+
+
+def test_dead_approved_tail_is_closed_with_a_reason(db, monkeypatch):
+    """Проверка 19.09: «одобрено 187», к отправке готово 0 — счётчик в боте обещал очередь,
+    которой нет."""
+    import time
+
+    from jobhunter.models import Application, ContactKind, Job
+    from jobhunter.repair_queue import sweep_dead_approved
+    monkeypatch.setenv("MAX_VACANCY_AGE_DAYS", "7")
+    from jobhunter.config import get_settings
+    get_settings.cache_clear()
+    old, fresh = int(time.time()) - 30 * 86400, int(time.time()) - 86400
+    rows = [("stale", "email", "hr@old.ru", old), ("link", "email", "https://jobicy.com/jobs/1", fresh),
+            ("service", "email", "support@corp.ru", fresh), ("good", "email", "jobs@startup.dev", fresh),
+            ("tg_old", "user_handle", "https://t.me/anna", old), ("tg_new", "user_handle", "https://t.me/ivan", fresh)]
+    ids = {}
+    with db.session_scope() as sess:
+        for name, kind, contact, posted in rows:
+            job = Job(external_uuid=name, source="tg:x", title="Backend Engineer", company_name=name,
+                      description_raw="We are hiring a backend engineer. Remote.", contact_kind=kind,
+                      contact_url=contact, posted_at=posted,
+                      contact_handle=contact.rsplit("/", 1)[-1] if kind == "user_handle" else "")
+            sess.add(job)
+            sess.flush()
+            app = Application(job_id=job.id, status="APPROVED", score=70, gate_passed=True, message_body="Hi")
+            sess.add(app)
+            sess.flush()
+            ids[name] = app.id
+    direct_id = _direct_app(db, "marco@konghq.com", status="APPROVED", company="Kong")
+    stats = sweep_dead_approved()
+    assert sum(stats.values()) == 4
+    with db.session_scope() as sess:
+        st = {n: sess.get(Application, i).status for n, i in ids.items()}
+        assert st == {"stale": "WITHDRAWN", "link": "HANDLE_MISSING", "service": "WITHDRAWN",
+                      "good": "APPROVED", "tg_old": "WITHDRAWN", "tg_new": "APPROVED"}
+        assert sess.get(Application, direct_id).status == "APPROVED"          # прямые письма не трогаем
+        assert "автозакрытие" in sess.get(Application, ids["stale"]).review_note
+        link_job = sess.get(Job, sess.get(Application, ids["link"]).job_id)
+        assert link_job.contact_kind == ContactKind.EXTERNAL_URL.value        # ушла в ручную очередь
