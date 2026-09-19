@@ -972,6 +972,31 @@ def step_mail_digest() -> None:
     log.info("почтовый дайджест отправлен в бот")
 
 
+def send_after_ingest(steps: tuple = ()) -> dict:
+    """Довести только что собранное до отправки: подготовка → одобрение → почта.
+
+    Зовёт сами функции шагов, а не задания планировщика: дневные задания обёрнуты
+    защитой «сегодня уже выполнялось» и молча возвращают None. Первая версия (19.09)
+    звала именно их — вечерний сбор принёс 373 вакансии, цепочка «отработала» за
+    миллисекунды и не сделала ничего, без единой строки в логе.
+    """
+    from .observability import record
+    steps = steps or (("prepare", step_prepare), ("approve", step_auto_approve),
+                      ("email", step_send_email))
+    out: dict = {}
+    for name, fn in steps:
+        try:
+            res = fn()
+            out[name] = res if isinstance(res, dict) else {"result": res}
+        except Exception as e:                                  # noqa: BLE001
+            log.error("после сбора: %s: %s: %s", name, type(e).__name__, str(e)[:120])
+            out[name] = {"error": type(e).__name__}
+    log.info("после сбора: %s", str(out)[:300])
+    record("task:after_ingest", "error" if any("error" in v for v in out.values()) else "ok",
+           details=out)
+    return out
+
+
 def disabled_sources() -> set:
     """Источники, выключенные владельцем или проверкой (config.disabled_sources)."""
     return {x.strip().lower() for x in (get_settings().disabled_sources or "").split(",") if x.strip()}
@@ -1060,7 +1085,7 @@ def run_daemon() -> int:
         """
         stats = step_ingest_telegram()
         if isinstance(stats, dict) and stats.get("new"):
-            sched.add_job(_chain(["prepare", "approve", "email"]), "date", id="after_tg_ingest",
+            sched.add_job(send_after_ingest, "date", id="after_tg_ingest",
                           replace_existing=True,
                           run_date=datetime.now() + timedelta(seconds=20), **opts)
         return stats

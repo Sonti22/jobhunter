@@ -54,3 +54,40 @@ def test_bot_tells_the_owner_when_autopilot_stalls_and_when_it_is_back(monkeypat
     assert watch.check(now=1300.0) == "up" and "снова работает" in sent[1][1]
     ages["autopilot"] = float("inf")                                  # пульса нет вовсе — не паникуем
     assert watch.check(now=1400.0) == ""
+
+
+def test_chain_after_ingest_runs_the_real_steps_and_survives_a_failing_one(tmp_path, monkeypatch):
+    """19.09: вечерний сбор принёс 373 вакансии, а цепочка молча не сделала ничего — она звала
+    задания планировщика, обёрнутые защитой «сегодня уже выполнялось»."""
+    monkeypatch.setenv("DB_PATH", str(tmp_path / "chain.db"))
+    import jobhunter.db as dbmod
+    from jobhunter.config import get_settings
+    get_settings.cache_clear()
+    dbmod._engine = None
+    dbmod._Session = None
+    try:
+        from jobhunter import autopilot
+        from jobhunter.models import RuntimeState
+        calls = []
+
+        def boom():
+            calls.append("approve")
+            raise RuntimeError("нет сети")
+        out = autopilot.send_after_ingest(steps=(
+            ("prepare", lambda: calls.append("prepare") or {"processed": 3}),
+            ("approve", boom),
+            ("email", lambda: calls.append("email") or {"ok": True})))
+        assert calls == ["prepare", "approve", "email"]           # сбой одного шага не рвёт цепочку
+        assert out["prepare"] == {"processed": 3} and out["approve"] == {"error": "RuntimeError"}
+        with dbmod.session_scope() as sess:
+            assert sess.get(RuntimeState, "task:after_ingest").status == "error"
+        # по умолчанию — сами функции шагов, а не обёрнутые задания планировщика
+        import inspect
+        src = inspect.getsource(autopilot.send_after_ingest)
+        assert "step_prepare" in src and "step_auto_approve" in src and "step_send_email" in src
+    finally:
+        if dbmod._engine is not None:
+            dbmod._engine.dispose()
+        dbmod._engine = None
+        dbmod._Session = None
+        get_settings.cache_clear()
