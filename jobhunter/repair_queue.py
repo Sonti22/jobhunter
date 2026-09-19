@@ -58,6 +58,11 @@ def reset_email_language(dry: bool = True) -> dict:
             job = sess.get(Job, app.job_id)
             if not job or job.contact_kind != ContactKind.EMAIL.value:
                 continue
+            # У прямого письма описание — служебный русский текст, а язык выбирается по
+            # адресату (direct_letter.lang_for). 19.09 все 16 подготовленных писем
+            # руководителям были сброшены как «письмо не на языке вакансии».
+            if (job.source or "").startswith("direct:"):
+                continue
             expected = _pick_lang(job.description_raw or "", job.title or "")
             if (app.cv_lang or "ru") == expected:
                 continue

@@ -135,6 +135,18 @@ def test_company_or_person_named_like_a_technology_passes_truth_gate(db):
     assert not bad.passed
 
 
+def test_language_repair_leaves_direct_letters_alone(db):
+    """19.09: ручная подготовка сбросила все 16 готовых писем — описание у них русское
+    служебное, а письмо английское, и «исправление языка» считало это ошибкой."""
+    from jobhunter.models import Application
+    from jobhunter.repair_queue import reset_email_language
+    app_id = _direct_app(db, "marco@konghq.com", status="APPROVED", company="Kong")
+    assert reset_email_language(dry=False).get("сброшено", 0) == 0
+    with db.session_scope() as sess:
+        app = sess.get(Application, app_id)
+        assert app.status == "APPROVED" and app.message_body and app.cv_lang == "en"
+
+
 def test_lowercase_company_from_github_login_is_capitalised(db):
     from jobhunter.ingest import people
     from jobhunter.models import Job
