@@ -135,6 +135,20 @@ def test_company_or_person_named_like_a_technology_passes_truth_gate(db):
     assert not bad.passed
 
 
+def test_lowercase_company_from_github_login_is_capitalised(db):
+    from jobhunter.ingest import people
+    from jobhunter.models import Job
+    from jobhunter.outreach import direct
+    with db.session_scope() as sess:
+        for email, company in (("cto@inato.com", "inato"), ("cto@konghq.com", "Kong"),
+                               ("a@eye2gene.com", "eye2gene")):
+            direct._create(sess, people.Contact(email=email, kind=people.EXEC, company=company,
+                                                source_url="https://api.github.com/users/x"))
+    with db.session_scope() as sess:
+        names = sorted(n for n, in sess.execute(select(Job.company_name).where(Job.source == "direct:exec")))
+        assert names == ["Eye2gene", "Inato", "Kong"]
+
+
 def test_general_inbox_waits_for_owner(db):
     """hello@/info@ читает поддержка: такое письмо само не уходит (сухой прогон 18.09)."""
     from jobhunter.models import Application

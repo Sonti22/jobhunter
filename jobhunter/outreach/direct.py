@@ -236,6 +236,12 @@ def _create(sess, contact, *, role: str = "", jd_text: str = "", linked: list | 
         sess.add(emp)
         sess.flush()
     kind = "referral" if contact.kind == people.REFERRAL else "exec"
+    # Название часто приходит логином GitHub («inato»): в теме письма строчная
+    # буква выглядит как рассылка. Бренд целиком не угадать, первую букву — можно.
+    company = (contact.company or "").strip()
+    if company and company == company.lower() and company[0].isalpha():
+        company = company[0].upper() + company[1:]
+    contact.company = company
     job = Job(external_uuid=PREFIX + email, source=PREFIX + kind, title=role or "",
               title_norm=norm_keep_digits(role or ""), company_name=contact.company or "",
               description_raw=_context(contact, role, linked or []),
