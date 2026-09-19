@@ -208,6 +208,14 @@ def _clip(text: str, limit: int) -> str:
     cut = t[:limit]
     if " " in cut:
         cut = cut[:cut.rfind(" ")]
+    # Обрезка посреди скобки оставляет её незакрытой: «Знание Linux (у нас используется…».
+    # Проверка читаемости бракует такое письмо целиком — так потеряны 22 отклика из 89
+    # отказов гейта (проверка 19.09). Незакрытый хвост отбрасываем вместе со скобкой.
+    for opener, closer in (("(", ")"), ("«", "»"), ("“", "”"), ("[", "]")):
+        if cut.count(opener) > cut.count(closer):
+            head = cut[:cut.rfind(opener)].rstrip(" ,;:—-")
+            if len(head) >= 12:
+                cut = head
     return cut.rstrip(" ,;:—-") + "…"
 
 # Для Middle-вакансий: без счётчика лет и без «Tech Lead» — тот же принцип,

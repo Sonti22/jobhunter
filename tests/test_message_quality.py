@@ -107,3 +107,20 @@ def test_quality_rejects(text, marker):
 ])
 def test_quality_accepts_normal_text(text):
     assert quality_problem(text) == ""
+
+
+def test_clipped_requirement_never_leaves_an_open_bracket():
+    """Проверка 19.09: 22 письма из 89 отказов гейта упали на «непарные скобки» — цитата
+    требования обрезалась многоточием посреди скобки."""
+    from jobhunter.tailor.llm_writer import quality_problem
+    from jobhunter.tailor.message import _clip
+    ru = _clip("Знание Linux на уровне системного администратора (у нас используется Astra и "
+               "немного CentOS в старом контуре)", 70)
+    en = _clip("Strong Linux knowledge (networking, kernel tuning, performance analysis, eBPF)", 60)
+    for cut in (ru, en):
+        assert cut.endswith("…") and cut.count("(") == cut.count(")")
+        assert not quality_problem("В требованиях увидел «%s» — с этим работал." % cut)
+    assert ru.startswith("Знание Linux на уровне системного администратора")
+    # закрытая скобка внутри лимита остаётся как есть
+    assert _clip("Python (3.10+) и FastAPI в продакшене, опыт от трёх лет и больше того", 40) \
+        .startswith("Python (3.10+)")
