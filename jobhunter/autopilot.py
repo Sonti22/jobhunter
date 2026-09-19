@@ -25,6 +25,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import logging
+import os
 import sys
 import time
 from datetime import datetime, timedelta, timezone
@@ -947,6 +948,33 @@ def step_mail_digest() -> None:
     log.info("почтовый дайджест отправлен в бот")
 
 
+# Одна сессия отправки легально держит телеграм-пул до ~25 минут, healthcheck ждёт 40.
+# Час без пульса — это уже не работа, а зависший вызов.
+TG_WEDGE_SECONDS = 3600
+
+
+def wedged(tg_pulse_age: float) -> bool:
+    """Телеграм-очередь зависла. inf (пульса не было вовсе) зависанием не считаем —
+    иначе неверно настроенная папка пульса уводила бы процесс в вечный перезапуск."""
+    return TG_WEDGE_SECONDS < tg_pulse_age < float("inf")
+
+
+def _watchdog() -> None:
+    """Завершить зависший процесс, чтобы Docker поднял его заново.
+
+    19.09 на 2,5 часа пропала сеть; вызов Telethon завис без таймаута, шаги
+    «входящие» и «решения» встали навсегда, цепочка догона — за ними. Контейнер
+    стал unhealthy, но Docker такие не перезапускает: автопилот простоял три часа
+    после возвращения сети, пока его не перезапустили руками. При restart:
+    unless-stopped выход из процесса = перезапуск, а догон на старте возвращает день.
+    """
+    age = health.age("autopilot_tg")
+    if wedged(age):
+        log.critical("телеграм-очередь молчит %.0f мин — выхожу, Docker перезапустит", age / 60)
+        logging.shutdown()
+        os._exit(1)
+
+
 def run_daemon() -> int:
     from apscheduler.executors.pool import ThreadPoolExecutor
     from apscheduler.schedulers.blocking import BlockingScheduler
@@ -1041,6 +1069,9 @@ def run_daemon() -> int:
     # перестанет отмечаться, и Docker это увидит.
     sched.add_job(lambda: health.beat("autopilot"), "interval", minutes=1,
                   id="beat", max_instances=1, coalesce=True, executor="beat")
+    # Сторож живёт в пуле пульса: тот свободен, даже когда остальные пулы стоят.
+    sched.add_job(_watchdog, "interval", minutes=5, id="watchdog",
+                  max_instances=1, coalesce=True, executor="beat")
     # Пульс из tg-пула: основной beat не видит зависший Telethon-вызов —
     # default-поток отбивается, а вся tg-очередь мертва. Порог свободный
     # (40 мин): одна сессия отправки легально держит пул до ~25 минут.
