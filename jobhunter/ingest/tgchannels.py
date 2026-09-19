@@ -319,6 +319,27 @@ _FIELD = re.compile(r"^[^\w\n]{0,6}(должность|позиция|вакан
                     r"(.{2,120}?)\s*$", re.I | re.M)
 
 
+# Ссылка «откликнуться на сайте»: у целых каналов отклик только такой — progjob ведёт на
+# career.habr.com, ya_jobs на yandex.ru/jobs. Контактом она не считалась, и вакансия
+# закрывалась как недостижимая, не попадая даже в ручную очередь (проверка 19.09:
+# ~1 100 вакансий в девяти каналах).
+_NOT_AN_APPLY_SITE = re.compile(
+    r"(?:^|\.)(?:t\.me|telegram\.me|telegra\.ph|tgstat\.\w+|youtube\.com|youtu\.be|instagram\.com|"
+    r"facebook\.com|tiktok\.com|twitter\.com|x\.com|boosty\.to|patreon\.com|vk\.com|vk\.cc|"
+    r"dzen\.ru|taplink\.\w+|linktr\.ee)$", re.I)
+
+
+def apply_site_link(links: list) -> str:
+    """Последняя внешняя ссылка поста: отклик обычно стоит в конце, под текстом вакансии."""
+    from urllib.parse import urlparse
+    for href in reversed(links or []):
+        href = (href or "").strip()
+        host = (urlparse(href).hostname or "").lower()
+        if href.startswith("http") and "." in host and not _NOT_AN_APPLY_SITE.search(host):
+            return href[:500]
+    return ""
+
+
 def apply_bot_link(links: list) -> str:
     """Ссылка «откликнуться через бота» среди ссылок поста, иначе пусто."""
     for href in links or []:
@@ -499,11 +520,14 @@ class TelegramChannelSource:
                         text, denylist=[channel] + list(self.channels) + CROSS_PROMO)
                     email = extract_email(text)
                     bot_link = "" if (handle or email) else apply_bot_link(post.get("links"))
+                    site_link = "" if (handle or email or bot_link) \
+                        else apply_site_link(post.get("links"))
                     kind = (ContactKind.USER_HANDLE.value if handle
                             else ContactKind.EMAIL.value if email
                             else ContactKind.BOT.value if bot_link
+                            else ContactKind.EXTERNAL_URL.value if site_link
                             else ContactKind.UNKNOWN.value)
-                    if handle or email or bot_link:
+                    if handle or email or bot_link or site_link:
                         stat["contacts"] += 1
                     fields = post_fields(text)
                     # Автопоиск может принести новые реферальные каналы — узнаём их по имени.
@@ -527,11 +551,12 @@ class TelegramChannelSource:
                         salary_raw=sal.group(0).strip() if sal else "",
                         contact_kind=kind,
                         contact_handle=handle,
-                        contact_url="https://t.me/%s" % handle if handle else bot_link,
+                        contact_url="https://t.me/%s" % handle if handle else bot_link or site_link,
                         contact_email=email,
                         all_links=[{"key": "telegram", "value": "https://t.me/%s" % handle}]
                                   if handle else
-                                  [{"key": "apply_bot", "value": bot_link}] if bot_link else [],
+                                  [{"key": "apply_bot", "value": bot_link}] if bot_link else
+                                  [{"key": "apply_site", "value": site_link}] if site_link else [],
                         raw={"channel": channel, "post": post_id,
                              "post_url": "https://t.me/%s" % post_id,
                              "referral": referral,

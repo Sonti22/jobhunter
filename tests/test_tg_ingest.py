@@ -75,6 +75,80 @@ def test_referral_channel_post_keeps_role_company_and_apply_bot(monkeypatch):
     assert not job.has_direct_contact                     # автомат туда не пишет — только владелец
 
 
+HABR_POST = (
+    '<div data-post="progjob/501"><time datetime="2026-09-18T07:00:00+00:00">'
+    '<div class="tgme_widget_message_text">'
+    "Вакансия: Backend-разработчик (Python). Требования: Python, FastAPI, PostgreSQL. "
+    "Мы предлагаем удалённую работу, зарплата от 300 000 ₽. Подписывайтесь: "
+    '<a href="https://t.me/progjob">@progjob</a><br/>'
+    '<a href="https://career.habr.com/vacancies/1000123">Откликнуться на Хабр Карьере</a>'
+    "</div></div>")
+
+
+def _scan(monkeypatch, channel, html):
+    import jobhunter.ingest.tgchannels as tg
+    monkeypatch.setattr(tg, "_verified_channels", lambda: [])
+    monkeypatch.setattr(tg, "_discovered", lambda: [])
+
+    class Response:
+        status_code = 200
+        text = html
+    src = tg.TelegramChannelSource(channels=[channel], throttle=0)
+    monkeypatch.setattr(src.http, "get", lambda *args, **kwargs: Response())
+    try:
+        return list(src.iter_jobs(pages_per_channel=1))
+    finally:
+        src.close()
+
+
+def test_apply_on_site_link_is_a_contact_for_the_manual_queue(monkeypatch):
+    """Проверка 19.09: progjob — 290 постов из 290 без контакта, хотя у каждого ссылка на
+    career.habr.com. Вакансия закрывалась как недостижимая и даже не оценивалась."""
+    job = _scan(monkeypatch, "progjob", HABR_POST)[0]
+    assert job.contact_kind == "external_url"
+    assert job.contact_url == "https://career.habr.com/vacancies/1000123"
+    assert not job.has_direct_contact                      # автомат не пишет — только ручная очередь
+
+
+def test_social_and_channel_links_are_not_apply_links():
+    from jobhunter.ingest.tgchannels import apply_site_link
+    assert apply_site_link(["https://t.me/progjob", "https://youtube.com/watch?v=1",
+                            "https://telegra.ph/x"]) == ""
+    assert apply_site_link(["https://yandex.ru/jobs/vacancies/123", "https://t.me/ya_jobs"]) \
+        == "https://yandex.ru/jobs/vacancies/123"
+
+
+def test_vacancy_closed_as_unreachable_comes_back_when_contact_is_found(tmp_path, monkeypatch):
+    monkeypatch.setenv("DB_PATH", str(tmp_path / "revive.db"))
+    import jobhunter.db as dbmod
+    from jobhunter.config import get_settings
+    get_settings.cache_clear()
+    dbmod._engine = None
+    dbmod._Session = None
+    try:
+        from sqlalchemy import select
+
+        from jobhunter.ingest.base import save_jobs
+        from jobhunter.models import Application, Job
+        job = _scan(monkeypatch, "progjob", HABR_POST)[0]
+        old = job.__class__(**{**job.__dict__, "contact_kind": "unknown", "contact_url": "",
+                               "all_links": []})
+        assert save_jobs(iter([old]), verbose=False)["unreachable"] == 1
+        stats = save_jobs(iter([job]), verbose=False)
+        assert stats["revived"] == 1
+        with dbmod.session_scope() as sess:
+            row = sess.scalar(select(Job))
+            app = sess.scalar(select(Application))
+            assert row.contact_kind == "external_url" and row.contact_url.startswith("https://career.habr")
+            assert app.status == "HANDLE_MISSING"
+    finally:
+        if dbmod._engine is not None:
+            dbmod._engine.dispose()
+        dbmod._engine = None
+        dbmod._Session = None
+        get_settings.cache_clear()
+
+
 def test_bare_bot_link_is_not_an_apply_button():
     from jobhunter.ingest.tgchannels import apply_bot_link, post_fields
     assert apply_bot_link(["https://t.me/refer_me_it_bot", "https://t.me/somechannel"]) == ""

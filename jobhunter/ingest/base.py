@@ -298,6 +298,21 @@ def save_jobs(jobs: Iterator[RawJob], verbose: bool = True) -> dict:
                             setattr(dup, attr, value)
                     if rj.all_links:
                         dup.all_links_json = rj.all_links
+                    # Контакт появился там, где его «не было»: разборщик научился читать
+                    # кнопку бота или ссылку на сайт. Вакансия была закрыта как недостижимая
+                    # не владельцем, а дефектом — возвращаем её в работу.
+                    unknown = ContactKind.UNKNOWN.value
+                    if dup.contact_kind == unknown and rj.contact_kind != unknown:
+                        dup.contact_kind = rj.contact_kind
+                        app = sess.scalar(select(Application).where(Application.job_id == dup.id))
+                        if (app is not None and app.status == Status.WITHDRAWN.value
+                                and not app.sent_at and not app.approved_at
+                                and not (app.outcome or "")):
+                            app.status = (Status.DISCOVERED.value if rj.has_direct_contact
+                                          else Status.HANDLE_MISSING.value)
+                            app.score, app.score_breakdown_json = 0.0, {}
+                            app.review_note = "контакт найден при повторном сборе"
+                            stats["revived"] = stats.get("revived", 0) + 1
                     if dup.is_closed:
                         dup.is_closed = False
                         dup.closed_at = None
