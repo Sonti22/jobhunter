@@ -989,7 +989,34 @@ def stats():
             "Цифры начнут что-то значить после ~200 отправок.</p>"
             % t["sent"]) if t["sent"] < 200 else ""
 
-    body = (
+    # Сколько уходит по дням — главный вопрос владельца к этой странице (20.09).
+    from . import charts
+    series = report.activity_series(30)
+    week, today_row = series[-7:], series[-1]
+
+    def _sum(rows, key):
+        return sum(r[key] for r in rows)
+    activity = (
+        "<h3>Отправка по дням · последние 30 дней</h3>"
+        "<div class='cards'>"
+        "<div class='card'><b>%d</b><span>ушло сегодня</span></div>"
+        "<div class='card'><b>%d</b><span>за 7 дней</span></div>"
+        "<div class='card'><b>%d</b><span>за 30 дней</span></div>"
+        "<div class='card'><b>%d</b><span>ответов за 7 дней</span></div>"
+        "<div class='card'><b>%d</b><span>сбоев за 7 дней</span></div></div>"
+        "<div class='card' style='display:block;margin:10px 0'>%s%s"
+        "<div style='display:flex;gap:18px;flex-wrap:wrap;margin-top:8px'>"
+        "<div style='flex:1;min-width:300px'><div class='muted'>Ответы рекрутёров</div>%s</div>"
+        "<div style='flex:1;min-width:300px'><div class='muted'>Отклики, поданные вручную</div>%s</div>"
+        "</div>%s</div>"
+        % (today_row["sent"], _sum(week, "sent"), _sum(series, "sent"), _sum(week, "replies"),
+           _sum(week, "failed"), charts.legend(charts.SERIES),
+           charts.bars(series, charts.SERIES, label="Отправлено сообщений по дням"),
+           charts.bars(series, (("replies", "Ответы", "#2a78d6"),), height=110, label="Ответы по дням"),
+           charts.bars(series, (("manual", "Вручную", "#2a78d6"),), height=110, label="Ручные отклики по дням"),
+           charts.table(series)))
+
+    body = activity + (
         "<div class='cards'><div class='card'><b>%d</b><span>всего заявок</span></div>"
         "<div class='card'><b>%d</b><span>отправлено</span></div>"
         "<div class='card'><b>%.0f%%</b><span>ответов</span></div></div>"

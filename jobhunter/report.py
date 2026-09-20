@@ -25,6 +25,7 @@ from .models import (
     Job,
     Message,
     OwnerRequest,
+    SendLog,
     Status,
     TelegramChannelStat,
 )
@@ -358,3 +359,61 @@ def daily_series(days: int = 7) -> list:
             select(DailyQuota).order_by(DailyQuota.date.desc()).limit(days)).all()
         return [{"date": r.date, "sent": r.sent_count,
                  "cap": r.planned_cap, "clean": r.clean_day} for r in rows][::-1]
+
+
+ACTIVITY_KEYS = ("mail", "direct", "tg")
+
+
+def activity_series(days: int = 30) -> list:
+    """Что ушло и что пришло по дням владельца — ряд для графика на странице статистики.
+
+    daily_series() считает только телеграм-квоту, а вопрос владельца шире: «сколько сообщений
+    отправляется». Здесь всё из журнала отправок: отклики почтой, прямые письма
+    руководителям, Telegram; отдельно — сбои, отклики, поданные владельцем вручную, и ответы
+    рекрутёров. Дни без событий тоже в ряду — иначе простой на графике не виден.
+    """
+    from zoneinfo import ZoneInfo
+
+    tz = ZoneInfo(get_settings().owner_tz)
+    today = datetime.now(tz).date()
+    start = today - timedelta(days=days - 1)
+    edge = datetime.combine(start, datetime.min.time(), tzinfo=tz).astimezone(timezone.utc)
+    edge = edge.replace(tzinfo=None)
+    rows: dict = {start + timedelta(days=i): {"date": start + timedelta(days=i), "mail": 0, "direct": 0,
+                                       "tg": 0, "failed": 0, "manual": 0, "replies": 0}
+            for i in range(days)}
+
+    def day(ts):
+        return ts.replace(tzinfo=timezone.utc).astimezone(tz).date() if ts else None
+
+    with session_scope() as sess:
+        for at, result, peer, source in sess.execute(
+                select(SendLog.attempted_at, SendLog.result, SendLog.peer_id, Job.source)
+                .join(Application, SendLog.application_id == Application.id)
+                .join(Job, Application.job_id == Job.id)
+                .where(SendLog.attempted_at >= edge)).all():
+            row = rows.get(day(at))
+            if row is None:
+                continue
+            if result != "ok":
+                row["failed"] += 1
+            elif (source or "").startswith("direct:"):
+                row["direct"] += 1
+            elif "@" in (peer or "") and not (peer or "").startswith("@"):
+                row["mail"] += 1
+            else:
+                row["tg"] += 1
+        for at, in sess.execute(select(Application.applied_at)
+                                .where(Application.applied_at >= edge)).all():
+            row = rows.get(day(at))
+            if row is not None:
+                row["manual"] += 1
+        for at, in sess.execute(select(Message.received_at)
+                                .where(Message.direction == "in", Message.received_at >= edge)).all():
+            row = rows.get(day(at))
+            if row is not None:
+                row["replies"] += 1
+    out = [rows[k] for k in sorted(rows)]
+    for r in out:
+        r["sent"] = sum(r[k] for k in ACTIVITY_KEYS)
+    return out
