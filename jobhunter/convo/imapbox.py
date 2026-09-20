@@ -59,6 +59,17 @@ def _state() -> tuple:
         return int(st.imap_uidvalidity or 0), int(st.imap_last_uid or 0)
 
 
+def _last_inbound_ts() -> int:
+    """Время последнего сохранённого входящего письма (unix) — точка старта после смены транспорта."""
+    from sqlalchemy import func, select
+
+    from ..models import Message
+    with session_scope() as sess:
+        ts = sess.scalar(select(func.max(Message.received_at)).where(
+            Message.direction == "in", Message.email_message_id != ""))
+    return int(ts.replace(tzinfo=timezone.utc).timestamp()) if ts else 0
+
+
 def _save_state(uidvalidity: int, last_uid: int) -> None:
     with session_scope() as sess:
         from ..outreach.policy import get_state
@@ -169,7 +180,7 @@ def new_uids(conn, folder: str = "") -> tuple:
     """Номера новых писем. Возвращает (uids, uidvalidity, сброшен_ли_знак)."""
     s = get_settings()
     if _is_api(conn):
-        return conn.new_uids(_state(), s.inbox_lookback_days, s.imap_max_fetch)
+        return conn.new_uids(_state(), s.inbox_lookback_days, s.imap_max_fetch, _last_inbound_ts())
     folder = folder or s.imap_folder
     # readonly=True — это команда EXAMINE: изменить флаги нельзя в принципе.
     typ, _ = conn.select(folder, readonly=True)

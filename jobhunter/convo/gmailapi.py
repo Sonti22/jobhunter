@@ -30,13 +30,18 @@ from .. import googleauth
 from ..config import get_settings
 
 log = logging.getLogger("gmailapi")
+# googleapiclient пишет WARNING на каждую повторную попытку внутри одного запроса — это шум.
+logging.getLogger("googleapiclient.http").setLevel(logging.ERROR)
 
 # Маркер в CampaignState.imap_uidvalidity: «водяной знак хранит время письма, а не IMAP-UID».
 VALIDITY = 4242
 # Gmail отдаёт список писем с задержкой в секунды: новое письмо может стать видимым уже
 # после того, как знак прошёл его время. Запрашиваем с запасом; повторы гасит дедуп по Message-ID.
 OVERLAP_S = 900
-MAX_LIST = 500
+MAX_LIST = 3000
+# Пауза между запросами метаданных: живая проверка 20.09 получила 403 rateLimitExceeded на серии
+# из сотен вызовов подряд. 25 запросов в секунду — это 125 единиц квоты из 250 допустимых.
+META_PAUSE_S = 0.04
 # Простая отправка через messages.send ограничена 5 МБ; резюме весит доли мегабайта.
 MAX_RAW = 4_500_000
 
@@ -224,7 +229,7 @@ class GmailMailbox:
         token = None
         while len(ids) < MAX_LIST:
             resp = self._exec(self._svc.users().messages().list(
-                userId="me", q=query, maxResults=100, pageToken=token), "список писем")
+                userId="me", q=query, maxResults=500, pageToken=token), "список писем")
             ids += [m["id"] for m in resp.get("messages") or []]
             token = resp.get("nextPageToken")
             if not token:
@@ -232,6 +237,7 @@ class GmailMailbox:
         return ids
 
     def _load_meta(self, gmail_id: str):
+        time.sleep(META_PAUSE_S)
         r = self._exec(self._svc.users().messages().get(
             userId="me", id=gmail_id, format="metadata", metadataHeaders=HEADER_NAMES),
             "заголовки письма")
@@ -247,24 +253,39 @@ class GmailMailbox:
 
     # ── интерфейс imapbox ──
 
-    def new_uids(self, state: tuple, lookback_days: int, max_fetch: int) -> tuple:
-        """(uids, validity, сброшен_ли_знак). Знак — время последнего обработанного письма."""
+    def new_uids(self, state: tuple, lookback_days: int, max_fetch: int, since_ts: int = 0) -> tuple:
+        """(uids, validity, сброшен_ли_знак). Знак — время последнего обработанного письма.
+
+        since_ts — время последнего входящего, уже сохранённого в базе: при первом проходе
+        начинаем с него (минус сутки), а не за 45 дней назад — иначе сотни лишних запросов.
+        """
         saved_validity, last = state
         reset = bool(saved_validity and saved_validity != VALIDITY)
         if reset:
             # Знак остался от IMAP: там лежал UID, здесь — время. Начинаем заново по дате.
             log.warning("почта переведена на Gmail API — водяной знак IMAP сброшен")
             last = 0
-        after = (last // 1_000_000 - OVERLAP_S) if last else int(time.time()) - lookback_days * 86400
-        found = []
-        for gmail_id in self._list("in:inbox after:%d" % max(0, after)):
-            uid = self._load_meta(gmail_id)
-            if uid is not None:
-                found.append(uid)
+        if last:
+            after = last // 1_000_000 - OVERLAP_S
+        else:
+            after = int(time.time()) - lookback_days * 86400
+            if since_ts:
+                after = max(after, int(since_ts) - 86400)
+        ids = self._list("in:inbox after:%d" % max(0, after))
+        # Список приходит от новых к старым и может быть длиннее пачки. Обрезать его сверху
+        # нельзя — потеряются самые старые письма. Идём от старых к новым (id письма в Gmail
+        # растёт со временем) и качаем метаданные только на одну пачку.
+        ids.sort(key=lambda g: (len(g), g))
         floor = last - OVERLAP_S * 1_000_000 if last else 0
-        uids = sorted(u for u in found if u > floor)
-        self._jobhunter_pending_count = len(uids)
-        return uids[:max(1, max_fetch)], VALIDITY, reset
+        kept = []
+        for gmail_id in ids:
+            if len(kept) >= max(1, max_fetch):
+                break
+            uid = self._load_meta(gmail_id)
+            if uid is not None and uid > floor:
+                kept.append(uid)
+        self._jobhunter_pending_count = len(ids)
+        return sorted(kept), VALIDITY, reset
 
     def headers(self, uids: list) -> list:
         from .imapbox import MailboxError

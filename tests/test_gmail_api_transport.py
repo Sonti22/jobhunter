@@ -13,6 +13,11 @@ from jobhunter import googleauth
 from jobhunter.convo import gmailapi, imapbox
 
 
+@pytest.fixture(autouse=True)
+def _no_pause(monkeypatch):
+    monkeypatch.setattr(gmailapi, "META_PAUSE_S", 0)
+
+
 class FakeExec:
     def __init__(self, result=None, error=None, log=None, tag=""):
         self.result, self.error, self.log, self.tag = result, error, log, tag
@@ -278,3 +283,23 @@ def test_morning_digest_lists_unread_through_the_api(monkeypatch):
     result = mail_digest.collect(hours=24)
     assert result["unseen"] == 1 and result["other"][0]["subject"] == "Interview?"
     assert "is:unread" in box._svc.last_query
+
+
+def test_long_outage_keeps_the_oldest_letters_and_first_pass_starts_from_the_last_stored_one():
+    """Живая проверка 20.09: список приходит от новых к старым; обрезка сверху теряла бы самые
+    старые письма при долгом простое."""
+    store = {("%016x" % (0x1a00000000000000 + i)): _mail(1_000_000_000_000 + i * 60_000, "n%d" % i,
+                                                          mid="<n%d@x>" % i) for i in range(700)}
+    ordered = dict(reversed(list(store.items())))                     # как отдаёт Gmail: новые первыми
+    svc = api(ordered)
+    box = gmailapi.GmailMailbox(svc)
+    uids, _, _ = box.new_uids((0, 0), 45, 50)
+    assert len(uids) == 50 and box._jobhunter_pending_count == 700
+    assert uids[0] // 1000 == 1_000_000_000_000 and uids[-1] // 1000 == 1_000_000_000_000 + 49 * 60_000
+    assert len([t for t, _ in svc.calls if t == "get-meta"]) == 50    # метаданные только на одну пачку
+    # старт первого прохода — от последнего сохранённого входящего, а не за 45 дней
+    import time
+    now = int(time.time())
+    b2 = gmailapi.GmailMailbox(api({}))
+    b2.new_uids((0, 0), 45, 200, since_ts=now - 3 * 86400)
+    assert b2._svc.last_query == "in:inbox after:%d" % (now - 4 * 86400) or         abs(int(b2._svc.last_query.split("after:")[1]) - (now - 4 * 86400)) <= 2
