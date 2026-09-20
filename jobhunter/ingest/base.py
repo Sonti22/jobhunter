@@ -214,7 +214,26 @@ NON_HIRING_MAILBOX = re.compile(
     r"donotreply|unsubscribe|dsar", re.I)
 
 
+# Заглушка вместо адреса: «first.last@grafana.com» в профиле GitHub — человек показывает
+# ФОРМАТ адреса, пряча настоящий. 20.09 прямое письмо ушло ровно на такую строку. Письмо на
+# заглушку — гарантированная отбивка, а отбивки останавливают прогрев ящика.
+PLACEHOLDER_MAILBOX = re.compile(
+    r"^(?:first[._-]?(?:name)?[._-]?last(?:name)?|f[._-]?last(?:name)?|name[._-]?surname|"
+    r"(?:your|my)[._-]?(?:name|email|mail)|(?:user)?name|user|someone|somebody|you|"
+    r"example|sample|test|foo|bar|john[._-]?(?:doe|smith)|jane[._-]?doe|ivan[._-]?ivanov|"
+    r"x{2,}|_+|\.+)$", re.I)
+_PLACEHOLDER_DOMAIN = re.compile(r"^(?:example\.(?:com|org|net)|domain\.com|company\.com|"
+                                 r"email\.com|yourcompany\.com|test\.com)$", re.I)
+
+
+def is_placeholder_email(addr: str) -> bool:
+    local, _, domain = (addr or "").strip().lower().replace("mailto:", "").partition("@")
+    return bool(PLACEHOLDER_MAILBOX.match(local) or _PLACEHOLDER_DOMAIN.match(domain))
+
+
 def is_hiring_mailbox(addr: str) -> bool:
+    if is_placeholder_email(addr):
+        return False
     return not NON_HIRING_MAILBOX.search((addr or "").split("@")[0])
 
 

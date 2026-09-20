@@ -276,3 +276,27 @@ def test_provenance_recheck(monkeypatch):
     gh = _github({"ann": {"login": "ann", "email": "ann@startup.dev", "bio": "hiring"}})
     assert people.page_publishes("ann@startup.dev", "https://api.github.com/users/ann", gh)
     assert not people.page_publishes("other@startup.dev", "https://api.github.com/users/ann", gh)
+
+
+@pytest.mark.parametrize("addr,placeholder", [
+    ("first.last@grafana.com", True), ("firstname.lastname@corp.io", True), ("f.last@corp.io", True),
+    ("name.surname@corp.io", True), ("your.name@corp.io", True), ("username@corp.io", True),
+    ("john.doe@corp.io", True), ("jobs@example.com", True), ("test@corp.io", True),
+    # настоящие адреса, похожие на заглушки
+    ("me@charlesvien.com", False), ("mail@firma.de", False), ("marco@konghq.com", False),
+    ("lastochkin@corp.ru", False), ("jobs@acme.io", False),
+])
+def test_placeholder_addresses_are_never_contacts(addr, placeholder):
+    """20.09: прямое письмо ушло на «first.last@grafana.com» — участник GitHub-организации
+    показал в профиле формат адреса, пряча настоящий. Это гарантированная отбивка."""
+    from jobhunter.ingest.base import is_hiring_mailbox, is_placeholder_email
+    assert is_placeholder_email(addr) is placeholder
+    assert is_hiring_mailbox(addr) is (not placeholder)
+
+
+def test_github_member_with_placeholder_email_is_skipped(monkeypatch):
+    monkeypatch.setattr(people.time, "sleep", lambda *a: None)
+    members = {"artur": {"login": "artur", "email": "first.last@grafana.com", "company": "@grafana",
+                         "bio": "Engineering at Grafana — we're hiring!"}}
+    f = _org_api({"login": "grafana", "blog": "https://grafana.com"}, members)
+    assert people.github_org_people("Grafana", "https://grafana.com", f) == []
