@@ -87,6 +87,33 @@ def _msg():
 
 # ───────────────────────── отправка ─────────────────────────
 
+def test_gmail_replaces_message_id_so_the_real_one_is_written_back_to_the_letter(monkeypatch):
+    """Живая проверка 20.09: Gmail API подменил наш Message-ID своим (по SMTP он сохранялся).
+    Ответ рекрутёра ссылается на настоящий — без подстановки привязка по Message-ID сломалась бы."""
+    monkeypatch.setattr(googleauth, "granted", lambda: set(googleauth.SCOPES))
+    svc = api({"sent1": {"ms": 1, "raw": b"", "headers": {"Message-ID": "<CAHpQn@mail.gmail.com>"}}})
+    msg = _msg()
+    gmailapi.GmailSender(svc).send_message(msg)
+    assert msg["Message-ID"] == "<CAHpQn@mail.gmail.com>"
+    assert [t for t, _ in svc.calls] == ["send", "get-meta"]
+    assert svc.calls[0] == ("send", 0)                 # отправка по-прежнему без автоповторов
+
+    # чтение настоящего id не удалось — письмо уже ушло, ошибки быть не должно
+    class NoRead(Api):
+        def get(self, **kw):
+            return FakeExec(error=http_error(500, "backendError"))
+    lost = _msg()
+    gmailapi.GmailSender(NoRead()).send_message(lost)
+    assert lost["Message-ID"] == "<jobhunter-1-initial@gmail.com>"
+
+    # без разрешения gmail.readonly настоящий id не читаем вовсе
+    monkeypatch.setattr(googleauth, "granted", lambda: {googleauth.GMAIL_SEND})
+    plain = api()
+    kept = _msg()
+    gmailapi.GmailSender(plain).send_message(kept)
+    assert kept["Message-ID"] == "<jobhunter-1-initial@gmail.com>" and [t for t, _ in plain.calls] == ["send"]
+
+
 def test_send_uses_the_raw_message_and_never_retries_on_its_own():
     svc = api()
     gmailapi.GmailSender(svc).send_message(_msg())

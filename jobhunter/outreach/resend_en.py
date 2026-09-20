@@ -236,11 +236,12 @@ def send(limit: int = DAILY, dry: bool = False) -> dict:
                 now = utcnow()
                 _save(app, sent_at=now.isoformat())
                 app.last_outbound_at = now
+                delivered = msg.get("Message-ID", mid)        # после Gmail API — настоящий
                 refs = list(app.email_thread_refs or [])
-                app.email_thread_refs = (refs + [mid])[-10:]
+                app.email_thread_refs = (refs + [delivered])[-10:]
                 sess.add(SendLog(application_id=app_id, result="ok", peer_id=addr))
                 sess.add(Message(application_id=app_id, direction="out", body=st["body"],
-                                 is_auto=True, sent_at=now, email_message_id=mid,
+                                 is_auto=True, sent_at=now, email_message_id=delivered,
                                  email_from=s.smtp_user, email_subject=subj))
                 emp = sess.get(Employer, app.employer_id) if app.employer_id else None
                 if emp is not None:

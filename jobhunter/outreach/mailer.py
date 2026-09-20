@@ -600,15 +600,17 @@ def _send_batch(limit: int, dry: bool) -> int:
                 # Message-ID сохраняем: по нему потом находится ответ рекрутёра
                 # через In-Reply-To/References — привязка, переживающая ответ с
                 # другого адреса.
-                mid = msg.get("Message-ID", "")
+                planned_mid = mid
+                mid = msg.get("Message-ID", "")       # после Gmail API — настоящий, не плановый
                 outbound = sess.scalar(select(Message).where(
                     Message.application_id == it["app_id"],
                     Message.direction == "out",
-                    Message.email_message_id == mid).limit(1))
+                    Message.email_message_id.in_([mid, planned_mid])).limit(1))
                 if outbound is None:
                     outbound = Message(application_id=it["app_id"], direction="out",
                                         body=sent_text, email_message_id=mid)
                     sess.add(outbound)
+                outbound.email_message_id = mid
                 outbound.body = sent_text
                 outbound.sent_at = utcnow()
                 outbound.is_auto = True

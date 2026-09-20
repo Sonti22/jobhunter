@@ -8,6 +8,9 @@
   gmail_api  только Gmail API, без запасного пути (ошибка вместо тихого отката);
   smtp       как раньше: SMTP для отправки и IMAP для чтения.
 
+Особенность Gmail API: он заменяет Message-ID письма своим. После отправки GmailSender
+читает настоящий и подставляет его в письмо — иначе ответы перестали бы привязываться.
+
 Гарантии, которые нельзя ломать:
   * Чтение — только разрешение gmail.readonly: пометить, удалить или переместить письмо
     бот физически не может. Как и при IMAP, тела скачиваются только для опознанных писем.
@@ -135,13 +138,37 @@ class GmailSender:
         if len(raw) > MAX_RAW:
             raise smtplib.SMTPResponseException(552, "письмо больше лимита Gmail API")
         try:
-            self._svc.users().messages().send(userId="me", body={"raw": raw}).execute(num_retries=0)
+            resp = self._svc.users().messages().send(
+                userId="me", body={"raw": raw}).execute(num_retries=0)
         except Exception as e:                              # noqa: BLE001
             mapped = translate(e)
             if mapped is e:
                 raise
             raise mapped from e
+        # Gmail API подменяет Message-ID своим (по SMTP наш сохранялся). Ответ рекрутёра ссылается
+        # именно на настоящий, поэтому записываем его в письмо: mailer сохранит его в базе, и
+        # привязка ответов по Message-ID продолжит работать. Сбой чтения письмо не отменяет —
+        # оно уже отправлено; остаются привязка по plus-адресу и остальные правила.
+        real = self._delivered_message_id((resp or {}).get("id", ""))
+        if real and real != msg.get("Message-ID"):
+            del msg["Message-ID"]
+            msg["Message-ID"] = real
         return {}
+
+    def _delivered_message_id(self, gmail_id: str) -> str:
+        if not gmail_id or googleauth.GMAIL_READ not in googleauth.granted():
+            return ""
+        try:
+            r = self._svc.users().messages().get(
+                userId="me", id=gmail_id, format="metadata",
+                metadataHeaders=["Message-ID"]).execute(num_retries=2)
+            for h in (r.get("payload") or {}).get("headers", []):
+                if str(h.get("name", "")).lower() == "message-id":
+                    return str(h.get("value", "")).strip()
+        except Exception as e:                              # noqa: BLE001
+            log.warning("настоящий Message-ID письма не прочитан (%s) — в базе останется плановый",
+                        str(e)[:100])
+        return ""
 
     def quit(self) -> None:
         return None
@@ -277,7 +304,7 @@ class GmailMailbox:
         # растёт со временем) и качаем метаданные только на одну пачку.
         ids.sort(key=lambda g: (len(g), g))
         floor = last - OVERLAP_S * 1_000_000 if last else 0
-        kept = []
+        kept: list = []
         for gmail_id in ids:
             if len(kept) >= max(1, max_fetch):
                 break
