@@ -76,4 +76,4 @@ def test_stats_page_shows_the_daily_block(db):
     _send(db, "hn", "jobs@acme.io")
     page = TestClient(app).get("/stats")
     assert page.status_code == 200
-    assert "Отправка по дням" in page.text and "ушло сегодня" in page.text and "<svg" in page.text
+    assert "Отправка по дням" in page.text and "сообщений сегодня" in page.text and "<svg" in page.text

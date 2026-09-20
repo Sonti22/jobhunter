@@ -33,23 +33,27 @@ def _top_rounded(x: float, y: float, w: float, h: float, r: float = 4.0) -> str:
             % (x, y + h, y + r, x, y, x + r, y, x + w - r, x + w, y, x + w, y + r, y + h))
 
 
-def bars(rows: list, keys: tuple, height: int = 170, label: str = "") -> str:
-    """Столбцы по дням. keys — ((ключ, подпись, цвет), …); несколько ключей складываются в стопку."""
+def bars(rows: list, keys: tuple, height: int = 170, label: str = "", width: int = W) -> str:
+    """Столбцы по дням. keys — ((ключ, подпись, цвет), …); несколько ключей складываются в стопку.
+
+    width — ширина в единицах viewBox: график на полстраницы рисуем в половинной ширине,
+    иначе он сжимается вместе с подписями и те становятся нечитаемыми.
+    """
     if not rows:
         return "<p class='muted'>ещё нет данных</p>"
     top = _nice_max(max(sum(r[k] for k, _, _ in keys) for r in rows) or 1)
-    plot_w, plot_h = W - PAD_L - PAD_R, height - PAD_T - PAD_B
+    plot_w, plot_h = width - PAD_L - PAD_R, height - PAD_T - PAD_B
     slot = plot_w / len(rows)
     bar_w = max(4.0, min(22.0, slot - 4))
     out = ["<svg viewBox='0 0 %d %d' role='img' aria-label='%s' style='width:100%%;height:auto;"
-           "display:block;background:%s'>" % (W, height, html.escape(label), SURFACE)]
+           "display:block;background:%s'>" % (width, height, html.escape(label), SURFACE)]
     for frac in (0.0, 0.5, 1.0):
         y = PAD_T + plot_h * (1 - frac)
         out.append("<line x1='%d' x2='%d' y1='%.1f' y2='%.1f' stroke='%s' stroke-width='1'/>"
-                   % (PAD_L, W - PAD_R, y, y, GRID))
+                   % (PAD_L, width - PAD_R, y, y, GRID))
         out.append("<text x='%d' y='%.1f' font-size='11' fill='%s' text-anchor='end'>%d</text>"
                    % (PAD_L - 6, y + 4, MUTED, round(top * frac)))
-    every = max(1, len(rows) // 10)
+    every = max(1, len(rows) // (10 if width >= W else 5))
     for i, r in enumerate(rows):
         x = PAD_L + slot * i + (slot - bar_w) / 2
         base = PAD_T + plot_h

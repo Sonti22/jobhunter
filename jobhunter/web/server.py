@@ -999,9 +999,9 @@ def stats():
     activity = (
         "<h3>Отправка по дням · последние 30 дней</h3>"
         "<div class='cards'>"
-        "<div class='card'><b>%d</b><span>ушло сегодня</span></div>"
-        "<div class='card'><b>%d</b><span>за 7 дней</span></div>"
-        "<div class='card'><b>%d</b><span>за 30 дней</span></div>"
+        "<div class='card'><b>%d</b><span>сообщений сегодня</span></div>"
+        "<div class='card'><b>%d</b><span>сообщений за 7 дней</span></div>"
+        "<div class='card'><b>%d</b><span>сообщений за 30 дней</span></div>"
         "<div class='card'><b>%d</b><span>ответов за 7 дней</span></div>"
         "<div class='card'><b>%d</b><span>сбоев за 7 дней</span></div></div>"
         "<div class='card' style='display:block;margin:10px 0'>%s%s"
@@ -1012,8 +1012,8 @@ def stats():
         % (today_row["sent"], _sum(week, "sent"), _sum(series, "sent"), _sum(week, "replies"),
            _sum(week, "failed"), charts.legend(charts.SERIES),
            charts.bars(series, charts.SERIES, label="Отправлено сообщений по дням"),
-           charts.bars(series, (("replies", "Ответы", "#2a78d6"),), height=110, label="Ответы по дням"),
-           charts.bars(series, (("manual", "Вручную", "#2a78d6"),), height=110, label="Ручные отклики по дням"),
+           charts.bars(series, (("replies", "Ответы", "#2a78d6"),), height=130, width=460, label="Ответы по дням"),
+           charts.bars(series, (("manual", "Вручную", "#2a78d6"),), height=130, width=460, label="Ручные отклики по дням"),
            charts.table(series)))
 
     body = activity + (
