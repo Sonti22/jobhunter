@@ -85,6 +85,11 @@ def parse_reply_to(text: str) -> int:
     return 0
 
 
+def _sending_ready() -> bool:
+    from ..convo import gmailapi
+    return gmailapi.sending_configured()
+
+
 def _smtp_connect():
     """Защищённый SMTP: implicit TLS на 465, обязательный STARTTLS иначе.
 
@@ -93,6 +98,10 @@ def _smtp_connect():
     Вынесено из smtp_session, чтобы партия могла переподключиться, когда
     Gmail закрыл сессию между письмами.
     """
+    from ..convo import gmailapi
+    api = gmailapi.open_sender()
+    if api is not None:
+        return api
     s = get_settings()
     context = ssl.create_default_context()
     if s.smtp_port == 465:
@@ -448,7 +457,7 @@ def _send_batch(limit: int, dry: bool) -> int:
     for it in batch:
         print("  %5.0f  %-34s %s" % (it["score"], it["email"], (it["title"] or "")[:40]))
 
-    if not dry and (not s.smtp_user or not s.smtp_app_password):
+    if not dry and not _sending_ready():
         print("\nНет SMTP_USER / SMTP_APP_PASSWORD в .env.")
         print("Gmail → Аккаунт → Безопасность → Двухэтапная аутентификация → "
               "Пароли приложений. Вписать в .env самому.")

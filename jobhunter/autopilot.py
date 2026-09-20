@@ -408,11 +408,12 @@ def step_submit_ashby() -> dict:
 
 
 def step_send_email() -> dict:
+    from .convo import gmailapi
     from .outreach.mailer import send_batch
     s = get_settings()
-    if not (s.smtp_user and s.smtp_app_password):
-        log.info("email пропущен: SMTP не настроен")
-        return {"blocked": "SMTP не настроен"}
+    if not gmailapi.sending_configured():
+        log.info("email пропущен: почта не настроена (ни Gmail API, ни SMTP)")
+        return {"blocked": "почта не настроена"}
     if policy.kill_switch_active():
         log.warning("email пропущен: активен стоп-кран")
         return {"blocked": "активен стоп-кран"}
@@ -475,10 +476,10 @@ def step_direct() -> dict:
 
 def step_resend_en() -> dict:
     """Повтор на английском тем HN-компаниям, кому ушло русское письмо (до 4 в день)."""
+    from .convo import gmailapi
     from .outreach import resend_en
-    s = get_settings()
-    if not (s.smtp_user and s.smtp_app_password):
-        return {"blocked": "SMTP не настроен"}
+    if not gmailapi.sending_configured():
+        return {"blocked": "почта не настроена"}
     if policy.kill_switch_active():
         return {"blocked": "активен стоп-кран"}
     stats = resend_en.run()
@@ -596,9 +597,10 @@ def step_inbox() -> dict:
 
 def step_inbox_email() -> dict:
     """Входящие письма: IMAP → привязка к заявкам → автоответы и карточки."""
+    from .convo import gmailapi
     from .convo.inbox_email import run as mail_run
     s = get_settings()
-    if not (s.imap_enabled and s.smtp_user and s.smtp_app_password):
+    if not (s.imap_enabled and gmailapi.reading_configured()):
         return {}
     try:
         stats = asyncio.run(mail_run(dry=False))
@@ -1037,8 +1039,8 @@ def step_mail_digest() -> None:
 
     Только заголовки, ящик readonly — см. convo/mail_digest.
     """
-    s = get_settings()
-    if not (s.smtp_user and s.smtp_app_password):
+    from .convo import gmailapi
+    if not gmailapi.reading_configured():
         return
     try:
         from .convo.mail_digest import run as digest_run

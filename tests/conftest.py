@@ -33,6 +33,18 @@ def _isolated_artifacts(tmp_path, monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _no_real_google_token(tmp_path, monkeypatch):
+    """Настоящий google_token.json владельца лежит рядом с проектом. Пока в нём был только
+    календарь, это никому не мешало; после перехода почты на Gmail API тесты IMAP/SMTP молча
+    получали живой транспорт вместо своих подставных. Токен теста — всегда несуществующий."""
+    from jobhunter.config import get_settings
+    monkeypatch.setenv("GOOGLE_TOKEN_PATH", str(tmp_path / "no_google_token.json"))
+    get_settings.cache_clear()
+    yield
+    get_settings.cache_clear()
+
+
+@pytest.fixture(autouse=True)
 def _no_external_network(monkeypatch):
     """Любой сокет наружу — падение с понятным текстом, а не тихий запрос.
 

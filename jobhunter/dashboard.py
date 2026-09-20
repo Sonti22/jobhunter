@@ -26,6 +26,11 @@ ATTENTION_CLOSED = {Status.WITHDRAWN.value, Status.REJECTED_SCORE.value,
                     Status.HANDLE_DEAD.value}
 
 
+def _mail_ready() -> bool:
+    from .convo import gmailapi
+    return gmailapi.sending_configured()
+
+
 def _now():
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
@@ -105,7 +110,7 @@ def sending(limit: int = 200, offset: int = 0) -> dict:
                     state.update(ready=False, code="quota", reason="Дневной лимит email исчерпан")
                 elif channel == "telegram" and not (s.tg_api_id and s.telegram_api_hash):
                     state.update(ready=False, code="configuration", reason="Telegram не настроен")
-                elif channel == "email" and not (s.smtp_user and s.smtp_app_password):
+                elif channel == "email" and not _mail_ready():
                     state.update(ready=False, code="configuration", reason="Почта не настроена")
                 elif not schedule[channel]["scheduler_alive"]:
                     state.update(ready=False, code="scheduler_offline",

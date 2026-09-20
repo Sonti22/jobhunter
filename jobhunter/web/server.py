@@ -1050,6 +1050,7 @@ def stats():
 
 @app.get("/health", response_class=HTMLResponse)
 def health():
+    from ..convo import gmailapi
     s = get_settings()
     with session_scope() as sess:
         st = policy.get_state(sess)
@@ -1072,7 +1073,7 @@ def health():
 
         ready = [("Telegram API", bool(s.tg_api_id and s.telegram_api_hash)),
                  ("Telegram сессия", Path(s.telegram_session_path).exists()),
-                 ("SMTP", bool(s.smtp_user and s.smtp_app_password)),
+                 ("Почта (Gmail API или SMTP)", gmailapi.sending_configured()),
                  ("careered токен", bool(s.auth_header))]
         rd = "".join("<tr><td>%s</td><td><span class='pill %s'>%s</span></td></tr>"
                      % (n, "ok" if ok else "bad", "готово" if ok else "не настроено")

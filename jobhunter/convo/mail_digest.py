@@ -41,15 +41,18 @@ def collect(hours: int = 24, limit: int = 60) -> dict:
     """Заголовки непрочитанных писем за последние `hours` часов."""
     conn = imapbox.connect()
     try:
-        typ, _ = conn.select("INBOX", readonly=True)
-        if typ != "OK":
-            return {"error": "IMAX SELECT failed"}
-        since = (datetime.now(timezone.utc) - timedelta(hours=hours))
-        typ, data = conn.uid("SEARCH", None,
-                             "UNSEEN SINCE %s" % since.strftime("%d-%b-%Y"))
-        if typ != "OK":
-            return {"error": "SEARCH failed"}
-        uids = [int(u) for u in (data[0] or b"").split()][-limit:]
+        if getattr(conn, "is_gmail_api", False):
+            uids = conn.unseen_uids(hours, limit)
+        else:
+            typ, _ = conn.select("INBOX", readonly=True)
+            if typ != "OK":
+                return {"error": "IMAX SELECT failed"}
+            since = (datetime.now(timezone.utc) - timedelta(hours=hours))
+            typ, data = conn.uid("SEARCH", None,
+                                 "UNSEEN SINCE %s" % since.strftime("%d-%b-%Y"))
+            if typ != "OK":
+                return {"error": "SEARCH failed"}
+            uids = [int(u) for u in (data[0] or b"").split()][-limit:]
         headers = imapbox.fetch_headers(conn, uids) if uids else []
     finally:
         try:

@@ -123,6 +123,9 @@ class Settings(BaseSettings):
     # ── Чтение почты (IMAP) ─────────────────────────────────────────────
     # Отдельных учётных данных не нужно: пароль приложения Gmail выдаётся на
     # аккаунт, а не на протокол, поэтому SMTP_APP_PASSWORD работает и здесь.
+    # Чем ходит почта: auto — Gmail API (HTTPS, порт 443; VPN его не режет), если в токене Google
+    # есть разрешения, иначе SMTP/IMAP; gmail_api — только API; smtp — как раньше.
+    mail_transport: str = Field(default="auto")
     imap_enabled: bool = Field(default=True)
     imap_host: str = Field(default="imap.gmail.com")
     imap_port: int = Field(default=993)

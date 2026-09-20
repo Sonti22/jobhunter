@@ -179,7 +179,8 @@ def send(limit: int = DAILY, dry: bool = False) -> dict:
     batch = ready[:max(0, min(limit, room))]
     if not batch:
         return stats
-    if not dry and not (s.smtp_user and s.smtp_app_password):
+    from ..convo import gmailapi
+    if not dry and not gmailapi.sending_configured():
         return dict(stats, blocked="SMTP не настроен")
 
     domain = (s.smtp_user or "localhost").rsplit("@", 1)[-1]

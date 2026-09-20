@@ -81,8 +81,20 @@ def _transient(exc: OSError) -> bool:
 
 
 def connect(retries: int = CONNECT_RETRIES, backoff: float = CONNECT_BACKOFF):
-    """Соединение с ящиком. Бросает MailboxError с внятной причиной."""
+    """Соединение с ящиком. Бросает MailboxError с внятной причиной.
+
+    Сначала Gmail API (HTTPS, порт 443 — VPN его не режет), потом IMAP.
+    """
     s = get_settings()
+    from . import gmailapi
+    try:
+        box = gmailapi.open_mailbox()
+    except gmailapi.googleauth.GoogleUnavailable as e:
+        raise MailboxError("вход Google: %s" % str(e)[:200]) from None
+    except Exception as e:                                  # noqa: BLE001
+        raise MailboxError("сеть: %s: %s" % (type(e).__name__, str(e)[:120])) from None
+    if box is not None:
+        return box
     if not (s.smtp_user and s.smtp_app_password):
         raise MailboxError("нет SMTP_USER / SMTP_APP_PASSWORD")
     for attempt in range(1, max(1, retries) + 1):
@@ -126,6 +138,14 @@ def network_hint(timeout: float = 6.0) -> str:
     искали бы не там.
     """
     s = get_settings()
+    from . import gmailapi
+    if gmailapi.can_read():
+        if _tls_ok("gmail.googleapis.com", 443, timeout):
+            return "Сейчас Gmail API отвечает — обрыв был кратким."
+        if _tls_ok("www.google.com", 443, timeout):
+            return ("www.google.com отвечает, а gmail.googleapis.com — нет: проверь VPN и "
+                    "прокси, они могут резать отдельные адреса Google.")
+        return "Интернета нет вообще: не отвечает даже HTTPS."
     if _tls_ok(s.imap_host, s.imap_port, timeout):
         return "Сейчас ящик отвечает — обрыв был кратким."
     if _tls_ok("www.google.com", 443, timeout):
@@ -148,6 +168,8 @@ def _uidvalidity(conn, folder: str) -> int:
 def new_uids(conn, folder: str = "") -> tuple:
     """Номера новых писем. Возвращает (uids, uidvalidity, сброшен_ли_знак)."""
     s = get_settings()
+    if _is_api(conn):
+        return conn.new_uids(_state(), s.inbox_lookback_days, s.imap_max_fetch)
     folder = folder or s.imap_folder
     # readonly=True — это команда EXAMINE: изменить флаги нельзя в принципе.
     typ, _ = conn.select(folder, readonly=True)
@@ -199,8 +221,15 @@ _UID_IN_RESPONSE = re.compile(rb"UID\s+(\d+)")
 FETCH_CHUNK = 50
 
 
+def _is_api(conn) -> bool:
+    """Соединение — это Gmail API, а не IMAP (см. gmailapi.py)."""
+    return getattr(conn, "is_gmail_api", False) is True
+
+
 def fetch_headers(conn, uids: list) -> list:
     """[(uid, dict заголовков)]. Тела не трогаются."""
+    if _is_api(conn):
+        return conn.headers(uids)
     out = []
     for start in range(0, len(uids), FETCH_CHUNK):
         chunk = uids[start:start + FETCH_CHUNK]
@@ -228,6 +257,8 @@ def fetch_headers(conn, uids: list) -> list:
 
 def fetch_body(conn, uid: int) -> tuple:
     """(текст, это_html) для одного письма. Зовётся только для опознанных."""
+    if _is_api(conn):
+        return conn.body(uid)
     typ, data = conn.uid("FETCH", str(uid), "(BODY.PEEK[])")
     if typ != "OK" or not data:
         raise MailboxError("не удалось загрузить тело письма UID %d" % uid)
@@ -235,6 +266,11 @@ def fetch_body(conn, uid: int) -> tuple:
                 if isinstance(part, tuple) and len(part) > 1), None)
     if not raw:
         raise MailboxError("пустой ответ загрузки письма UID %d" % uid)
+    return body_of(raw)
+
+
+def body_of(raw: bytes) -> tuple:
+    """(текст, это_html) из сырых байтов письма — общий разбор для IMAP и Gmail API."""
     msg = _parse(raw)
     try:
         part = msg.get_body(preferencelist=("plain", "html"))
