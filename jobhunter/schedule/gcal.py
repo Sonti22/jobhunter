@@ -65,37 +65,12 @@ def available() -> tuple:
 
 
 def _credentials(interactive: bool = False):
-    """Учётные данные из токена; при interactive — полный OAuth-флоу."""
-    from google.auth.transport.requests import Request
-    from google.oauth2.credentials import Credentials
-
-    s = get_settings()
-    token_path = _path(s.google_token_path)
-    creds = None
-    if token_path.is_file():
-        creds = Credentials.from_authorized_user_file(str(token_path), SCOPES)
-    if creds and creds.valid:
-        return creds
-    if creds and creds.expired and creds.refresh_token:
-        creds.refresh(Request())
-        token_path.write_text(creds.to_json(), encoding="utf-8")
-        return creds
-    if not interactive:
-        raise GCalUnavailable("нет действующего токена Google "
-                              "(python -m jobhunter.schedule.gcal --login)")
-
-    from google_auth_oauthlib.flow import InstalledAppFlow
-    secret = _path(s.google_client_secret_path)
-    if not secret.is_file():
-        raise GCalUnavailable("нет файла %s" % secret)
-    flow = InstalledAppFlow.from_client_secrets_file(str(secret), SCOPES)
-    creds = flow.run_local_server(port=0)
-    token_path.write_text(creds.to_json(), encoding="utf-8")
+    """Учётные данные — из общего входа Google (календарь и почта живут на одном токене)."""
+    from .. import googleauth
     try:
-        token_path.chmod(0o600)
-    except OSError:
-        pass
-    return creds
+        return googleauth.credentials(interactive, need=() if interactive else (googleauth.CALENDAR,))
+    except googleauth.GoogleUnavailable as e:
+        raise GCalUnavailable(str(e)) from e
 
 
 def _service(interactive: bool = False):

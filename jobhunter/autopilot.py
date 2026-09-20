@@ -819,6 +819,27 @@ def step_calendar() -> None:
         log.info("календарь: %d интервью", n)
 
 
+def step_google_token() -> dict:
+    """Жив ли вход в Google. Мёртвый токен — это молча не работающие календарь и почта.
+
+    20.09 выяснилось, что токен от 26.08 умер с invalid_grant (проект Google Cloud в статусе
+    «Тестирование» — токены живут 7 дней), и три недели об этом никто не знал.
+    """
+    from . import googleauth, notify
+    state = googleauth.check()
+    if state["token"] and not state["alive"]:
+        notify.push_once(
+            "google_token_dead",
+            "⚠️ Вход в Google перестал работать: календарь и почта через Gmail API стоят.
+"
+            "Нужен повторный вход: python -m jobhunter.googleauth --login
+"
+            "Если это повторяется раз в неделю — проект Google Cloud в статусе «Тестирование», "
+            "переведи его в «В работе».",
+            dedup="google_token_dead:%s" % datetime.now().strftime("%Y-%m-%d"))
+    return {k: state[k] for k in ("token", "alive", "calendar", "gmail_send", "gmail_read")}
+
+
 BACKUP_KEEP_DAILY = 7
 BACKUP_KEEP_WEEKLY = 4
 _BACKUP_NAME = "jobhunter-%s.tar.gz"
@@ -1196,6 +1217,7 @@ def run_daemon() -> int:
                   id="reminders", **opts)
     sched.add_job(step_followups, "cron", hour=12, minute=0, id="followups", **opts)
     sched.add_job(step_calendar, "cron", hour="*/4", id="calendar", **opts)
+    sched.add_job(step_google_token, "cron", hour="*/4", minute=20, id="google_token", **opts)
     sched.add_job(step_gcal_sync, "cron", hour="*/4", minute=10,
                   id="gcal", **opts)
     sched.add_job(step_daily_summary, "cron", hour=20, minute=0, id="summary", **opts)
