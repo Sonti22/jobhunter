@@ -95,6 +95,11 @@ async def process(dry: bool = False) -> dict:
     if not dry:
         status = "error" if result.get("error") else "partial" if result.get("remaining") else "ok"
         record("gmail", status, details=result, error=result.get("error", ""))
+        if status == "ok":
+            # Ключ «gmail» в начале каждого прохода получает статус running, поэтому по нему
+            # нельзя узнать, когда проход последний раз дошёл до конца. Смена транспорта почты
+            # (imapbox._resume_ts) стартует именно с этого момента.
+            record("gmail_ok", "ok")
     return result
 
 

@@ -71,8 +71,8 @@ def _resume_ts() -> int:
 
     from ..models import Message, RuntimeState
     with session_scope() as sess:
-        st = sess.get(RuntimeState, "gmail")
-        if st is not None and st.status == "ok" and st.finished_at:
+        st = sess.get(RuntimeState, "gmail_ok")
+        if st is not None and st.finished_at:
             return int(st.finished_at.replace(tzinfo=timezone.utc).timestamp()) - 3600
         ts = sess.scalar(select(func.max(Message.received_at)).where(
             Message.direction == "in", Message.email_message_id != ""))

@@ -364,10 +364,50 @@ def test_first_api_pass_resumes_from_the_last_successful_pass(monkeypatch, tmp_p
                              received_at=now - timedelta(days=4), email_message_id="<a@x>"))
         stamp = int((now - timedelta(days=4)).replace(tzinfo=timezone.utc).timestamp())
         assert imapbox._resume_ts() == stamp - 86400                        # нет прохода: от входящего минус сутки
-        record("gmail", "ok", details={})
+        record("gmail", "running", details={})               # проход начался, но до конца не дошёл
+        assert imapbox._resume_ts() == stamp - 86400
+        record("gmail_ok", "ok")
+        record("gmail", "running", details={})               # следующий проход снова начался
         assert abs(imapbox._resume_ts() - (int(datetime.now(timezone.utc).timestamp()) - 3600)) <= 5
-        record("gmail", "partial", details={"remaining": 3})
-        assert imapbox._resume_ts() == stamp - 86400                        # не дошёл до конца — глубже
+    finally:
+        if dbmod._engine is not None:
+            dbmod._engine.dispose()
+        dbmod._engine = None
+        dbmod._Session = None
+        get_settings.cache_clear()
+
+
+def test_inbox_pass_remembers_when_it_last_reached_the_end(tmp_path, monkeypatch):
+    """Живая проверка 20.09: проход ставит статус running ДО чтения ящика, и по ключу «gmail»
+    нельзя было узнать время последнего успешного прохода — первый проход на API читал глубже."""
+    import asyncio
+
+    import jobhunter.db as dbmod
+    from jobhunter.config import get_settings
+    from jobhunter.convo import inbox_email
+    from jobhunter.models import RuntimeState
+    monkeypatch.setenv("DB_PATH", str(tmp_path / "ok.db"))
+    get_settings.cache_clear()
+    dbmod._engine = None
+    dbmod._Session = None
+    try:
+        async def partial(dry, stats):
+            return dict(stats, remaining=5)
+
+        async def done(dry, stats):
+            return dict(stats, remaining=0)
+
+        async def none(**kw):
+            return 0
+        monkeypatch.setattr(inbox_email, "retry_stuck", none)
+        monkeypatch.setattr(inbox_email, "_process", partial)
+        asyncio.run(inbox_email.process())
+        with dbmod.session_scope() as sess:
+            assert sess.get(RuntimeState, "gmail_ok") is None                # не дошёл до конца
+        monkeypatch.setattr(inbox_email, "_process", done)
+        asyncio.run(inbox_email.process())
+        with dbmod.session_scope() as sess:
+            assert sess.get(RuntimeState, "gmail_ok").finished_at is not None
     finally:
         if dbmod._engine is not None:
             dbmod._engine.dispose()
