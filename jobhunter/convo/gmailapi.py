@@ -283,8 +283,8 @@ class GmailMailbox:
     def new_uids(self, state: tuple, lookback_days: int, max_fetch: int, since_ts: int = 0) -> tuple:
         """(uids, validity, сброшен_ли_знак). Знак — время последнего обработанного письма.
 
-        since_ts — время последнего входящего, уже сохранённого в базе: при первом проходе
-        начинаем с него (минус сутки), а не за 45 дней назад — иначе сотни лишних запросов.
+        since_ts — с какого момента читать при первом проходе (см. imapbox._resume_ts): всё
+        до него уже разобрано прежним транспортом. Без него — за lookback_days дней.
         """
         saved_validity, last = state
         reset = bool(saved_validity and saved_validity != VALIDITY)
@@ -297,7 +297,7 @@ class GmailMailbox:
         else:
             after = int(time.time()) - lookback_days * 86400
             if since_ts:
-                after = max(after, int(since_ts) - 86400)
+                after = max(after, int(since_ts))
         ids = self._list("in:inbox after:%d" % max(0, after))
         # Список приходит от новых к старым и может быть длиннее пачки. Обрезать его сверху
         # нельзя — потеряются самые старые письма. Идём от старых к новым (id письма в Gmail

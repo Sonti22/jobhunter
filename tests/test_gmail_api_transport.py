@@ -329,4 +329,48 @@ def test_long_outage_keeps_the_oldest_letters_and_first_pass_starts_from_the_las
     now = int(time.time())
     b2 = gmailapi.GmailMailbox(api({}))
     b2.new_uids((0, 0), 45, 200, since_ts=now - 3 * 86400)
-    assert b2._svc.last_query == "in:inbox after:%d" % (now - 4 * 86400) or         abs(int(b2._svc.last_query.split("after:")[1]) - (now - 4 * 86400)) <= 2
+    assert abs(int(b2._svc.last_query.split("after:")[1]) - (now - 3 * 86400)) <= 2
+    b3 = gmailapi.GmailMailbox(api({}))
+    b3.new_uids((0, 0), 45, 200, since_ts=now - 400 * 86400)          # слишком давно — не глубже lookback
+    assert abs(int(b3._svc.last_query.split("after:")[1]) - (now - 45 * 86400)) <= 2
+
+
+def test_first_api_pass_resumes_from_the_last_successful_pass(monkeypatch, tmp_path):
+    """Сухой прогон 20.09: разбор недельной давности слал бы владельцу те же 12 уведомлений заново.
+    Всё до последнего успешного прохода прежнего транспорта уже разобрано."""
+    from datetime import datetime, timedelta, timezone
+
+    import jobhunter.db as dbmod
+    from jobhunter.config import get_settings
+    from jobhunter.models import Application, Job, Message
+    from jobhunter.observability import record
+    monkeypatch.setenv("DB_PATH", str(tmp_path / "resume.db"))
+    get_settings.cache_clear()
+    dbmod._engine = None
+    dbmod._Session = None
+    try:
+        with dbmod.session_scope():
+            pass                                                            # создать схему
+        assert imapbox._resume_ts() == 0                                    # ни прохода, ни писем
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        with dbmod.session_scope() as sess:
+            job = Job(external_uuid="j", source="hn", title="Backend")
+            sess.add(job)
+            sess.flush()
+            app = Application(job_id=job.id, status="AWAITING_REPLY")
+            sess.add(app)
+            sess.flush()
+            sess.add(Message(application_id=app.id, direction="in", body="hi",
+                             received_at=now - timedelta(days=4), email_message_id="<a@x>"))
+        stamp = int((now - timedelta(days=4)).replace(tzinfo=timezone.utc).timestamp())
+        assert imapbox._resume_ts() == stamp - 86400                        # нет прохода: от входящего минус сутки
+        record("gmail", "ok", details={})
+        assert abs(imapbox._resume_ts() - (int(datetime.now(timezone.utc).timestamp()) - 3600)) <= 5
+        record("gmail", "partial", details={"remaining": 3})
+        assert imapbox._resume_ts() == stamp - 86400                        # не дошёл до конца — глубже
+    finally:
+        if dbmod._engine is not None:
+            dbmod._engine.dispose()
+        dbmod._engine = None
+        dbmod._Session = None
+        get_settings.cache_clear()

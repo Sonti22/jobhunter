@@ -59,15 +59,24 @@ def _state() -> tuple:
         return int(st.imap_uidvalidity or 0), int(st.imap_last_uid or 0)
 
 
-def _last_inbound_ts() -> int:
-    """Время последнего сохранённого входящего письма (unix) — точка старта после смены транспорта."""
+def _resume_ts() -> int:
+    """С какого момента (unix) читать ящик после смены транспорта.
+
+    Последний УСПЕШНЫЙ проход прежнего транспорта (минус час на запас): всё до него уже
+    разобрано, и повторный разбор недельной давности слал бы владельцу те же уведомления
+    заново (сухой прогон 20.09: 12 писем «неоднозначная привязка»). Прохода не было или он
+    не дошёл до конца — от последнего сохранённого входящего (минус сутки).
+    """
     from sqlalchemy import func, select
 
-    from ..models import Message
+    from ..models import Message, RuntimeState
     with session_scope() as sess:
+        st = sess.get(RuntimeState, "gmail")
+        if st is not None and st.status == "ok" and st.finished_at:
+            return int(st.finished_at.replace(tzinfo=timezone.utc).timestamp()) - 3600
         ts = sess.scalar(select(func.max(Message.received_at)).where(
             Message.direction == "in", Message.email_message_id != ""))
-    return int(ts.replace(tzinfo=timezone.utc).timestamp()) if ts else 0
+    return int(ts.replace(tzinfo=timezone.utc).timestamp()) - 86400 if ts else 0
 
 
 def _save_state(uidvalidity: int, last_uid: int) -> None:
@@ -180,7 +189,7 @@ def new_uids(conn, folder: str = "") -> tuple:
     """Номера новых писем. Возвращает (uids, uidvalidity, сброшен_ли_знак)."""
     s = get_settings()
     if _is_api(conn):
-        return conn.new_uids(_state(), s.inbox_lookback_days, s.imap_max_fetch, _last_inbound_ts())
+        return conn.new_uids(_state(), s.inbox_lookback_days, s.imap_max_fetch, _resume_ts())
     folder = folder or s.imap_folder
     # readonly=True — это команда EXAMINE: изменить флаги нельзя в принципе.
     typ, _ = conn.select(folder, readonly=True)
