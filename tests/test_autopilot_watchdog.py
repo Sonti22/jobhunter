@@ -91,3 +91,29 @@ def test_chain_after_ingest_runs_the_real_steps_and_survives_a_failing_one(tmp_p
         dbmod._engine = None
         dbmod._Session = None
         get_settings.cache_clear()
+
+
+def test_external_watchdog_ping_is_silent_without_url_and_never_raises(monkeypatch):
+    from jobhunter import health
+    from jobhunter.config import get_settings
+    monkeypatch.setenv("HEALTHCHECK_URL", "")
+    get_settings.cache_clear()
+    assert health.ping_external() is False                      # выключено — в сеть не ходим
+    monkeypatch.setenv("HEALTHCHECK_URL", "https://hc-ping.com/00000000-0000-0000-0000-000000000000")
+    get_settings.cache_clear()
+    calls = []
+
+    class Resp:
+        status_code = 200
+
+    def fake_get(url, **kw):
+        calls.append(url)
+        if url.endswith("/fail"):
+            raise OSError("нет сети")
+        return Resp()
+    import httpx
+    monkeypatch.setattr(httpx, "get", fake_get)
+    assert health.ping_external() is True
+    assert health.ping_external("/fail") is False               # сбой сети не роняет сторожа
+    assert calls[0].endswith("000000") and calls[1].endswith("/fail")
+    get_settings.cache_clear()

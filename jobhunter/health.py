@@ -68,3 +68,17 @@ def human(seconds: float) -> str:
     if seconds < 5400:
         return "%d мин назад" % int(seconds // 60)
     return "%d ч назад" % int(seconds // 3600)
+
+
+def ping_external(suffix: str = "") -> bool:
+    """Отметиться у внешнего сторожа. suffix="/fail" — сообщить о сбое. Ошибки сети не важны:
+    пропущенная отметка и есть сигнал, ради которого сторож существует."""
+    from .config import get_settings
+    url = (get_settings().healthcheck_url or "").strip().rstrip("/")
+    if not url.startswith("https://"):
+        return False
+    try:
+        import httpx
+        return httpx.get(url + suffix, timeout=8.0, trust_env=False).status_code < 400
+    except Exception:                                      # noqa: BLE001
+        return False

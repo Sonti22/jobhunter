@@ -819,6 +819,68 @@ def step_calendar() -> None:
         log.info("календарь: %d интервью", n)
 
 
+BACKUP_KEEP_DAILY = 7
+BACKUP_KEEP_WEEKLY = 4
+_BACKUP_NAME = "jobhunter-%s.tar.gz"
+
+
+def backup_dir() -> Path:
+    """Папка копий — на диске хоста (./out смонтирован в /out), а не в томе с самой базой."""
+    return Path(get_settings().out_dir) / "backups"
+
+
+def prune_backups(folder: Path, today: datetime | None = None) -> list:
+    """Оставить 7 последних ежедневных копий и 4 воскресные. Возвращает удалённые имена.
+
+    Трогаем только файлы своего образца: в папке могут лежать копии, сделанные руками.
+    """
+    import re
+    pattern = re.compile(r"^jobhunter-(\d{4}-\d{2}-\d{2})\.tar\.gz$")
+    dated = []
+    for path in folder.glob("jobhunter-*.tar.gz"):
+        m = pattern.match(path.name)
+        if m:
+            dated.append((datetime.strptime(m.group(1), "%Y-%m-%d"), path))
+    dated.sort(reverse=True)
+    keep = {p for _, p in dated[:BACKUP_KEEP_DAILY]}
+    keep |= {p for d, p in [x for x in dated if x[0].weekday() == 6][:BACKUP_KEEP_WEEKLY]}
+    removed = []
+    for _, path in dated:
+        if path not in keep:
+            path.unlink(missing_ok=True)
+            removed.append(path.name)
+    return removed
+
+
+def step_backup() -> dict:
+    """Ежедневная копия базы и сессий с проверкой восстановления.
+
+    Проверка 20.09: модуль backup.py существовал, но автопилот его ни разу не вызывал —
+    21 тысяча вакансий, вся переписка и сессия Telegram жили в одном томе Docker без единой
+    копии. create_archive снимает SQLite штатным backup API и сам же распаковывает архив во
+    временную папку с integrity_check: копия, которую нельзя восстановить, не публикуется.
+    """
+    from . import notify
+    from .backup import create_archive
+    folder = backup_dir()
+    target = folder / (_BACKUP_NAME % datetime.now().strftime("%Y-%m-%d"))
+    if target.exists():
+        return {"skipped": "сегодняшняя копия уже есть", "archive": target.name}
+    try:
+        result = create_archive(Path(get_settings().db_path).parent, target)
+    except Exception as e:
+        log.error("резервная копия: %s: %s", type(e).__name__, str(e)[:160])
+        notify.push_once("backup_failed",
+                         "⚠️ Резервная копия базы не создана: %s\n%s" % (type(e).__name__, str(e)[:300]),
+                         dedup="backup_failed:%s" % datetime.now().strftime("%Y-%m-%d"))
+        return {"error": type(e).__name__}
+    removed = prune_backups(folder)
+    log.info("резервная копия: %s, %.1f МБ, заявок %s, удалено старых %d", result["archive"],
+             result["bytes"] / 1e6, result.get("applications"), len(removed))
+    return {"archive": result["archive"], "mb": round(result["bytes"] / 1e6, 1),
+            "applications": result.get("applications"), "removed": len(removed)}
+
+
 def step_db_maintenance() -> None:
     """Ночное обслуживание SQLite.
 
@@ -1025,8 +1087,10 @@ def _watchdog() -> None:
     age = health.age("autopilot_tg")
     if wedged(age):
         log.critical("телеграм-очередь молчит %.0f мин — выхожу, Docker перезапустит", age / 60)
+        health.ping_external("/fail")
         logging.shutdown()
         os._exit(1)
+    health.ping_external()          # внешний сторож: «жив»; без отметок он поднимет тревогу сам
 
 
 def run_daemon() -> int:
@@ -1150,6 +1214,8 @@ def run_daemon() -> int:
                   misfire_grace_time=300, executor="tg")
     sched.add_job(step_db_maintenance, "cron", hour=3, minute=30,
                   id="dbmaint", **opts)
+    # Копия базы — в 08:45, перед дневным конвейером, и в догон: ночью домашний ПК выключен.
+    sched.add_job(step_backup, "cron", hour=8, minute=45, id="backup", **opts)
     # Проверка ATS-кандидатов — раз в неделю: каждая проверка это живой
     # запрос к доске. Включение прошедших остаётся за владельцем (--apply).
     sched.add_job(step_ats_verify, "cron", day_of_week="sun", hour=12,
@@ -1166,7 +1232,7 @@ def run_daemon() -> int:
     # замечает разрыв монотонных часов (= машина спала) и на старте демона
     # проверяет маркеры: плановое время прошло, прогона не было — шаг
     # ставится на ближайшую минуту, в исходном порядке конвейера.
-    daily = [("discover", 9, 0), ("ingest", 9, 30), ("prepare", 10, 0),
+    daily = [("backup", 8, 45), ("discover", 9, 0), ("ingest", 9, 30), ("prepare", 10, 0),
              ("approve", 10, 15), ("direct", 9, 50), ("email", 10, 30), ("resend_en", 11, 0),
              ("tg1", 11, 15),
              ("manual_prep", 9, 40), ("manual_batch", 9, 45),
