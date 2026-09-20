@@ -830,10 +830,8 @@ def step_google_token() -> dict:
     if state["token"] and not state["alive"]:
         notify.push_once(
             "google_token_dead",
-            "⚠️ Вход в Google перестал работать: календарь и почта через Gmail API стоят.
-"
-            "Нужен повторный вход: python -m jobhunter.googleauth --login
-"
+            "⚠️ Вход в Google перестал работать: календарь и почта через Gmail API стоят.\n"
+            "Нужен повторный вход: python -m jobhunter.googleauth --login\n"
             "Если это повторяется раз в неделю — проект Google Cloud в статусе «Тестирование», "
             "переведи его в «В работе».",
             dedup="google_token_dead:%s" % datetime.now().strftime("%Y-%m-%d"))
