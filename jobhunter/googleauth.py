@@ -39,6 +39,21 @@ def _path(raw: str) -> Path:
     return p if p.is_absolute() else ROOT / p
 
 
+def _direct_request():
+    """Транспорт для обмена и обновления токена — напрямую, мимо системного прокси.
+
+    requests берёт прокси из настроек Windows. У владельца там остаётся локальный SOCKS-порт
+    VPN (socks=127.0.0.1:10808) даже при выключенном VPN, и обмен кода на токен падал с
+    SOCKSHTTPSConnectionPool (20.09). Весь остальной проект ходит с trust_env=False по той же
+    причине; Google доступен напрямую.
+    """
+    import requests
+    from google.auth.transport.requests import Request
+    session = requests.Session()
+    session.trust_env = False
+    return Request(session=session)
+
+
 def granted() -> set:
     """Какие разрешения реально лежат в токене: владелец мог снять галочку на экране входа."""
     import json
@@ -56,7 +71,6 @@ def credentials(interactive: bool = False, need: tuple = ()):
     need — разрешения, без которых вызывающему делать нечего (например, GMAIL_SEND).
     """
     from google.auth.exceptions import RefreshError
-    from google.auth.transport.requests import Request
     from google.oauth2.credentials import Credentials
 
     s = get_settings()
@@ -75,7 +89,7 @@ def credentials(interactive: bool = False, need: tuple = ()):
         return creds
     if creds and creds.expired and creds.refresh_token:
         try:
-            creds.refresh(Request())
+            creds.refresh(_direct_request())
         except RefreshError as e:
             raise GoogleUnavailable("токен Google отозван или истёк (%s) — нужен повторный вход: "
                                     "python -m jobhunter.googleauth --login" % str(e)[:60]) from e
@@ -90,6 +104,7 @@ def credentials(interactive: bool = False, need: tuple = ()):
     if not secret.is_file():
         raise GoogleUnavailable("нет файла %s" % secret)
     flow = InstalledAppFlow.from_client_secrets_file(str(secret), SCOPES)
+    flow.oauth2session.trust_env = False        # обмен кода на токен — тоже мимо системного прокси
     # offline + consent: Google выдаёт refresh_token только при явном согласии
     creds = flow.run_local_server(port=0, access_type="offline", prompt="consent")
     token_path.write_text(creds.to_json(), encoding="utf-8")

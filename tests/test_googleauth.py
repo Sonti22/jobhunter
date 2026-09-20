@@ -53,3 +53,10 @@ def test_no_token_at_all(token):
     assert googleauth.granted() == set()
     assert googleauth.check() == {"token": False, "calendar": False, "gmail_send": False,
                                   "gmail_read": False, "alive": False, "mailbox": ""}
+
+
+def test_google_login_ignores_the_system_proxy():
+    """20.09: в Windows остался системный прокси VPN (socks=127.0.0.1:10808), и обмен кода на
+    токен падал с SOCKSHTTPSConnectionPool, хотя Google доступен напрямую."""
+    from jobhunter import googleauth
+    assert googleauth._direct_request().session.trust_env is False
