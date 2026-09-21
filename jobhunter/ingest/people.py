@@ -73,7 +73,23 @@ _EXEC_ROLE = re.compile(
     r"генеральн\w+\s+директор|основател\w+|техническ\w+\s+директор|"
     r"руководител\w+\s+разработк\w+", re.I)
 _HIRING_BIO = re.compile(r"\bhiring\b|нанимаем|ищем\s+в\s+команду", re.I)
-_TAG = re.compile(r"<(script|style)\b.*?</\1>|<[^>]+>", re.S | re.I)
+# Слово «hiring» в био бывает и у СОИСКАТЕЛЯ: «Open to collaborations & hiring opportunities»,
+# «available for hire», «Hiring?? Let me know». 21.09 основатель-одиночка ответил на письмо
+# «ваша команда нанимает»: он сам ищет предложения. Из 17 разосланных писем таких было два.
+_SEEKER_BIO = re.compile(
+    r"open\s+(?:to|for)\b[^.|;\n]{0,60}\b(?:hiring|hire|work|jobs?|opportunit\w*|offers?|roles?)|"
+    r"(?:available|ready)\s+for\s+(?:hire|work|freelance)|\bfor\s+hire\b|\bhire\s+me\b|"
+    r"(?:looking|searching)\s+for\s+(?:a\s+|an\s+|new\s+|my\s+next\s+)?(?:job|work|role|position|opportunit\w*)|"
+    r"seeking\s+(?:a\s+|an\s+|new\s+)?(?:job|work|role|position|opportunit\w*)|"
+    r"hiring\s+opportunit\w*|hiring\s*\?|ищу\s+работу|открыт\s+к\s+предложениям", re.I)
+
+
+def hiring_bio(bio: str) -> bool:
+    """В био человек пишет, что НАНИМАЕТ (а не что его самого можно нанять)."""
+    return bool(_HIRING_BIO.search(bio or "")) and not _SEEKER_BIO.search(bio or "")
+
+
+_TAG =re.compile(r"<(script|style)\b.*?</\1>|<[^>]+>", re.S | re.I)
 _MAILTO = re.compile(r"href=[\"']mailto:([^\"'?>\s]+)", re.I)
 
 
@@ -414,12 +430,12 @@ def _person_contact(u: dict, *, company: str = "", need_hiring: bool = True,
         # Человек сам пишет, что нанимает: должность — его собственные слова о себе.
         found = _EXEC_ROLE.search(bio)
         role = found.group(0) if found else ""
-        if not _HIRING_BIO.search(bio):
+        if not hiring_bio(bio):
             return None
     else:
         # Участник организации целевой компании: должность должна быть в ней самой.
         role = _role_at(bio, company, *aliases)
-        if not role and not _HIRING_BIO.search(bio):
+        if not role and not hiring_bio(bio):
             return None                   # рядовой участник организации — не адресат
     login = u.get("login") or ""
     return Contact(

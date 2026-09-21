@@ -300,3 +300,34 @@ def test_github_member_with_placeholder_email_is_skipped(monkeypatch):
                          "bio": "Engineering at Grafana — we're hiring!"}}
     f = _org_api({"login": "grafana", "blog": "https://grafana.com"}, members)
     assert people.github_org_people("Grafana", "https://grafana.com", f) == []
+
+
+@pytest.mark.parametrize("bio,employer", [
+    ("Open to collaborations & hiring opportunities", False),
+    ("Backend Engineer. Open to hiring opportunities", False),
+    ("Hiring?? - Let me know", False),
+    ("Available for hire. Python, Go", False),
+    ("Looking for a new opportunity in fintech", False),
+    ("Ищу работу, открыт к предложениям", False),
+    ("CTO @Kong. We are hiring engineers: https://konghq.com/careers", True),
+    ("Founder & CEO. We're hiring!", True),
+    ("PlusAI is hiring. Leader in self-driving trucks", True),
+    ("Hiring (reach out on LinkedIn)", True),
+    ("Мы нанимаем разработчиков", True),
+    ("Backend dev, no hiring here", True),
+])
+def test_bio_saying_open_to_hiring_opportunities_is_a_job_seeker_not_an_employer(bio, employer):
+    """21.09: основатель-одиночка ответил на «ваша команда нанимает» — в био у него
+    «Open to collaborations & hiring opportunities», то есть он сам ищет предложения."""
+    assert people.hiring_bio(bio) is employer
+
+
+def test_github_search_skips_job_seekers_whose_bio_only_contains_the_word_hiring(monkeypatch):
+    monkeypatch.setattr(people.time, "sleep", lambda *a: None)
+    users = {
+        "solo": {"login": "solo", "name": "Sukhraj", "email": "solo@gmail.com",
+                 "bio": "Backend Engineer. Open to collaborations & hiring opportunities."},
+        "boss": {"login": "boss", "name": "Lee", "email": "lee@corp.dev", "bio": "CTO. We're hiring"},
+    }
+    found = people.github_people(limit=10, fetcher=_github(users), queries=("hiring in:bio",))
+    assert [c.email for c in found] == ["lee@corp.dev"]
