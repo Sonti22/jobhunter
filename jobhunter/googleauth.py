@@ -19,6 +19,8 @@
 from __future__ import annotations
 
 import argparse
+import logging
+import os
 import sys
 from pathlib import Path
 
@@ -28,6 +30,9 @@ CALENDAR = "https://www.googleapis.com/auth/calendar.events"
 GMAIL_SEND = "https://www.googleapis.com/auth/gmail.send"
 GMAIL_READ = "https://www.googleapis.com/auth/gmail.readonly"
 SCOPES = [CALENDAR, GMAIL_SEND, GMAIL_READ]
+
+
+log = logging.getLogger("googleauth")
 
 
 class GoogleUnavailable(RuntimeError):
@@ -93,7 +98,15 @@ def credentials(interactive: bool = False, need: tuple = ()):
         except RefreshError as e:
             raise GoogleUnavailable("токен Google отозван или истёк (%s) — нужен повторный вход: "
                                     "python -m jobhunter.googleauth --login" % str(e)[:60]) from e
-        token_path.write_text(creds.to_json(), encoding="utf-8")
+        try:
+            token_path.write_text(creds.to_json(), encoding="utf-8")
+        except OSError as e:
+            # 21.09: файл токена принадлежал root после docker cp, бот работает под app. Обновлённый
+            # токен не записался, исключение уходило наверх, и почта молча переходила на SMTP/IMAP.
+            # Токен уже получен и годен в памяти — работаем с ним, а не падаем. Обновление станет
+            # ходить в сеть на каждое подключение, пока права не исправят (step_google_token скажет).
+            log.warning("токен Google обновлён, но не записан на диск (%s) — исправь права на %s",
+                        str(e)[:80], token_path)
         return creds
     if not interactive:
         raise GoogleUnavailable("нет действующего токена Google "
@@ -119,7 +132,8 @@ def check() -> dict:
     """Жив ли токен и что им разрешено. Адрес ящика возвращается с маской."""
     have = granted()
     out = {"token": bool(have), "calendar": CALENDAR in have, "gmail_send": GMAIL_SEND in have,
-           "gmail_read": GMAIL_READ in have, "alive": False, "mailbox": ""}
+           "gmail_read": GMAIL_READ in have, "alive": False, "mailbox": "",
+           "writable": os.access(_path(get_settings().google_token_path), os.W_OK)}
     if not have:
         return out
     try:

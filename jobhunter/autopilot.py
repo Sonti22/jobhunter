@@ -837,7 +837,17 @@ def step_google_token() -> dict:
             "Если это повторяется раз в неделю — проект Google Cloud в статусе «Тестирование», "
             "переведи его в «В работе».",
             dedup="google_token_dead:%s" % datetime.now().strftime("%Y-%m-%d"))
-    return {k: state[k] for k in ("token", "alive", "calendar", "gmail_send", "gmail_read")}
+    if state["token"] and state["alive"] and not state["writable"]:
+        # 21.09: файл токена остался у root после docker cp, бот (пользователь app) не мог записать
+        # обновлённый токен — и почта тихо ушла на SMTP/IMAP. Теперь код работает и так, но каждое
+        # подключение ходит за новым токеном; правильно — вернуть права.
+        notify.push_once(
+            "google_token_readonly",
+            "⚠️ Токен Google не перезаписывается (нет прав на файл). Почта работает, но каждый раз "
+            "запрашивает новый токен.\nИсправление: docker compose exec -u root autopilot "
+            "chown app:app /data/google_token.json",
+            dedup="google_token_readonly:%s" % datetime.now().strftime("%Y-%m-%d"))
+    return {k: state[k] for k in ("token", "alive", "writable", "calendar", "gmail_send", "gmail_read")}
 
 
 BACKUP_KEEP_DAILY = 7
