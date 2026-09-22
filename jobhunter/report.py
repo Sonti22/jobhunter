@@ -81,7 +81,11 @@ def quota() -> dict:
         # 0/30» при двух ушедших письмах читается как «система стоит».
         email_sent = policy.email_sent_today(sess)
         return {"sent": q.sent_count,
-                "cap": min(q.planned_cap or st.quota_ceiling, st.quota_ceiling),
+                # Дневного потолка у холодных больше нет — темп держит пауза
+                # (решение владельца 23.09). Показываем её, а не выдуманный
+                # лимит: «3/6» читалось бы как «осталось три».
+                "gap_minutes": policy.COLD_GAP_MINUTES,
+                "gap_left_s": policy.cold_gap_left(sess),
                 "email_sent": email_sent,
                 "email_cap": policy.email_daily_cap(sess),
                 "clean_days": st.consecutive_clean_days,

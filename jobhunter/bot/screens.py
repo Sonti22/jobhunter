@@ -28,6 +28,19 @@ def _meter(cur: int, cap: int, width: int = 6) -> str:
     return "▓" * filled + "░" * (width - filled) + " %d/%d" % (cur, cap)
 
 
+def _cold_line(q: dict) -> str:
+    """Холодные Telegram: счёт за день и когда можно следующее.
+
+    Полоски-квоты здесь больше нет: дневной потолок снят, темп держит пауза
+    между сообщениями (решение владельца 23.09). Дробь «3/6» читалась бы как
+    «осталось три», хотя ограничения по числу нет вовсе.
+    """
+    sent = q.get("sent", 0)
+    left = int(q.get("gap_left_s", 0) or 0)
+    when = ("следующее через %d мин" % -(-left // 60)) if left > 0 else "можно сейчас"
+    return "%d за сегодня · %s" % (sent, when)
+
+
 def _plural(n: int, one: str, few: str, many: str) -> str:
     """Русская плюрализация: 1 карточку, 2 карточки, 5 карточек, 21 карточку."""
     if n % 10 == 1 and n % 100 != 11:
@@ -143,7 +156,7 @@ def main() -> tuple:
 
     # 2. Что сделала система сегодня.
     lines.append("── СЕГОДНЯ ──────────────")
-    lines.append("Telegram  %s" % _meter(q["sent"], q["cap"]))
+    lines.append("Telegram  %s" % _cold_line(q))
     lines.append("Почта     %s" % _meter(q.get("email_sent", 0),
                                          q.get("email_cap", 0)))
     if msg["incoming"] or msg["auto"]:
@@ -194,7 +207,7 @@ def stats() -> tuple:
     src = report.sources(30)
 
     lines = ["📊 Статистика · %s" % _now(), ""]
-    lines.append("Сегодня  Telegram %s" % _meter(q["sent"], q["cap"]))
+    lines.append("Сегодня  Telegram %s" % _cold_line(q))
     lines.append("         Почта    %s" % _meter(q.get("email_sent", 0),
                                                  q.get("email_cap", 0)))
     lines.append("Дней без предупреждений Telegram: %d (предупреждений "

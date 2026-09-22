@@ -667,6 +667,18 @@ async def run(limit: int, dry: bool, max_sessions: int | None = None) -> int:
             res = await send_one(client, item, rng, dry)
             print("  [%d.%d] @%-22s %s" % (si + 1, k + 1, item["handle"], res))
             if res.startswith("stop:"):
+                if policy.COLD_GAP_REASON in res:
+                    # Не сбой, а выдержка паузы: следующее сообщение — со
+                    # следующим вызовом планировщика. Спать здесь нельзя:
+                    # полчаса сна занимают однопоточную tg-очередь, пульс
+                    # autopilot_tg не отбивается, и сторож убивает контейнер
+                    # посреди отправки (порог healthcheck — 40 минут).
+                    if client:
+                        await client.disconnect()
+                    _summary(stats)
+                    print("  пауза между холодными выдерживается — "
+                          "остаток партии: %d" % (len(batch) - idx))
+                    return MORE_TO_SEND
                 stats["stopped"] += 1
                 print("\nСТОП: %s" % res[5:])
                 if client:
@@ -674,8 +686,6 @@ async def run(limit: int, dry: bool, max_sessions: int | None = None) -> int:
                 _summary(stats)
                 return 1
             stats["ok" if res == "ok" else "skipped"] += 1
-            if idx < len(batch) and not dry:
-                await asyncio.sleep(policy.gap_seconds(rng))
         # Сессионный режим: одна сессия за вызов, межсессионную паузу держит
         # планировщик, а не этот поток. Прежний сплошной прогон занимал
         # единственный tg-воркер на 3-7 часов, и всё это время кнопочные
@@ -689,9 +699,12 @@ async def run(limit: int, dry: bool, max_sessions: int | None = None) -> int:
                                                  len(batch) - idx))
             return MORE_TO_SEND
         if idx < len(batch) and not dry:
-            gap = policy.session_gap_seconds(rng)
-            print("  ── пауза между сессиями %d мин ──" % round(gap / 60))
-            await asyncio.sleep(gap)
+            # Паузу держит планировщик, а не этот поток: сон занимал бы
+            # tg-очередь и глушил пульс autopilot_tg.
+            if client:
+                await client.disconnect()
+            _summary(stats)
+            return MORE_TO_SEND
 
     if client:
         await client.disconnect()

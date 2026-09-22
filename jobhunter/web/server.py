@@ -169,7 +169,6 @@ def queue(q: str = "", source: str = "", page: int = 1,
                             .offset((page - 1) * page_size).limit(page_size)).all()
         counts = _status_counts(sess)
         quota_state = policy.get_quota(sess)
-        st = policy.get_state(sess)
         verdict = policy.can_send_cold(sess)
         rows = []
         for a in apps:
@@ -195,7 +194,7 @@ def queue(q: str = "", source: str = "", page: int = 1,
                    if promoted else "",
                    _h(contact), chan, a.id))
 
-        cap = min(quota_state.planned_cap or st.quota_ceiling, st.quota_ceiling)
+        gap_left = policy.cold_gap_left(sess)
         pill = ("<span class='pill ok'>отправка разрешена</span>" if verdict.allowed
                 else "<span class='pill bad'>%s</span>" % _h(verdict.reason))
         cards = (
@@ -204,19 +203,21 @@ def queue(q: str = "", source: str = "", page: int = 1,
             "<div class='card'><b>%d</b><span>одобрено</span></div>"
             "<div class='card'><b>%d</b><span>отправлено</span></div>"
             "<div class='card'><b>%d</b><span>ждут ответа</span></div>"
-            "<div class='card'><b>%d/%d</b><span>квота сегодня</span></div>"
+            "<div class='card'><b>%d</b><span>холодных сегодня%s</span></div>"
             "</div>"
             % (counts.get(Status.PENDING_APPROVAL.value, 0),
                counts.get(Status.APPROVED.value, 0),
                counts.get(Status.SENT.value, 0) + counts.get(Status.AWAITING_REPLY.value, 0),
-               counts.get(Status.AWAITING_REPLY.value, 0), quota_state.sent_count, cap))
+               counts.get(Status.AWAITING_REPLY.value, 0), quota_state.sent_count,
+               (", следующее через %d мин" % -(-gap_left // 60)) if gap_left else ""))
 
         body = cards + (
-            "<div class='bar'>%s &nbsp; лимит %d/день &nbsp;·&nbsp; "
+            "<div class='bar'>%s &nbsp; пауза между холодными: %d мин &nbsp;·&nbsp; "
             "резюме в первом сообщении: %s"
             "<form method='post' action='/killswitch' style='display:inline;float:right'>"
             "<button class='btn %s' name='on' value='%s'>%s</button></form></div>"
-            % (pill, cap, "да" if s.send_cv_with_first_message else "нет",
+            % (pill, policy.COLD_GAP_MINUTES,
+               "да" if s.send_cv_with_first_message else "нет",
                "ghost" if policy.kill_switch_active() else "bad",
                "0" if policy.kill_switch_active() else "1",
                "Снять стоп" if policy.kill_switch_active() else "СТОП отправки"))
@@ -459,13 +460,14 @@ def sending_page(offset: Annotated[int, Query(ge=0)] = 0,
                    for r in data["items"])
     last = data["last_success"]
     body = ("<h2>Почему не отправляет</h2><div class='bar'>"
-            "В работе: %d · прошли отбор: %d · Telegram сегодня: %d/%d<br>"
+            "В работе: %d · прошли отбор: %d · Telegram сегодня: %d (пауза %d мин)<br>"
             "Последняя успешная отправка: %s%s</div>"
             "<p class='muted'>Время — %s. Квота и готовность заявки проверяются перед каждой отправкой. "
             "Назначенное время может сдвинуться, если предыдущая задача ещё работает.</p>"
             "<table><tr><th>Заявка</th><th>Канал</th><th>Оценка</th><th>Причина</th>"
             "<th>Ближайшее время</th></tr>%s</table>" % (
-                data["total"], data["eligible"], data["quota"]["sent"], data["quota"]["cap"],
+                data["total"], data["eligible"], data["quota"]["sent"],
+                data["quota"]["gap_minutes"],
                 _h(_local_time(last["at"])) if last else "ещё нет", times,
                 _h(get_settings().owner_tz), rows or "<tr><td colspan='5'>Нет ожидающих заявок</td></tr>"))
     return _layout(body + _pagination("/sending", data))
@@ -1082,7 +1084,7 @@ def health():
         body = (
             "<h3>Готовность каналов</h3><table>%s</table>"
             "<h3 style='margin-top:22px'>Кампания</h3><table>"
-            "<tr><td>дневной потолок</td><td>%d</td></tr>"
+            "<tr><td>пауза между холодными</td><td>%d мин</td></tr>"
             "<tr><td>отправлено сегодня</td><td>%d</td></tr>"
             "<tr><td>чистых дней подряд</td><td>%d</td></tr>"
             "<tr><td>PeerFlood всего</td><td>%d</td></tr>"
@@ -1096,7 +1098,7 @@ def health():
             "</table>"
             "<h3 style='margin-top:22px'>Последние отправки</h3>"
             "<table><tr><th>когда</th><th>результат</th><th>ошибка</th><th>адресат</th></tr>%s</table>"
-            % (rd, st.quota_ceiling, q.sent_count, st.consecutive_clean_days,
+            % (rd, policy.COLD_GAP_MINUTES, q.sent_count, st.consecutive_clean_days,
                st.peerflood_total, "ДА" if st.manual_only else "нет",
                lk.locked_until or "—",
                "активен" if policy.kill_switch_active() else "снят",

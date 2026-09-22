@@ -487,6 +487,25 @@ def step_resend_en() -> dict:
     return stats
 
 
+def _rearm_telegram(after_seconds: float):
+    """Назначить следующий заход отправки через after_seconds. None вне демона.
+
+    Темп холодных держит пауза, а не дневной счётчик: каждый заход отправляет
+    одно сообщение и переназначает себя. Спать внутри прогона нельзя —
+    однопоточная tg-очередь тогда не отбивает пульс, и сторож убивает
+    контейнер посреди отправки.
+    """
+    sched = _SCHED.get("sched")
+    if sched is None:
+        return None
+    when = datetime.now() + timedelta(seconds=max(60.0, after_seconds))
+    sched.add_job(step_send_telegram, "date", id="tg_more",
+                  replace_existing=True, run_date=when,
+                  misfire_grace_time=3600, executor="tg")
+    log.info("следующая отправка в %s", when.strftime("%H:%M"))
+    return when
+
+
 def step_send_telegram() -> dict:
     from .outreach.sender import run as sender_run
     s = get_settings()
@@ -503,13 +522,12 @@ def step_send_telegram() -> dict:
     with session_scope() as sess:
         v = policy.can_send_cold(sess)
     if not v.allowed:
-        log.warning("telegram пропущен: %s", v.reason)
-        if "квота" in v.reason:
-            from . import notify
-            notify.push("quota_done", "📮 Дневная квота отправки исчерпана: %s"
-                        % v.reason,
-                        dedup="quota:%s" % datetime.now(timezone.utc)
-                                                    .strftime("%Y-%m-%d"))
+        log.info("telegram пропущен: %s", v.reason)
+        if policy.COLD_GAP_REASON in v.reason:
+            # Пауза — штатный режим, а не отказ: молча переназначаем прогон на
+            # её конец. Уведомлять владельца тут не о чем, он получил бы такое
+            # сообщение два десятка раз в день.
+            _rearm_telegram(v.wait_seconds + 30)
         return {"blocked": v.reason}
     try:
         from .outreach.sender import MORE_TO_SEND, ProcessLock, lock_path
@@ -524,16 +542,10 @@ def step_send_telegram() -> dict:
             rc = asyncio.run(sender_run(s.daily_cold_limit, dry=False,
                                         max_sessions=sessions))
         if rc == MORE_TO_SEND and _SCHED.get("sched") is not None:
-            import random as _r
-            gap = _r.uniform(40 * 60, 120 * 60)
-            when = datetime.now() + timedelta(seconds=gap)
-            _SCHED["sched"].add_job(
-                step_send_telegram, "date", id="tg_more",
-                replace_existing=True, run_date=when,
-                misfire_grace_time=3600, executor="tg")
-            log.info("продолжение отправки в %s", when.strftime("%H:%M"))
+            when = _rearm_telegram(policy.gap_seconds())
             from .observability import record
-            record("sender:telegram", "partial", next_run_at=when.astimezone())
+            record("sender:telegram", "partial",
+                   next_run_at=when.astimezone() if when else None)
         else:
             from .observability import record
             record("sender:telegram", "ok" if rc == 0 else "blocked",
@@ -964,9 +976,9 @@ def step_daily_summary() -> None:
         q = policy.get_quota(sess)
         st = policy.get_state(sess)
         policy.close_day(sess)
-    log.info("ИТОГ ДНЯ: отправлено %d/%d | ждут ответа %d | ответили %d | "
+    log.info("ИТОГ ДНЯ: отправлено %d (пауза %d мин) | ждут ответа %d | ответили %d | "
              "в очереди %d | чистых дней подряд %d",
-             q.sent_count, st.quota_ceiling,
+             q.sent_count, policy.COLD_GAP_MINUTES,
              c.get(Status.AWAITING_REPLY.value, 0),
              c.get(Status.REPLIED.value, 0) + c.get(Status.IN_DIALOGUE.value, 0),
              c.get(Status.PENDING_APPROVAL.value, 0),
@@ -983,11 +995,11 @@ def step_daily_summary() -> None:
     day = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     notify.push("daily_summary",
                 "📊 Итог дня\n"
-                "отправлено: %d/%d\n"
+                "отправлено: %d (пауза между холодными %d мин)\n"
                 "ждут ответа: %d · ответили: %d\n"
                 "в очереди: %d · интервью: %d\n"
                 "чистых дней подряд: %d"
-                % (q.sent_count, st.quota_ceiling,
+                % (q.sent_count, policy.COLD_GAP_MINUTES,
                    c.get(Status.AWAITING_REPLY.value, 0),
                    c.get(Status.REPLIED.value, 0)
                    + c.get(Status.IN_DIALOGUE.value, 0),

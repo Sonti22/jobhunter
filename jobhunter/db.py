@@ -88,6 +88,7 @@ _ADDED_COLUMNS = {
         ("owner_last_seen_msg_id", "INTEGER DEFAULT 0"),
         ("imap_uidvalidity", "INTEGER DEFAULT 0"),
         ("imap_last_uid", "INTEGER DEFAULT 0"),
+        ("last_cold_sent_at", "DATETIME"),
     ],
     "owner_requests": [
         ("next_try_at", "DATETIME"),

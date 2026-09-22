@@ -403,13 +403,21 @@ def test_email_daily_limit_checked_before_smtp_login(isolated_db, monkeypatch):
         assert not policy.can_send_email(sess).allowed
 
 
-def test_panel_uses_actual_recovery_quota(isolated_db):
+def test_panel_shows_the_pause_instead_of_a_daily_cap(isolated_db):
+    """Дневного потолка у холодных нет (решение владельца 23.09).
+
+    Панель показывает паузу и когда можно следующее сообщение: дробь «1/6»
+    читалась бы как «осталось пять», хотя ограничения по числу нет вовсе.
+    """
     from jobhunter import report
     from jobhunter.outreach import policy
     with isolated_db.session_scope() as sess:
-        policy.get_state(sess).quota_ceiling = 25
-        policy.get_quota(sess).planned_cap = 3
-    assert report.quota()["cap"] == 3
+        policy.register_sent(sess, cold=True)
+    q = report.quota()
+    assert "cap" not in q
+    assert q["sent"] == 1
+    assert q["gap_minutes"] == policy.COLD_GAP_MINUTES
+    assert 0 < q["gap_left_s"] <= policy.COLD_GAP_MINUTES * 60
 
 
 def fake_sender_client(monkeypatch, *, during_typing=None):

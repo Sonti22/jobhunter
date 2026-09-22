@@ -775,6 +775,11 @@ class CampaignState(Base):
     consecutive_clean_days: Mapped[int] = mapped_column(Integer, default=0)
     peerflood_total: Mapped[int] = mapped_column(Integer, default=0)
     manual_only: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Момент последнего ХОЛОДНОГО сообщения. Темп холодных задан паузой между
+    # ними, а не дневным счётчиком (решение владельца 23.09), и пауза обязана
+    # переживать перезапуск: счётчик в памяти процесса обнулялся бы при каждом
+    # вызове планировщика, и первое сообщение каждого прогона уходило бы сразу.
+    last_cold_sent_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     started_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     # id последнего разобранного сообщения из «Избранного» — чтобы не
     # обрабатывать одну и ту же команду владельца дважды.

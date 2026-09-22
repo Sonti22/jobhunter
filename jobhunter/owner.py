@@ -636,7 +636,6 @@ def status_text() -> str:
         apps = sess.scalars(select(Application)).all()
         c = Counter(a.status for a in apps)
         q = policy.get_quota(sess)
-        st = policy.get_state(sess)
         open_reqs = sess.scalars(
             select(OwnerRequest).where(OwnerRequest.decision == "")).all()
         interviews = sess.scalars(
@@ -649,7 +648,8 @@ def status_text() -> str:
 
     s = get_settings()
     lines = ["Сводка jobhunter",
-             "отправлено сегодня: %d/%d" % (q.sent_count, st.quota_ceiling),
+             "отправлено сегодня: %d (пауза между холодными %d мин)"
+             % (q.sent_count, policy.COLD_GAP_MINUTES),
              "ждут ответа: %d · ответили: %d · в очереди: %d"
              % (c.get(Status.AWAITING_REPLY.value, 0),
                 c.get(Status.REPLIED.value, 0) + c.get(Status.IN_DIALOGUE.value, 0),

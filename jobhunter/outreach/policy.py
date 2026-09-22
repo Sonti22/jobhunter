@@ -17,6 +17,14 @@ from ..models import CampaignState, DailyQuota, SendLock, utcnow
 # они низкорисковые и не должны съедать холодную квоту.
 WARM_REPLY_DAILY = 80
 
+# Темп холодных задан ПАУЗОЙ, а не дневным счётчиком (решение владельца 23.09):
+# новому адресату — не чаще раза в полчаса, дневного потолка нет. В окне
+# вежливости 09-21 это само по себе даёт не больше ~24 сообщений в день.
+# Тёплые ответы тем, кто уже написал сам, эта пауза не касается — у них свой
+# бакет (WARM_REPLY_DAILY) и своя проверка в convo/send.py.
+COLD_GAP_MINUTES = 30
+COLD_GAP_REASON = "пауза между холодными"
+
 PEERFLOOD_LOCK_HOURS = 48
 FLOOD_SLEEP_MAX = 300          # выше — это уже анти-спам сигнал, не rate limit
 
@@ -77,8 +85,28 @@ def kill_switch_active() -> bool:
     return get_settings().kill_switch.exists()
 
 
+def cold_gap_left(sess) -> int:
+    """Секунд до следующего холодного сообщения. 0 — можно сейчас."""
+    st = get_state(sess)
+    last = st.last_cold_sent_at
+    if not last:
+        return 0
+    # utcnow() отдаёт время с зоной, из SQLite оно читается без неё: в одной
+    # транзакции метка ещё «с зоной», после перечитывания — уже без. Вычитание
+    # разнородных дат падает TypeError, поэтому приводим к наивному UTC.
+    if last.tzinfo is not None:
+        last = last.astimezone(timezone.utc).replace(tzinfo=None)
+    passed = (datetime.now(timezone.utc).replace(tzinfo=None) - last).total_seconds()
+    return max(0, int(COLD_GAP_MINUTES * 60 - passed))
+
+
 def can_send_cold(sess) -> Verdict:
-    """Можно ли отправить ещё одно холодное сообщение прямо сейчас."""
+    """Можно ли отправить ещё одно холодное сообщение прямо сейчас.
+
+    Дневного потолка нет: темп держит пауза между сообщениями. Счётчик
+    отправленных за день остаётся — он нужен пульту и отчётам, но ничего
+    не запрещает.
+    """
     if kill_switch_active():
         return Verdict(False, "kill-switch: %s" % get_settings().kill_switch.name)
 
@@ -92,17 +120,22 @@ def can_send_cold(sess) -> Verdict:
         return Verdict(False, "лок до %s (%s)" % (lk.locked_until, lk.reason),
                        int(left.total_seconds()))
 
-    q = get_quota(sess)
-    cap = min(q.planned_cap or st.quota_ceiling, st.quota_ceiling)
-    if q.sent_count >= cap:
-        return Verdict(False, "дневная квота исчерпана (%d/%d)" % (q.sent_count, cap))
-    return Verdict(True, "%d/%d за сегодня" % (q.sent_count, cap))
+    left_s = cold_gap_left(sess)
+    if left_s > 0:
+        return Verdict(False, "%s: ещё %d мин" % (COLD_GAP_REASON,
+                                                  -(-left_s // 60)), left_s)
+    return Verdict(True, "пауза выдержана, сегодня отправлено %d"
+                   % get_quota(sess).sent_count)
 
 
 def register_sent(sess, cold: bool = True) -> None:
     q = get_quota(sess)
     if cold:
         q.sent_count += 1
+        # Пауза считается от последней ОТПРАВКИ и хранится в базе: прогон
+        # запускается планировщиком заново каждые полчаса, и счётчик в памяти
+        # процесса не пережил бы ни одного перезапуска.
+        get_state(sess).last_cold_sent_at = utcnow()
 
 
 def email_sent_today(sess) -> int:
@@ -237,12 +270,11 @@ def on_peer_flood(sess, detail: str = "") -> Verdict:
 
     notify.push("peerflood",
                 "⚠️ PeerFlood: Telegram придержал отправку.\n"
-                "Стоп на %d ч, дневной потолок понижен до %d.\n"
+                "Стоп на %d ч; дальше — по одному холодному раз в %d мин.\n"
                 "Переписка с теми, кто уже ответил, продолжается."
-                % (PEERFLOOD_LOCK_HOURS, st.quota_ceiling),
+                % (PEERFLOOD_LOCK_HOURS, COLD_GAP_MINUTES),
                 dedup="peerflood:%s" % today, sess=sess)
-    return Verdict(False, "PeerFlood: стоп на %dч, потолок → %d"
-                   % (PEERFLOOD_LOCK_HOURS, st.quota_ceiling))
+    return Verdict(False, "PeerFlood: стоп на %dч" % PEERFLOOD_LOCK_HOURS)
 
 
 def resume_manual_only(sess) -> bool:
@@ -268,8 +300,8 @@ def resume_manual_only(sess) -> bool:
         return False
     st.manual_only = False
     from .. import notify
-    notify.push("info", "▶️ Telegram возобновлён вручную. Потолок остаётся понижен (%d/день)."
-                % st.quota_ceiling, sess=sess)
+    notify.push("info", "▶️ Telegram возобновлён вручную. Холодные — по одному раз в %d мин."
+                % COLD_GAP_MINUTES, sess=sess)
     return True
 
 
@@ -310,23 +342,21 @@ def session_plan(daily_cap: int, rng: random.Random | None = None) -> list:
 
 
 def gap_seconds(rng: random.Random | None = None) -> float:
-    """Пауза между сообщениями внутри сессии: логнормальная, медиана ~30 мин.
+    """Когда планировщику звать отправку снова: логнормальная, медиана ~33 мин.
 
-    Раньше медиана держалась в секундах (90 → 120 с после первых PeerFlood):
-    несколько сообщений подряд уходили за пару минут, и сама плотность
-    пачки — независимо от текста — уже похожа на спам-паттерн для Telegram.
-    К 22.09 счёт дошёл до 6 страйков. Решение владельца 22.09: не больше
-    одного холодного сообщения одному адресату — пауза перед следующим не
-    короче получаса.
+    Раньше медиана держалась в секундах (90 → 120 с): несколько сообщений
+    подряд уходили за пару минут, и сама плотность пачки — независимо от
+    текста — уже похожа на спам-паттерн для Telegram. К 22.09 счёт дошёл до
+    6 страйков. Решение владельца 22-23.09: новому адресату — не чаще раза
+    в полчаса, дневного потолка нет.
+
+    Жёсткий минимум держит can_send_cold() по метке в базе; здесь — разброс,
+    чтобы вызовы не попадали в одну и ту же секунду получаса: ровный интервал
+    сам по себе машинный признак.
     """
     rng = rng or random.Random()
     v = rng.lognormvariate(7.6, 0.12)    # медиана e^7.6 ≈ 1998 с ≈ 33 мин
-    return max(1800.0, min(2700.0, v)) + rng.uniform(0, 30)   # не короче получаса
-
-
-def session_gap_seconds(rng: random.Random | None = None) -> float:
-    rng = rng or random.Random()
-    return rng.uniform(40 * 60, 120 * 60)
+    return max(float(COLD_GAP_MINUTES * 60), min(2700.0, v)) + rng.uniform(0, 30)
 
 
 def typing_seconds(text: str, rng: random.Random | None = None) -> float:
