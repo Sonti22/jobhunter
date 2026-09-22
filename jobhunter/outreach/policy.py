@@ -245,6 +245,34 @@ def on_peer_flood(sess, detail: str = "") -> Verdict:
                    % (PEERFLOOD_LOCK_HOURS, st.quota_ceiling))
 
 
+def resume_manual_only(sess) -> bool:
+    """Снять ручной режим Telegram по явному решению владельца. True — было что снимать.
+
+    До этой функции снять ручной режим было НЕЧЕМ: on_peer_flood переводит кампанию
+    в manual_only и пишет «до твоего решения», а решения в коде не было — ни кнопки,
+    ни команды. Временный лок (locked_until, 48ч) при этом отключён отдельно и мог
+    истечь днями раньше; ручной режим оставался висеть вечно (docs/audit 2026-09,
+    находка «Telegram — причина сбоя», 22.09).
+
+    Понижение quota_ceiling и историю peerflood_total не трогаем: темп навсегда
+    остаётся ниже прежнего, а если новый PeerFlood случится сразу после возобновления,
+    on_peer_flood снова поставит ручной режим при первом же срабатывании.
+
+    Это НЕ обход антиспама Telegram: временный лок (реакция самого Telegram) к этому
+    моменту уже истёк сам; здесь снимается только наш добавочный самозапрет. Решение —
+    осознанное действие владельца, а не автоматика; перед ним стоит проверить статус
+    аккаунта у @SpamBot.
+    """
+    st = get_state(sess)
+    if not st.manual_only:
+        return False
+    st.manual_only = False
+    from .. import notify
+    notify.push("info", "▶️ Telegram возобновлён вручную. Потолок остаётся понижен (%d/день)."
+                % st.quota_ceiling, sess=sess)
+    return True
+
+
 def close_day(sess) -> None:
     """Итог дня: чистый день увеличивает счётчик доверия."""
     q = get_quota(sess)

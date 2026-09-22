@@ -166,6 +166,14 @@ def _callback(cbq: dict, chat_id: int) -> list:
                 {"do": "screen", "chat_id": chat_id, "name": "main",
                  "msg_id": msg_id}]
 
+    if data["kind"] == "queue" and data["action"] == "tgresume":
+        from ..outreach import policy
+        with session_scope() as sess:
+            did = policy.resume_manual_only(sess)
+        note = "Telegram возобновлён" if did else "уже не в ручном режиме"
+        return [{"do": "answer", "cb_id": cb_id, "text": note},
+                {"do": "screen", "chat_id": chat_id, "name": "main", "msg_id": msg_id}]
+
     if data["kind"] == "queue" and data["action"] == "approve10":
         n = _approve_top(10)
         return [{"do": "answer", "cb_id": cb_id, "text": "Одобрено: %d" % n},

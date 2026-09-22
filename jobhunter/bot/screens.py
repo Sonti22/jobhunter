@@ -47,8 +47,8 @@ def _lock_reason(verdict: str) -> str:
     if "kill-switch" in v:
         return "отправка выключена тобой — жми ▶️ чтобы включить"
     if "ручной режим" in v:
-        return ("ручной режим после предупреждений Telegram — "
-                "сам не снимется, реши в /queue")
+        return ("ручной режим после предупреждений Telegram — сам не снимется. "
+                "Сначала проверь статус аккаунта у @SpamBot, затем ▶️ на пульте")
     if "peerflood" in v or "лок до" in v:
         # вытащим дату из «лок до 2026-08-30 13:45:00…»
         import re
@@ -176,7 +176,15 @@ def main() -> tuple:
     elif beat_ap > 900:
         lines += ["", "⚠️ Автопилот молчит %s — проверь Docker"
                   % health.human(beat_ap)]
-    return "\n".join(lines), _kb(_nav("main"))
+
+    kb = _nav("main")
+    if q["manual_only"]:
+        # Единственное место, откуда ручной режим вообще можно снять: on_peer_flood
+        # переводит кампанию сюда и пишет «до твоего решения» — раньше решения было
+        # неоткуда принять (docs/audit 2026-09, находка 22.09).
+        kb.insert(0, [{"text": "▶️ Возобновить Telegram (после проверки у @SpamBot)",
+                       "callback_data": cb("q", "tgresume")}])
+    return "\n".join(lines), _kb(kb)
 
 
 def stats() -> tuple:
