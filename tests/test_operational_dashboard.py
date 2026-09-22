@@ -466,6 +466,39 @@ def test_stop_during_typing_prevents_network_send(isolated_db, monkeypatch):
         assert sess.get(Application, app_id).status == "APPROVED"
 
 
+def test_failed_send_attempt_still_starts_the_pause(isolated_db, monkeypatch):
+    """Обрыв посреди запроса или отказ Telegram — тоже сообщение незнакомцу.
+    Считай паузу только от успеха — следующий адресат получал бы сообщение
+    сразу за неудачным, и пачка возвращалась бы в обход паузы."""
+    from jobhunter.outreach import policy, sender
+    make_app(isolated_db)
+    client = fake_sender_client(monkeypatch)
+
+    async def broken(self, request):
+        raise RuntimeError("обрыв соединения")
+
+    monkeypatch.setattr(type(client), "__call__", broken)
+    res = asyncio.run(sender.send_one(client, sender.pick_batch(1)[0], random.Random(1), dry=False))
+    assert res == "skipped:RuntimeError"
+    with isolated_db.session_scope() as sess:
+        v = policy.can_send_cold(sess)
+        assert not v.allowed and policy.COLD_GAP_REASON in v.reason
+
+
+def test_sending_page_during_pause_shows_when_not_an_old_lock(isolated_db):
+    """Во время паузы «не ранее» — её конец, а не дата давно истёкшего лока."""
+    from jobhunter.dashboard import sending
+    from jobhunter.outreach import policy
+    app_id = make_app(isolated_db)
+    with isolated_db.session_scope() as sess:
+        policy.get_lock(sess).locked_until = datetime(2026, 9, 20, 8, 17)
+        policy.register_sent(sess, cold=True)
+    item = next(i for i in sending()["items"] if i["id"] == app_id)
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    assert item["code"] == "pacing"
+    assert now < item["retry_at"] <= now + timedelta(minutes=policy.COLD_GAP_MINUTES)
+
+
 def test_followup_has_own_random_id_and_preserves_initial_send_time(isolated_db, monkeypatch):
     from jobhunter.models import Application
     from jobhunter.outreach import sender

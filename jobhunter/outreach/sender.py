@@ -383,6 +383,9 @@ async def send_one(client, item: dict, rng: random.Random, dry: bool) -> str:
                 current.transition(Status.APPROVED)
                 current.sending_lease_until = None
             return ("stop:" if not safety.allowed else "skipped:") + reason
+        # Той же транзакцией, что и последняя проверка: запрос уходит сразу
+        # следом, и пауза должна начаться при любом его исходе.
+        policy.mark_cold_attempt(sess)
 
     try:
         # Сначала текст, затем файл отдельным сообщением (решение владельца,
@@ -686,6 +689,12 @@ async def run(limit: int, dry: bool, max_sessions: int | None = None) -> int:
                 _summary(stats)
                 return 1
             stats["ok" if res == "ok" else "skipped"] += 1
+            if res != "ok" and not dry and idx < len(batch):
+                # Пропуск мог стоить запроса к Telegram (резолв ника). Без
+                # паузы следующий резолв шёл бы вплотную, а серия резолвов
+                # подряд сама ловит FloodWait. Пауза короткая: сессия из 5-8
+                # заявок держит tg-очередь минуты, пульс успевает отбиться.
+                await asyncio.sleep(rng.uniform(20, 60))
         # Сессионный режим: одна сессия за вызов, межсессионную паузу держит
         # планировщик, а не этот поток. Прежний сплошной прогон занимал
         # единственный tg-воркер на 3-7 часов, и всё это время кнопочные
@@ -708,8 +717,8 @@ async def run(limit: int, dry: bool, max_sessions: int | None = None) -> int:
 
     if client:
         await client.disconnect()
-    with session_scope() as sess:
-        policy.close_day(sess)
+    # close_day() здесь не зовём: итог дня подводит step_daily_summary раз в
+    # сутки, а второй вызов из отправщика удваивал счёт «чистых дней».
     _summary(stats)
     return 0
 

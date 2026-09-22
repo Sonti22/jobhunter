@@ -195,8 +195,11 @@ def queue(q: str = "", source: str = "", page: int = 1,
                    _h(contact), chan, a.id))
 
         gap_left = policy.cold_gap_left(sess)
+        # Пауза — штатный ход, а не сбой: жёлтая плашка, не красная.
         pill = ("<span class='pill ok'>отправка разрешена</span>" if verdict.allowed
-                else "<span class='pill bad'>%s</span>" % _h(verdict.reason))
+                else "<span class='pill %s'>%s</span>"
+                % ("warn" if policy.COLD_GAP_REASON in verdict.reason else "bad",
+                   _h(verdict.reason)))
         cards = (
             "<div class='cards'>"
             "<div class='card'><b>%d</b><span>в очереди</span></div>"

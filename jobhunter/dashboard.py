@@ -104,8 +104,14 @@ def sending(limit: int = 200, offset: int = 0) -> dict:
                 if stop:
                     state.update(ready=False, code="kill_switch", reason="Включён стоп отправки")
                 elif channel == "telegram" and not q["can_send"]:
-                    state.update(ready=False, code="quota", reason=q["verdict"],
-                                 retry_at=q.get("locked_until"))
+                    # Пауза между холодными — штатный ход, время известно точно;
+                    # истёкший лок из прошлого подставлять нельзя.
+                    pacing = policy.COLD_GAP_REASON in (q["verdict"] or "")
+                    retry = (datetime.now(timezone.utc).replace(tzinfo=None)
+                             + timedelta(seconds=q.get("gap_left_s", 0))) if pacing \
+                        else q.get("locked_until")
+                    state.update(ready=False, code="pacing" if pacing else "quota",
+                                 reason=q["verdict"], retry_at=retry)
                 elif channel == "email" and q["email_sent"] >= q["email_cap"]:
                     state.update(ready=False, code="quota", reason="Дневной лимит email исчерпан")
                 elif channel == "telegram" and not (s.tg_api_id and s.telegram_api_hash):

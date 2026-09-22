@@ -502,6 +502,11 @@ def _rearm_telegram(after_seconds: float):
     sched.add_job(step_send_telegram, "date", id="tg_more",
                   replace_existing=True, run_date=when,
                   misfire_grace_time=3600, executor="tg")
+    # APScheduler держит задание в памяти. Без записи в базу перезапуск
+    # контейнера посреди паузы обрывал бы цепочку до следующего крона
+    # (вплоть до завтра); на старте демон восстанавливает «partial».
+    from .observability import record
+    record("sender:telegram", "partial", next_run_at=when.astimezone())
     log.info("следующая отправка в %s", when.strftime("%H:%M"))
     return when
 
@@ -542,10 +547,7 @@ def step_send_telegram() -> dict:
             rc = asyncio.run(sender_run(s.daily_cold_limit, dry=False,
                                         max_sessions=sessions))
         if rc == MORE_TO_SEND and _SCHED.get("sched") is not None:
-            when = _rearm_telegram(policy.gap_seconds())
-            from .observability import record
-            record("sender:telegram", "partial",
-                   next_run_at=when.astimezone() if when else None)
+            _rearm_telegram(policy.gap_seconds())
         else:
             from .observability import record
             record("sender:telegram", "ok" if rc == 0 else "blocked",

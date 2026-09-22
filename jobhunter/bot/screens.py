@@ -16,6 +16,7 @@ from .. import health, report
 from ..config import get_settings
 from ..convo.slots import fmt
 from ..outreach import archive
+from ..outreach.policy import COLD_GAP_REASON
 from .cards import cb
 
 BAR = "▁▂▃▄▅▆▇█"
@@ -167,7 +168,9 @@ def main() -> tuple:
     status = []
     if q["kill_switch"]:
         status.append("⛔ Отправка выключена тобой (жми ▶️ чтобы включить)")
-    elif not q["can_send"]:
+    elif not q["can_send"] and COLD_GAP_REASON not in (q["verdict"] or ""):
+        # Пауза между холодными — не остановка: строка Telegram выше уже
+        # говорит «следующее через N мин», а «⏸» читалось бы как поломка.
         status.append("⏸ %s" % _lock_reason(q["verdict"]))
     # Не дублировать: если вердикт выше уже объяснил ручной режим,
     # вторая строка о том же только путает.
