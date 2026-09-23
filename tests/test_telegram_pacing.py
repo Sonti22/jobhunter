@@ -167,26 +167,53 @@ def test_step_during_pause_rearms_quietly(db, monkeypatch, tmp_path):
     """Пауза — штатный ход: без «квота исчерпана» владельцу, с переназначением
     на её конец."""
     from jobhunter import autopilot
-    from jobhunter.config import get_settings
     from jobhunter.models import BotOutbox
     from jobhunter.outreach import policy
+    _telegram_env(monkeypatch, tmp_path)
+    with db.session_scope() as sess:
+        policy.register_sent(sess, cold=True)
+        before = sess.query(BotOutbox).count()
+    rearmed = []
+    monkeypatch.setattr(autopilot, "_rearm_telegram", lambda s: rearmed.append(s))
+    res = autopilot.step_send_telegram()
+    assert policy.COLD_GAP_REASON in res["blocked"]
+    assert rearmed and 0 < rearmed[0] <= policy.COLD_GAP_MINUTES * 60 + 30
+    with db.session_scope() as sess:
+        assert sess.query(BotOutbox).count() == before, "владельцу о паузе не пишем"
+
+
+def _telegram_env(monkeypatch, tmp_path):
+    from jobhunter.config import get_settings
     session_file = tmp_path / "tg.session"
     session_file.write_text("x")
     monkeypatch.setenv("TELEGRAM_API_ID", "1")
     monkeypatch.setenv("TELEGRAM_API_HASH", "h")
     monkeypatch.setenv("TELEGRAM_SESSION_PATH", str(session_file))
     get_settings.cache_clear()
-    with db.session_scope() as sess:
-        policy.register_sent(sess, cold=True)
-        before = sess.query(BotOutbox).count()
-    rearmed = []
-    monkeypatch.setattr(autopilot, "_rearm_telegram", lambda s: rearmed.append(s))
-    monkeypatch.setattr(autopilot, "sender_run", None, raising=False)
-    res = autopilot.step_send_telegram()
-    assert policy.COLD_GAP_REASON in res["blocked"]
-    assert rearmed and 0 < rearmed[0] <= policy.COLD_GAP_MINUTES * 60 + 30
-    with db.session_scope() as sess:
-        assert sess.query(BotOutbox).count() == before, "владельцу о паузе не пишем"
+
+
+@pytest.mark.parametrize("error, rearmed", [
+    (ConnectionError("Connection to Telegram failed 5 time(s)"), True),
+    (TimeoutError(), True),
+    (ValueError("ошибка в коде"), False),
+])
+def test_network_failure_keeps_the_chain_alive(db, monkeypatch, tmp_path, error, rearmed):
+    """23.09: сеть пропала 10:20-12:08, tg1 в 11:15 упал на подключении, и
+    Telegram молчал бы до tg2 в 16:40. При обрыве сети цепочка пробует снова;
+    ошибку кода повторять бессмысленно — её видно в журнале и на пульте."""
+    from jobhunter import autopilot
+    from jobhunter.outreach import sender
+    _telegram_env(monkeypatch, tmp_path)
+
+    async def broken(*args, **kwargs):
+        raise error
+
+    monkeypatch.setattr(sender, "run", broken)
+    calls = []
+    monkeypatch.setattr(autopilot, "_rearm_telegram", lambda s: calls.append(s))
+    with pytest.raises(type(error)):
+        autopilot.step_send_telegram()
+    assert calls == ([autopilot.NETWORK_RETRY_S] if rearmed else [])
 
 
 def test_pult_does_not_show_the_pause_as_a_stop(db):

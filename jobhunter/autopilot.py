@@ -26,6 +26,7 @@ import argparse
 import asyncio
 import logging
 import os
+import socket
 import sys
 import time
 from datetime import datetime, timedelta, timezone
@@ -487,6 +488,12 @@ def step_resend_en() -> dict:
     return stats
 
 
+# Обрыв сети: Telethon бросает ConnectionError («failed 5 time(s)»), резолвер —
+# gaierror, зависший сокет — TimeoutError. Сбой настройки или кода сюда не входит.
+NETWORK_ERRORS = (ConnectionError, TimeoutError, socket.gaierror)
+NETWORK_RETRY_S = 15 * 60
+
+
 def _rearm_telegram(after_seconds: float):
     """Назначить следующий заход отправки через after_seconds. None вне демона.
 
@@ -556,6 +563,11 @@ def step_send_telegram() -> dict:
         log.error("telegram: %s: %s", type(e).__name__, str(e)[:120])
         from .observability import record
         record("sender:telegram", "error", error=type(e).__name__)
+        if isinstance(e, NETWORK_ERRORS):
+            # 23.09 сеть пропала с 10:20 до 12:08: tg1 в 11:15 упал на
+            # подключении, а догон шаг не повторил — Telegram молчал бы до
+            # tg2 в 16:40. Цепочка сама пробует снова, пока сеть не вернётся.
+            _rearm_telegram(NETWORK_RETRY_S)
         raise
     return {"ok": True} if rc in (0, MORE_TO_SEND) else {"blocked": "код %d" % rc}
 
