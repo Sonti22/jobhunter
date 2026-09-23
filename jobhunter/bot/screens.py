@@ -38,7 +38,17 @@ def _cold_line(q: dict) -> str:
     """
     sent = q.get("sent", 0)
     left = int(q.get("gap_left_s", 0) or 0)
-    when = ("следующее через %d мин" % -(-left // 60)) if left > 0 else "можно сейчас"
+    paced = COLD_GAP_REASON in (q.get("verdict") or "")
+    if not q.get("can_send", True) and not paced:
+        # Стоп важнее паузы: «можно сейчас» при ручном режиме было бы неправдой.
+        from datetime import timezone
+        until = q.get("locked_until")
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        when = ("стоит до %s" % _short(until)) if until and until > now else "стоит"
+    elif left > 0:
+        when = "следующее через %d мин" % -(-left // 60)
+    else:
+        when = "можно сейчас"
     return "%d за сегодня · %s" % (sent, when)
 
 

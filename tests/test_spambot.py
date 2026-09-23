@@ -42,11 +42,12 @@ def db(tmp_path_factory):
 
 @pytest.fixture(autouse=True)
 def clean(db):
-    from jobhunter.models import AccountHealth, BotOutbox
+    from jobhunter.models import AccountHealth, BotOutbox, SendLog
     from jobhunter.outreach import policy
     with db.session_scope() as sess:
         sess.query(AccountHealth).delete()
         sess.query(BotOutbox).delete()
+        sess.query(SendLog).delete()
         policy.get_state(sess).manual_only = True
         lk = policy.get_lock(sess)
         lk.locked_until, lk.reason = None, ""
@@ -196,3 +197,49 @@ def test_pult_shows_what_spambot_said(db):
     spamcheck.apply(LIMITED_EN)
     text, _ = screens.main()
     assert "🧊 @SpamBot" in text and "аккаунт ограничен до 30.09 15:45" in text
+
+
+def test_replies_to_those_who_wrote_first_are_allowed_while_limited(db):
+    """SpamBot 23.09: «Если незнакомый пользователь напишет Вам первым, Вы сможете ему
+    ответить». Ручной режим глушил и такие ответы, хотя ограничение — только на холодные."""
+    from jobhunter.convo import route
+    from jobhunter.convo.send import can_reply
+    from jobhunter.outreach import spamcheck
+    with db.session_scope() as sess:
+        assert not can_reply(sess, route.TELEGRAM)[0]        # SpamBot ещё не спрашивали
+    spamcheck.apply(LIMITED_RU)
+    with db.session_scope() as sess:
+        assert can_reply(sess, route.TELEGRAM)[0]
+        from jobhunter.outreach import policy
+        assert not policy.can_send_cold(sess).allowed        # холодные по-прежнему стоят
+
+
+def test_a_peerflood_after_the_check_sends_replies_back_to_the_owner(db):
+    from jobhunter.convo import route
+    from jobhunter.convo.send import can_reply
+    from jobhunter.models import SendLog
+    from jobhunter.outreach import spamcheck
+    spamcheck.apply(LIMITED_RU)
+    with db.session_scope() as sess:
+        sess.add(SendLog(result="peerflood", error_class="PeerFloodError", peer_id="hr"))
+    with db.session_scope() as sess:
+        assert not can_reply(sess, route.TELEGRAM)[0]
+
+
+def test_unrecognised_answer_does_not_open_replies(db):
+    from jobhunter.convo import route
+    from jobhunter.convo.send import can_reply
+    from jobhunter.outreach import spamcheck
+    spamcheck.apply("Hello! Choose an option below.")
+    with db.session_scope() as sess:
+        assert not can_reply(sess, route.TELEGRAM)[0]
+
+
+def test_pult_telegram_line_says_stopped_not_can_send_now(db):
+    """23.09 пульт писал «Telegram 0 за сегодня · можно сейчас» при ручном режиме."""
+    from jobhunter.bot import screens
+    from jobhunter.outreach import spamcheck
+    spamcheck.apply(LIMITED_EN)
+    text, _ = screens.main()
+    line = next(ln for ln in text.splitlines() if ln.startswith("Telegram"))
+    assert "можно сейчас" not in line and "стоит до 30.09 15:45" in line

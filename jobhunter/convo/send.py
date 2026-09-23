@@ -40,6 +40,30 @@ def warm_sent_today(sess) -> int:
                Application.first_reply_at.is_not(None))) or 0)
 
 
+def replies_allowed_while_limited(sess) -> bool:
+    """Ручной режим не мешает отвечать тем, кто написал сам, — если так сказал @SpamBot.
+
+    Ответ SpamBot 23.09: «Вы не можете писать тем, кто не сохранил Ваш номер… Если
+    незнакомый пользователь напишет Вам первым, Вы сможете ему ответить». Ограничение
+    касается только холодных. Раньше ручной режим глушил и ответы рекрутёрам, которые
+    написали сами, — они уходили владельцу карточкой, хотя владелец 23.09 велел:
+    «старым рекрутёрам, которые уже ответили, писать можно».
+
+    Условия: последний ответ SpamBot — «ограничен» (то есть известно, что это именно
+    такое ограничение), и после этой проверки не было ни одного PeerFlood. Если ответ
+    всё же получил отказ — ответы снова идут через владельца до следующей проверки.
+    """
+    from ..models import AccountHealth
+    last = sess.scalars(select(AccountHealth).where(AccountHealth.spambot_verdict != "")
+                        .order_by(AccountHealth.id.desc()).limit(1)).first()
+    if last is None or last.spambot_verdict != "limited":
+        return False
+    flood_after = sess.scalar(select(func.count(SendLog.id)).where(
+        SendLog.result.in_(("peerflood", "cv_peerflood")),
+        SendLog.attempted_at >= last.checked_at))
+    return not flood_after
+
+
 def can_reply(sess, channel: str = route.TELEGRAM) -> tuple:
     """(можно, причина). Тёплые ответы не расходуют холодную квоту.
 
@@ -52,7 +76,7 @@ def can_reply(sess, channel: str = route.TELEGRAM) -> tuple:
         return False, "стоп-кран: %s" % get_settings().kill_switch.name
     if channel != route.EMAIL:
         st = policy.get_state(sess)
-        if st.manual_only:
+        if st.manual_only and not replies_allowed_while_limited(sess):
             return False, "ручной режим после двух PeerFlood"
         lk = policy.get_lock(sess)
         now = datetime.now(timezone.utc).replace(tzinfo=None)
