@@ -592,6 +592,33 @@ def remind_pending(now: datetime | None = None) -> int:
     return sent
 
 
+# Срок карточки идёт, только пока владелец её видит. 23.09 сеть пропала на
+# 1 ч 47 мин: карточка #28 закрылась в 11:07, а напоминание «истекает через
+# 1 ч» бот доставил в 12:08 — уже про закрытую.
+OWNER_OFFLINE_S = 600
+CARD_GRACE = timedelta(hours=2)
+
+
+def owner_unreachable(sess, now: datetime) -> bool:
+    """Бот не может достучаться до владельца: пульс бота протух или уведомления висят.
+
+    Пульс бот пишет только после подключения к Telegram, поэтому при обрыве сети
+    он стареет. Недоставленные уведомления ловят обрыв посреди работы, когда
+    пульс ещё идёт. Нет файла пульса вовсе — бот не запускался, судить не о чем.
+    """
+    from sqlalchemy import func
+
+    from . import health
+    from .models import BotOutbox
+    bot_age = health.age("bot")
+    if bot_age != float("inf") and bot_age > OWNER_OFFLINE_S:
+        return True
+    stuck = sess.scalar(select(func.count(BotOutbox.id)).where(
+        BotOutbox.sent_at.is_(None), BotOutbox.attempts < 5,
+        BotOutbox.created_at < now - timedelta(seconds=OWNER_OFFLINE_S)))
+    return bool(stuck)
+
+
 def expire_stale() -> int:
     """Карточки, на которые владелец не ответил вовремя, закрываются.
 
@@ -606,6 +633,12 @@ def expire_stale() -> int:
             .where(OwnerRequest.decision == "",
                    OwnerRequest.expires_at.is_not(None),
                    OwnerRequest.expires_at < now)).all()
+        if rows and owner_unreachable(sess, now):
+            # Не закрываем то, чего владелец не мог увидеть: срок сдвигается,
+            # пока связь не вернётся, и после неё остаётся ещё CARD_GRACE.
+            for r in rows:
+                r.expires_at = now + CARD_GRACE
+            return 0
         for r in rows:
             r.decision = "expired"
             r.answered_at = utcnow()

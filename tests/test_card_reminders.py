@@ -149,3 +149,59 @@ def test_reminders_do_not_repeat_after_delivery(db):
     # на следующий день сводка приходит снова — ключ у неё по дате
     owner.remind_pending(now=noon + timedelta(hours=24))
     assert len([t for t in _texts(db) if t.startswith("📬")]) == 2
+
+
+def _expired_card(db):
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    return _card(db, "YADRO", now - timedelta(hours=49), now - timedelta(minutes=5))
+
+
+def _stale_bot_beat(minutes):
+    import os
+    import time
+
+    from jobhunter import health
+    health.beat("bot")
+    path = health._dir() / "bot.beat"
+    old = time.time() - minutes * 60
+    os.utime(path, (old, old))
+
+
+def test_card_does_not_expire_while_the_bot_cannot_reach_the_owner(db):
+    """23.09 сеть пропала на 1 ч 47 мин: карточка #28 закрылась в 11:07, а напоминание
+    «истекает через 1 ч» бот доставил в 12:08. Срок идёт, только пока владелец видит."""
+    from jobhunter import owner
+    from jobhunter.models import OwnerRequest
+    rid = _expired_card(db)
+    _stale_bot_beat(minutes=90)                         # бот без связи полтора часа
+    assert owner.expire_stale() == 0
+    with db.session_scope() as sess:
+        r = sess.get(OwnerRequest, rid)
+        assert r.decision == ""
+        left = r.expires_at - datetime.now(timezone.utc).replace(tzinfo=None)
+        assert timedelta(hours=1, minutes=55) < left <= owner.CARD_GRACE
+
+
+def test_undelivered_notifications_also_mean_the_owner_is_unreachable(db):
+    """Обрыв посреди работы: пульс бота ещё идёт, а уведомления не уходят."""
+    from jobhunter import health, owner
+    from jobhunter.models import BotOutbox, OwnerRequest
+    rid = _expired_card(db)
+    health.beat("bot")
+    with db.session_scope() as sess:
+        sess.add(BotOutbox(kind="card_reminder", text="⏰",
+                           created_at=datetime.now(timezone.utc).replace(tzinfo=None)
+                           - timedelta(minutes=30)))
+    assert owner.expire_stale() == 0
+    with db.session_scope() as sess:
+        assert sess.get(OwnerRequest, rid).decision == ""
+
+
+def test_card_expires_normally_when_the_owner_could_see_it(db):
+    from jobhunter import health, owner
+    from jobhunter.models import OwnerRequest
+    rid = _expired_card(db)
+    health.beat("bot")                                  # бот на связи, очередь пуста
+    assert owner.expire_stale() == 1
+    with db.session_scope() as sess:
+        assert sess.get(OwnerRequest, rid).decision == "expired"
