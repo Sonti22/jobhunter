@@ -271,9 +271,10 @@ def on_peer_flood(sess, detail: str = "") -> Verdict:
     if st.peerflood_total >= 2:
         st.manual_only = True
         notify.push("error",
-                    "🛑 Второй PeerFlood — кампания в ручном режиме.\n"
-                    "Автоматическая отправка остановлена до твоего решения.\n"
-                    "Причина: %s" % (detail or "—"),
+                    "🛑 PeerFlood №%d — Telegram не даёт писать незнакомцам, холодные остановлены.\n"
+                    "Бот каждое утро сам спрашивает @SpamBot о статусе аккаунта и возобновит "
+                    "отправку, когда Telegram снимет ограничение. Почта работает.\n"
+                    "Причина: %s" % (st.peerflood_total, detail or "—"),
                     dedup="manual_only", sess=sess)
         return Verdict(False, "второй PeerFlood — постоянный ручной режим")
 
@@ -286,7 +287,7 @@ def on_peer_flood(sess, detail: str = "") -> Verdict:
     return Verdict(False, "PeerFlood: стоп на %dч" % PEERFLOOD_LOCK_HOURS)
 
 
-def resume_manual_only(sess) -> bool:
+def resume_manual_only(sess, by_spambot: bool = False) -> bool:
     """Снять ручной режим Telegram по явному решению владельца. True — было что снимать.
 
     До этой функции снять ручной режим было НЕЧЕМ: on_peer_flood переводит кампанию
@@ -309,8 +310,10 @@ def resume_manual_only(sess) -> bool:
         return False
     st.manual_only = False
     from .. import notify
-    notify.push("info", "▶️ Telegram возобновлён вручную. Холодные — по одному раз в %d мин."
-                % COLD_GAP_MINUTES, sess=sess)
+    how = ("@SpamBot подтвердил: ограничений нет — Telegram возобновлён автоматически"
+           if by_spambot else "Telegram возобновлён вручную")
+    notify.push("info", "▶️ %s. Холодные — по одному раз в %d мин."
+                % (how, COLD_GAP_MINUTES), sess=sess)
     return True
 
 

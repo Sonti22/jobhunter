@@ -94,7 +94,18 @@ def quota() -> dict:
                 "locked_until": lk.locked_until,
                 "lock_reason": lk.reason,
                 "can_send": verdict.allowed, "verdict": verdict.reason,
-                "kill_switch": policy.kill_switch_active()}
+                "kill_switch": policy.kill_switch_active(),
+                "spambot": _last_spambot(sess)}
+
+
+def _last_spambot(sess) -> dict | None:
+    """Последний ответ @SpamBot: что сказал и когда."""
+    from .models import AccountHealth
+    row = sess.scalars(select(AccountHealth).where(AccountHealth.spambot_verdict != "")
+                       .order_by(AccountHealth.id.desc()).limit(1)).first()
+    if row is None:
+        return None
+    return {"verdict": row.spambot_verdict, "checked_at": row.checked_at}
 
 
 def queue_top(n: int = 10) -> list:

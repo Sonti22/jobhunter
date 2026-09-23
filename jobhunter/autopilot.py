@@ -572,6 +572,36 @@ def step_send_telegram() -> dict:
     return {"ok": True} if rc in (0, MORE_TO_SEND) else {"blocked": "код %d" % rc}
 
 
+def step_spambot() -> dict:
+    """Пока кампания в ручном режиме — спросить @SpamBot, снято ли ограничение.
+
+    До 23.09 ручной режим снимался только кнопкой, вслепую, и первое же сообщение ловило
+    новый PeerFlood. Теперь статус называет сам Telegram: «ограничений нет» — отправка
+    возобновляется, «ограничен до даты» — до неё не пробуем.
+    """
+    from pathlib import Path
+
+    from .outreach import spamcheck
+    s = get_settings()
+    if not (s.tg_api_id and s.telegram_api_hash) or not Path(s.telegram_session_path).exists():
+        return {"blocked": "нет Telegram-сессии"}
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    with session_scope() as sess:
+        if not policy.get_state(sess).manual_only:
+            return {"skipped": "ручного режима нет"}
+        lk = policy.get_lock(sess)
+        if lk.locked_until and lk.locked_until > now \
+                and (lk.reason or "").startswith(spamcheck.LOCK_PREFIX):
+            return {"skipped": "SpamBot назвал срок: %s UTC" % lk.locked_until}
+    try:
+        v = asyncio.run(spamcheck.run())
+    except Exception as e:
+        log.error("spambot: %s: %s", type(e).__name__, str(e)[:120])
+        return {"error": type(e).__name__}
+    log.info("SpamBot: %s%s", v.status, " до %s UTC" % v.until if v.until else "")
+    return {"status": v.status, "until": str(v.until or "")}
+
+
 def step_discover() -> dict:
     """Автопоиск новых каналов с вакансиями.
 
@@ -1191,6 +1221,8 @@ def run_daemon() -> int:
     sched.add_job(step_stage_ashby, "cron", hour=20, minute=30,
                   id="ashby_stage", **opts)
     # Telegram — двумя окнами, чтобы дневная квота расходилась по времени
+    # Статус аккаунта у @SpamBot — до первой отправки дня; вне ручного режима шаг пустой.
+    sched.add_job(step_spambot, "cron", hour=10, minute=55, id="spambot", **tg)
     sched.add_job(step_send_telegram, "cron", hour=11, minute=15, id="tg1", **tg)
     sched.add_job(step_send_telegram, "cron", hour=16, minute=40, id="tg2", **tg)
     # Сбор вакансий не должен ждать следующего утра. Тот же однопоточный
@@ -1292,7 +1324,7 @@ def run_daemon() -> int:
     # ставится на ближайшую минуту, в исходном порядке конвейера.
     daily = [("backup", 8, 45), ("discover", 9, 0), ("ingest", 9, 30), ("prepare", 10, 0),
              ("approve", 10, 15), ("direct", 9, 50), ("email", 10, 30), ("resend_en", 11, 0),
-             ("tg1", 11, 15),
+             ("spambot", 10, 55), ("tg1", 11, 15),
              ("manual_prep", 9, 40), ("manual_batch", 9, 45),
              ("followups", 12, 0), ("tg2", 16, 40)]
 
@@ -1349,7 +1381,7 @@ def run_daemon() -> int:
             if nrt is not None and nrt - now.astimezone(nrt.tzinfo) \
                     < timedelta(minutes=20):
                 continue
-            (missed_tg if job_id in ("discover", "tg1", "tg2")
+            (missed_tg if job_id in ("discover", "spambot", "tg1", "tg2")
              else missed_default).append(job_id)
             log.info("догоняю пропущенный шаг %s (план был %02d:%02d)",
                      job_id, hh, mm)

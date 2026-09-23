@@ -61,8 +61,8 @@ def _lock_reason(verdict: str) -> str:
     if "kill-switch" in v:
         return "отправка выключена тобой — жми ▶️ чтобы включить"
     if "ручной режим" in v:
-        return ("ручной режим после предупреждений Telegram — сам не снимется. "
-                "Сначала проверь статус аккаунта у @SpamBot, затем ▶️ на пульте")
+        return ("ручной режим после предупреждений Telegram. Бот каждое утро сам спрашивает "
+                "@SpamBot и возобновит отправку, когда ограничение снимут")
     if "peerflood" in v or "лок до" in v:
         # вытащим дату из «лок до 2026-08-30 13:45:00…»
         import re
@@ -80,6 +80,14 @@ def _lock_reason(verdict: str) -> str:
     if "квота" in v:
         return "дневная квота выбрана — продолжит завтра"
     return verdict
+
+
+def _short(dt_utc) -> str:
+    """Наивное UTC → «23.09 16:45» в часовом поясе владельца."""
+    from datetime import timezone
+    from zoneinfo import ZoneInfo
+    return dt_utc.replace(tzinfo=timezone.utc).astimezone(
+        ZoneInfo(get_settings().owner_tz)).strftime("%d.%m %H:%M")
 
 
 def _kb(rows: list) -> dict:
@@ -176,6 +184,13 @@ def main() -> tuple:
     # вторая строка о том же только путает.
     if q["manual_only"] and not any("ручной режим" in s for s in status):
         status.append("🛑 " + _lock_reason("ручной режим"))
+    sb = q.get("spambot")
+    if q["manual_only"] and sb:
+        said = {"free": "ограничений нет", "limited": "аккаунт ограничен",
+                "unknown": "ответ не распознан"}.get(sb["verdict"], sb["verdict"])
+        until = q.get("locked_until") if (q.get("lock_reason") or "").startswith("spambot:") else None
+        status.append("🧊 @SpamBot %s: %s%s" % (
+            _short(sb["checked_at"]), said, (" до %s" % _short(until)) if until else ""))
     if status:
         lines.append("")
         lines += status
