@@ -124,3 +124,55 @@ def test_money_hint_switches_with_salary(db):
     prompt2 = prompt_reply("X", "", "", "Какая у вас вилка?",
                            facts_block(_profile()), "", "", "money")
     assert "Не называй сумму" in prompt2
+
+
+FAQ_FIXTURE = [
+    {"id": "last_project", "answer_ru": "Последний проект — Integration Manager в Linkero."},
+    {"id": "location_and_format", "answer_ru": "Живу в Москве. Работаю только удалённо."},
+    {"id": "payments_experience", "answer_ru": "Есть опыт платёжных интеграций — Stripe, PayPal."},
+    {"id": "start_date", "answer_ru": "Могу выйти сразу."},
+]
+GDL_IT = ("Добрый день! Спасибо за отклик. Ответьте пожалуйста на вопросы: "
+          "1) Расскажите о вашем последнем проекте, какие технологии там использовались? "
+          "2) Готовы ли к посещению офиса в Москве? 3) Есть ли опыт в финтехе? "
+          "Я вернусь с обратной связью в течении недели.")
+
+
+def test_every_question_covered_by_faq_is_answered_verbatim_in_order(monkeypatch):
+    """24.09: LLM-пересказ на вопросы GDL IT написал «переезд в офис обсуждаем» —
+    а у владельца на все три вопроса есть выверенные ответы."""
+    from jobhunter.convo.reply import faq_reply
+    prof = _profile(faq=FAQ_FIXTURE)
+    monkeypatch.setattr("jobhunter.profile.get_profile", lambda: prof)
+    text, topics = faq_reply(GDL_IT)
+    assert topics == ["last_project", "location_and_format", "payments_experience"]
+    assert text == ("Последний проект — Integration Manager в Linkero. Живу в Москве. "
+                    "Работаю только удалённо. Есть опыт платёжных интеграций — Stripe, PayPal.")
+    assert faq_reply("Когда сможете выйти?") == ("Могу выйти сразу.", ["start_date"])
+
+
+def test_a_question_outside_faq_falls_back_to_the_checked_draft(monkeypatch):
+    from jobhunter.convo.reply import faq_reply
+    prof = _profile(faq=FAQ_FIXTURE)
+    monkeypatch.setattr("jobhunter.profile.get_profile", lambda: prof)
+    assert faq_reply("Когда сможете выйти? И какой у вас опыт с Rust?") == ("", [])
+
+
+def test_tech_question_plan_uses_faq_verbatim(db, monkeypatch):
+    from jobhunter.convo.reply import plan_reply
+    prof = _profile(faq=FAQ_FIXTURE)
+    monkeypatch.setattr("jobhunter.profile.get_profile", lambda: prof)
+    plan = plan_reply(_app_row(db), GDL_IT, bold=True)
+    assert plan.should_reply and plan.verbatim and not plan.needs_draft
+    assert "только удалённо" in plan.text
+
+
+@pytest.mark.parametrize("incoming, draft_text, bad", [
+    ("Готовы ли к посещению офиса в Москве?", "Живу в Москве, переезд в офис обсуждаем.", True),
+    ("Готовы ли к посещению офиса в Москве?", "Работаю только удалённо.", False),
+    ("Есть опыт в финтехе?", "Есть опыт финтех-интеграций: Stripe.", True),
+    ("Есть опыт в финтехе?", "Есть опыт платёжных интеграций: Stripe.", False),
+])
+def test_llm_tech_draft_keeps_the_owner_positions(incoming, draft_text, bad):
+    from jobhunter.convo.draft import _tech_stance_problem
+    assert bool(_tech_stance_problem(incoming, draft_text)) == bad

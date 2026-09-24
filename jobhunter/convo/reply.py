@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import random
+import re
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
@@ -98,6 +99,48 @@ class ReplyPlan:
     # Строка предложенных слотов — время считает КОД, и LLM-вариант ответа
     # обязан содержать её дословно (проверяется в draft_routine_reply).
     slots_line: str = ""
+    # Текст — выверенный ответ владельца (faq): уходит дословно, без LLM-пересказа.
+    # 24.09 пересказ техвопроса превратил «только удалённо» в «переезд в офис
+    # обсуждаем» — самопроверка это пропустила.
+    verbatim: bool = False
+
+
+# Темы готовых ответов владельца (profile.yaml → faq). Вопрос рекрутёра
+# отвечается дословно, если КАЖДЫЙ его вопрос попал в одну из тем; иначе —
+# черновик LLM по фактам с проверками.
+_FAQ_TOPICS = (
+    ("start_date", re.compile(
+        r"когда\s+(?:\w+\s+)?(?:сможете|можете|готовы)\s+(?:выйти|приступить|начать)|"
+        r"срок\w*\s+выхода|when\s+(?:can|could)\s+you\s+start|notice\s+period", re.I)),
+    ("last_project", re.compile(
+        r"(?:последн|текущ|недавн)\w*\s+проект|(?:latest|last|current|recent)\s+project", re.I)),
+    ("payments_experience", re.compile(
+        r"финтех|fintech|плат[её]ж|payment|эквайринг", re.I)),
+    ("location_and_format", re.compile(
+        r"офис|office|удал[её]н|remote|гибрид|hybrid|переезд|релокац|relocat|"
+        r"где\s+(?:вы\s+)?(?:живёте|живете|находитесь)|where\s+are\s+you\s+(?:based|located)|"
+        r"формат\w*\s+работы", re.I)),
+)
+
+
+def faq_reply(text: str, lang: str = "ru") -> tuple:
+    """(текст, [темы]) из готовых ответов владельца или ("", []), если хоть один
+    вопрос сообщения не покрыт темами faq."""
+    from ..profile import get_profile
+    body = text or ""
+    questions = [q for q in body.split("?")[:-1] if q.strip()] if "?" in body else [body]
+    ids: list = []
+    for q in questions:
+        hit = next((fid for fid, rx in _FAQ_TOPICS if rx.search(q)), None)
+        if hit is None:
+            return "", []
+        if hit not in ids:
+            ids.append(hit)
+    prof = get_profile()
+    answers = [prof.faq_answer(fid, lang=lang) for fid in ids]
+    if not ids or not all(answers):
+        return "", []
+    return " ".join(a.strip() for a in answers), ids
 
 
 def _slots(tz_name: str = OWNER_TZ, count: int = 3,
@@ -231,7 +274,7 @@ def plan_reply(app: Application, incoming_text: str,
         about = get_profile().faq_answer(
             "about_me", lang="en" if en else "ru")
         if about:
-            return ReplyPlan(True, about, intent=intent.label)
+            return ReplyPlan(True, about, intent=intent.label, verbatim=True)
         return ReplyPlan(True, "", intent=intent.label, needs_draft=True,
                          needs_review=True,
                          reason="о себе — черновиком по фактам профиля")
@@ -239,6 +282,12 @@ def plan_reply(app: Application, incoming_text: str,
         if (getattr(app, "auto_tech_replies_count", 0) or 0) >=                 MAX_AUTO_TECH_REPLIES:
             return ReplyPlan(False, escalate=True, intent=intent.label,
                              reason="лимит техответов в треде")
+        # Всё, о чём спросили, покрыто готовыми ответами владельца — отвечаем ими
+        # дословно: без LLM, без её лимитов и без риска пересказа.
+        ready, topics = faq_reply(incoming_text, lang="en" if en else "ru")
+        if ready:
+            return ReplyPlan(True, ready, intent=intent.label, verbatim=True,
+                             reason="готовые ответы владельца: " + ", ".join(topics))
         # Текста здесь нет и быть не может: ответ на технический вопрос
         # пишет LLM по фактам профиля. Шаблонного отката нет — значит при
         # любом сбое проверки уходит карточка, а не «что-нибудь».

@@ -12,6 +12,7 @@
 """
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 
 from ..llm import generate
@@ -183,6 +184,25 @@ _ROUTINE_TASK = {
 }
 
 
+# Позиции владельца, которые гейт правды не видит (он сверяет технологии и
+# цифры, а не формат работы). 24.09 черновик ответил на «готовы к офису?»
+# «переезд в офис обсуждаем» — самопроверка это пропустила.
+_ASKS_FORMAT = re.compile(r"офис|office|удал[её]н|remote|гибрид|hybrid|переезд|релокац|relocat",
+                          re.I)
+_STATES_REMOTE_ONLY = re.compile(r"только\s+удал[её]нн?\w*|remote[- ]only|only\s+remote|"
+                                 r"remotely\s+only|work\s+remotely\s+only", re.I)
+_FINTECH = re.compile(r"финтех|fintech", re.I)
+
+
+def _tech_stance_problem(incoming: str, text: str) -> str:
+    """Почему автоответ на техвопрос нельзя отправлять без владельца; пусто — можно."""
+    if _FINTECH.search(text or ""):
+        return "в ответе «финтех» — владелец велел говорить о платёжных интеграциях"
+    if _ASKS_FORMAT.search(incoming or "") and not _STATES_REMOTE_ONLY.search(text or ""):
+        return "спросили про офис или формат, а в ответе нет «только удалённо»"
+    return ""
+
+
 def draft_routine_reply(intent: str, role: str, jd_text: str, incoming: str,
                         history: list, slots_line: str = "",
                         profile: Profile | None = None) -> Draft:
@@ -232,6 +252,10 @@ def draft_routine_reply(intent: str, role: str, jd_text: str, incoming: str,
     bad = quality_problem(text)
     if bad:
         return Draft(problem=bad)
+    if intent == "tech_question":
+        stance = _tech_stance_problem(incoming, text)
+        if stance:
+            return Draft(problem=stance)
     _lang = "en" if not __import__("re").search(r"[а-яёА-ЯЁ]", text or "") else "ru"
     gate = check(DocModel(lang=_lang, kind="message", free_text=text),
                  jd_text=jd_text, profile=p)

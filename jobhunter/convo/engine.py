@@ -398,7 +398,7 @@ async def handle_message(client, app_id: int, text: str,
         # Любой сбой откатывает на шаблон из plan: тот выдумать ничего
         # не может, и автоответ уходит всегда.
         out_text, out_src = plan.text, "шаблон"
-        if get_settings().llm_auto_reply_enabled or plan.needs_draft:
+        if (get_settings().llm_auto_reply_enabled and not plan.verbatim) or plan.needs_draft:
             from .draft import draft_routine_reply
             d = draft_routine_reply(plan.intent, title, jd_text, text,
                                     history, slots_line=plan.slots_line)
