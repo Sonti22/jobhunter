@@ -1225,8 +1225,7 @@ def run_daemon() -> int:
     sched.add_job(step_spambot, "cron", hour=10, minute=55, id="spambot", **tg)
     sched.add_job(step_send_telegram, "cron", hour=11, minute=15, id="tg1", **tg)
     sched.add_job(step_send_telegram, "cron", hour=16, minute=40, id="tg2", **tg)
-    # Сбор вакансий не должен ждать следующего утра. Тот же однопоточный
-    # tg-пул не допускает пересечения с Telethon-сессией отправки.
+    # Сбор вакансий не должен ждать следующего утра.
     def _ingest_tg_then_send():
         """Дневной и вечерний сбор сразу доводится до отправки.
 
@@ -1243,10 +1242,14 @@ def run_daemon() -> int:
                           run_date=datetime.now() + timedelta(seconds=20), **opts)
         return stats
 
+    # Общий пул, не tg: лента каналов читается по HTTP (t.me/s/…), Telethon не
+    # открывается. 24.09 этот сбор держал однопоточный tg-пул 30+ минут —
+    # входящие, решения и ответы рекрутёрам стояли в очереди, а пульс
+    # autopilot_tg молчал, и сторож через час убил бы процесс посреди сбора.
     sched.add_job(_ingest_tg_then_send, "cron", hour=13, minute=30,
-                  id="ingest_tg_midday", **tg)
+                  id="ingest_tg_midday", **opts)
     sched.add_job(_ingest_tg_then_send, "cron", hour=18, minute=30,
-                  id="ingest_tg_evening", **tg)
+                  id="ingest_tg_evening", **opts)
     # Входящие — каждые 20 минут днём: рекрутёру, назвавшему время, нельзя
     # отвечать на следующий день, а чаще — лишний трафик по MTProto.
     sched.add_job(step_inbox, "cron", hour="9-21", minute="*/20",
