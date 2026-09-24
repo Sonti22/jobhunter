@@ -75,7 +75,7 @@ def test_letter_always_states_the_constraint():
                        source="ваш пост в @pyjobs")
         assert FORMAT_LINE in msg.text, "условие пропало при seed=%s" % seed
         assert "удал" in msg.text.lower()
-        assert "C1" in msg.text
+        assert "C2" in msg.text
 
 
 def test_unknown_source_leaves_no_empty_parens():

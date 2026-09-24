@@ -23,8 +23,8 @@
 
 meta:
   version: 1
-  source_document: "Акопян_Сурен_Python(2).pdf"
-  updated_at: "2026-08-30"   # Linkero переписан под новое резюме
+  source_document: "jnh Акопян Сурен Суренович (1).pdf"   # = cv_base/Акопян_Сурен_Python.pdf с 24.09
+  updated_at: "2026-09-24"   # новое резюме владельца; faq; английский C2; Москва, только удалённо
   compiled_at: "2026-08-03"
   timeline_start: "2019-01"          # начало отсчёта общего опыта
 
@@ -80,11 +80,10 @@ languages:
   - code: en
     name_ru: "Английский"
     name_en: "English"
-    level: "C1_plus"
+    level: "C2"
     note: >-
-      В исходном резюме заявлен C2. Понижено до C1+ сознательно: вакансии
-      требуют C1+, а C2 без сертификата проверяется на первом же созвоне.
-      Поднять обратно, если есть подтверждение.
+      C2 — решение владельца 24.09 (так же в новом резюме). До этого было
+      сознательно понижено до C1+.
   - code: hy
     name_ru: "Армянский"
     name_en: "Armenian"
@@ -946,12 +945,74 @@ claims:
 # Заполняет владелец. Пусто — бот эскалирует такие вопросы как раньше.
 # Ответ пересказывается ботом почти дословно и проходит гейт правды, поэтому
 # пиши только то, что готов сказать рекрутёру сам.
-faq: []
-#  - id: about_me
-#    answer_ru: >-
-#      Семь лет в разработке: вырос из backend-инженера в технического лидера.
-#      Основной стек — Python, FastAPI, PostgreSQL, Docker. Ищу удалённую
-#      backend-роль, английский C1.
+# Заполнено владельцем 24.09 (ответы на вопросы в сессии). Цифр нет сознательно:
+# гейт режет числа, которых нет среди метрик профиля.
+faq:
+  - id: about_me
+    answer_ru: >-
+      Backend-разработчик на Python, больше шести лет в коммерческой разработке;
+      последний год — Tech Lead / архитектор интеграционной платформы в Linkero,
+      веду команду. Проектирую отказоустойчивые распределённые системы:
+      интеграции с внешними API, очереди с backpressure, идемпотентная
+      обработка, observability. Стек: Python, FastAPI, Django, PostgreSQL,
+      ClickHouse, Redis, Kafka, RabbitMQ, Docker, Kubernetes. Живу в Москве,
+      работаю удалённо, английский C2, могу выйти сразу.
+    answer_en: >-
+      Python backend engineer with more than six years of commercial
+      experience; for the last year Tech Lead and software architect of an
+      integration platform at Linkero, leading the team. I design
+      fault-tolerant distributed systems: external API integrations, queues
+      with backpressure, idempotent processing, observability. Stack: Python,
+      FastAPI, Django, PostgreSQL, ClickHouse, Redis, Kafka, RabbitMQ, Docker,
+      Kubernetes. Based in Moscow, remote only, English C2, available
+      immediately.
+  - id: last_project
+    answer_ru: >-
+      Последний проект — Integration Manager в Linkero: единая точка
+      подключения внешних сервисов к платформе (FastAPI + React): реестр
+      интеграций, права доступа, allow/deny-политики и проверка безопасности.
+      Подключение новой интеграции сократилось с пяти дней до одного. Там же
+      ввёл стандарт внешних вызовов — таймауты, ретраи с backoff,
+      идемпотентность, backpressure; после этого инциденты с переполнением
+      очередей прекратились. События и метрики — в ClickHouse, наблюдаемость —
+      Prometheus и Grafana, прод — Kubernetes и GitLab CI.
+    answer_en: >-
+      My latest project is the Integration Manager at Linkero: a single entry
+      point for connecting external services to the platform (FastAPI +
+      React) — an integration registry, permissions, allow/deny policies and
+      security validation. Onboarding a new integration went from five days
+      to one. I also introduced a standard for external calls — timeouts,
+      retries with backoff, idempotency, backpressure — after which
+      queue-overflow incidents stopped. Events and metrics live in ClickHouse,
+      observability is Prometheus and Grafana, production runs on Kubernetes
+      with GitLab CI.
+  - id: location_and_format
+    answer_ru: >-
+      Живу в Москве. Работаю только удалённо. Переезд — обсуждаемо,
+      командировки возможны. Могу выйти сразу.
+    answer_en: >-
+      I'm based in Moscow and work remotely only. Relocation is open for
+      discussion; business trips are fine. I can start immediately.
+  - id: start_date
+    answer_ru: "Могу выйти сразу."
+    answer_en: "I can start immediately."
+  - id: salary
+    answer_ru: >-
+      Ожидания хочу сверить с вилкой позиции — подскажете, какой бюджет
+      предусмотрен?
+    answer_en: >-
+      I'd like to align my expectations with the role's range — could you
+      share the budget?
+  - id: payments_experience
+    # Владелец 24.09: компанию не называть, про «работал в финтехе» не говорить.
+    answer_ru: >-
+      Есть опыт платёжных интеграций — Stripe, PayPal, ЮKassa, Telegram Stars —
+      и леджера со сверкой балансов, идемпотентными зачислениями и атомарными
+      списаниями.
+    answer_en: >-
+      I have hands-on experience with payment integrations — Stripe, PayPal,
+      YooKassa, Telegram Stars — and with a ledger: balance reconciliation,
+      idempotent credits and atomic debits.
 
 # Зарплатное ожидание. Пусто — бот никогда не называет цифру, а на вопрос
 # о деньгах вежливо возвращает вопрос и зовёт владельца. Заполнено — цифра

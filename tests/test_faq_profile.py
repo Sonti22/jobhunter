@@ -52,7 +52,7 @@ def _app_row(db):
         return app
 
 
-def test_about_without_faq_goes_to_draft(db):
+def test_about_without_faq_goes_to_draft(db, monkeypatch):
     """Пустой faq больше не означает эскалацию.
 
     Раньше «расскажите о себе» без выверенного текста в профиле уходило
@@ -62,6 +62,9 @@ def test_about_without_faq_goes_to_draft(db):
     """
     from jobhunter.convo.reply import plan_reply
 
+    # Боевой profile.yaml с 24.09 содержит about_me — пустой faq задаём явно.
+    empty = _profile()
+    monkeypatch.setattr("jobhunter.profile.get_profile", lambda: empty)
     plan = plan_reply(_app_row(db), "Расскажите о себе, пожалуйста")
     assert plan.should_reply
     assert plan.needs_draft and plan.needs_review,         "текст обязан быть написан LLM и проверен перед отправкой"

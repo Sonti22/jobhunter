@@ -65,7 +65,7 @@ FORMAT_REPLIES = [
     "Рассматриваю только удалённый формат — страна и часовой пояс не важны, "
     "работал в распределённых командах. Если у вас есть удалённые позиции, "
     "с радостью обсужу.",
-    "Работаю только удалённо, к переезду и офису не готов. Английский C1, "
+    "Работаю только удалённо, офис не рассматриваю; переезд — обсуждаемо. Английский C2, "
     "с распределёнными командами опыт есть — если формат подойдёт, "
     "буду рад продолжить.",
 ]
@@ -73,8 +73,8 @@ FORMAT_REPLIES_EN = [
     "I'm looking for remote-only roles — any country and time zone work for "
     "me, I've worked in distributed teams. Happy to continue if you have "
     "remote openings.",
-    "I work remotely only and am not considering relocation or office work. "
-    "English C1, experience in distributed teams — glad to talk if that fits.",
+    "I work remotely only — no office work; relocation is open for discussion. "
+    "English C2, experience in distributed teams — glad to talk if that fits.",
 ]
 
 ACK_REPLIES_EN = [

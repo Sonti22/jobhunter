@@ -54,7 +54,7 @@ ASK_REFERRAL_EN = [
     "Would you be open to referring me, or telling me how referrals work on your team?",
     "Would you be open to a referral, or could you tell me the best way to apply?",
 ]
-TAIL_EN = "My CV is attached. I work remotely only — any country. English: C1."
+TAIL_EN = "My CV is attached. I work remotely only — any country. English: C2."
 OPTOUT_EN = "If this isn't relevant, just reply “no” and I won't write again."
 
 WHY_ROLE_RU = [
@@ -79,7 +79,7 @@ ASK_REFERRAL_RU = [
     "Готовы ли вы порекомендовать меня — или подсказать, как у вас устроены рекомендации?",
     "Возможна ли рекомендация, или подскажите, как лучше откликнуться?",
 ]
-TAIL_RU = "Резюме во вложении. Работаю только удалённо, страна не важна. Английский C1."
+TAIL_RU = "Резюме во вложении. Работаю только удалённо, страна не важна. Английский C2."
 OPTOUT_RU = "Если письмо не по адресу — ответьте «нет», больше не напишу."
 
 
