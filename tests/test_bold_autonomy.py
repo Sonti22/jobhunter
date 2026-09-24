@@ -151,7 +151,7 @@ def test_tech_question_draft_is_actually_written(monkeypatch):
     monkeypatch.setenv("LLM_ENABLED", "true")
     get_settings.cache_clear()
     answer = ("Последний проект — Integration Manager в Linkero на FastAPI и "
-              "PostgreSQL. Работаю только удалённо. Есть опыт платёжных "
+              "PostgreSQL. Живу в Москве, подходит и офис. Есть опыт платёжных "
               "интеграций — Stripe и PayPal.")
     monkeypatch.setattr(draft, "generate",
                         lambda prompt: SimpleNamespace(ok=True, text=answer,

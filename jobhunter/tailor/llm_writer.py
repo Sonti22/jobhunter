@@ -215,8 +215,8 @@ def write_message(role: str, jd_text: str, score, source: str,
             hint = (("\n\nPREVIOUS ANSWER REJECTED: it does not say the "
                      "candidate is looking for REMOTE-ONLY work. State it "
                      "explicitly.") if en else
-                    ("\n\nПРЕДЫДУЩИЙ ОТВЕТ ОТКЛОНЁН: в нём не сказано, что "
-                     "кандидат ищет ТОЛЬКО удалённую работу. Добавь это явно."))
+                    ("\n\nПРЕДЫДУЩИЙ ОТВЕТ ОТКЛОНЁН: в нём не сказан формат "
+                     "кандидата — удалённо, гибрид или офис в Москве. Добавь это явно."))
             continue
         doc = DocModel(lang=lang, kind="message", free_text=text,
                        rendered_bullets=[])

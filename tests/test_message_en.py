@@ -56,7 +56,7 @@ def test_ru_letter_unchanged():
     sc = score_job("Python-разработчик", "", jd)
     msg = generate("Python-разработчик", jd, sc, seed_str="r1",
                    source="ваш пост в @pyjobs")
-    assert "удалённый" in msg.text or "удаленный" in msg.text
+    assert "удалённо" in msg.text or "удаленно" in msg.text
     assert CYRILLIC.search(msg.text)
 
 

@@ -92,6 +92,7 @@ class Score:
     is_junior: bool = False
     is_middle: bool = False
     work_format: str = workformat.UNKNOWN
+    onsite_moscow: bool = False       # офис/гибрид в Москве без переезда — подходит
 
     @property
     def recommend(self) -> bool:
@@ -101,12 +102,12 @@ class Score:
 
     @property
     def onsite_only(self) -> bool:
-        """Офис или релокация без единого упоминания удалёнки.
+        """Офис или релокация, которые владельцу не подходят.
 
-        Владелец рассматривает только удалённый формат. Молчание о
+        С 24.09 офис и гибрид в Москве подходят, переезд — нет. Молчание о
         формате отказом не считается — см. match/workformat.py.
         """
-        return self.work_format == workformat.ONSITE
+        return self.work_format == workformat.ONSITE and not self.onsite_moscow
 
     @property
     def forbidden_dominant(self) -> bool:
@@ -172,10 +173,13 @@ def score_job(title: str, tag: str, jd_text: str, profile: Profile | None = None
         reason_bits.append("product-роль без инженерного бонуса")
     if junior:
         reason_bits.append("junior-позиция при 7 годах опыта")
+    moscow = fmt == workformat.ONSITE and workformat.onsite_ok(title, tag, jd_text)
     if fmt == workformat.ONSITE:
-        reason_bits.append("офис/релокация, удалёнка не упомянута")
+        reason_bits.append("офис/гибрид в Москве — подходит" if moscow
+                           else "офис или релокация не в Москве")
 
     return Score(total=round(total, 1), fit_role=fit, misfit_role=misfit,
                  matched_skills=matched, forbidden_demands=forbidden,
                  jd_terms=sorted(jd_terms), reason="; ".join(reason_bits),
-                 is_junior=junior, is_middle=middle, work_format=fmt)
+                 is_junior=junior, is_middle=middle, work_format=fmt,
+                 onsite_moscow=moscow)

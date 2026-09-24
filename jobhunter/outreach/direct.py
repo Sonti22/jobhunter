@@ -194,8 +194,8 @@ def company_targets(sess, limit: int = 30) -> list:
         score = score_job(job.title, job.tag, job.description_raw, source=job.source)
         if not score.recommend or not classify(job.title, job.tag, job.description_raw).supported:
             continue
-        if workformat.detect(job.title, job.tag, job.description_raw or "",
-                             source=job.source) == workformat.ONSITE:
+        if workformat.unacceptable(job.title, job.tag, job.description_raw or "",
+                                   source=job.source):
             continue
         seen.add(key)
         out.append({"company": job.company_name or key, "site": site, "key": key,

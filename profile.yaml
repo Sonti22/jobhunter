@@ -24,7 +24,7 @@
 meta:
   version: 1
   source_document: "Акопян Сурен Суренович (3).pdf"   # = cv_base/Акопян_Сурен_Python.pdf, hh.ru от 24.09 14:56
-  updated_at: "2026-09-24"   # новое резюме владельца; faq; английский C2; Москва, только удалённо
+  updated_at: "2026-09-24"   # резюме владельца; faq; английский C2; Москва: удалённо/гибрид/офис, без переезда
   compiled_at: "2026-08-03"
   timeline_start: "2019-01"          # начало отсчёта общего опыта
 
@@ -35,8 +35,9 @@ identity:
   location: "Москва, Россия"
   citizenship: "Россия"
   work_authorization: "Гражданство РФ — бессрочное право на работу в стране пребывания"
-  relocation: true
+  relocation: false          # владелец 24.09: «Не готов к переезду», как в резюме
   business_trips: true
+  work_formats: ["remote", "hybrid_moscow", "office_moscow"]   # резюме 24.09
   phone: "+7 (999) 404-84-43"
   email: "suren6pro@gmail.com"
   telegram: "https://t.me/Sonti22"
@@ -955,8 +956,8 @@ faq:
       веду команду. Проектирую отказоустойчивые распределённые системы:
       интеграции с внешними API, очереди с backpressure, идемпотентная
       обработка, observability. Стек: Python, FastAPI, Django, PostgreSQL,
-      ClickHouse, Redis, Kafka, RabbitMQ, Docker, Kubernetes. Живу в Москве,
-      работаю удалённо, английский C2, могу выйти сразу.
+      ClickHouse, Redis, Kafka, RabbitMQ, Docker, Kubernetes. Живу в Москве;
+      удалённо, гибрид или офис в Москве; английский C2, могу выйти сразу.
     answer_en: >-
       Python backend engineer with more than six years of commercial
       experience; for the last year Tech Lead and software architect of an
@@ -964,8 +965,8 @@ faq:
       fault-tolerant distributed systems: external API integrations, queues
       with backpressure, idempotent processing, observability. Stack: Python,
       FastAPI, Django, PostgreSQL, ClickHouse, Redis, Kafka, RabbitMQ, Docker,
-      Kubernetes. Based in Moscow, remote only, English C2, available
-      immediately.
+      Kubernetes. Based in Moscow, working remotely (not relocating),
+      English C2, available immediately.
   - id: last_project
     answer_ru: >-
       Последний проект — Integration Manager в Linkero: единая точка
@@ -988,11 +989,11 @@ faq:
       with GitLab CI.
   - id: location_and_format
     answer_ru: >-
-      Живу в Москве. Работаю только удалённо. Переезд — обсуждаемо,
-      командировки возможны. Могу выйти сразу.
+      Живу в Москве. Подходит удалённый формат, гибрид или офис в Москве.
+      К переезду не готов, командировки возможны. Могу выйти сразу.
     answer_en: >-
-      I'm based in Moscow and work remotely only. Relocation is open for
-      discussion; business trips are fine. I can start immediately.
+      I'm based in Moscow and work remotely; I'm not relocating, but business
+      trips are fine. I can start immediately.
   - id: start_date
     answer_ru: "Могу выйти сразу."
     answer_en: "I can start immediately."

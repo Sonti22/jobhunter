@@ -1,6 +1,10 @@
 """Формат работы: удалёнка, офис или молчание.
 
-Владелец рассматривает только удалённый формат — страна значения не имеет.
+С 24.09 (резюме владельца): Москва — удалёнка, гибрид и офис подходят, переезд
+нет; решение — unacceptable() внизу. Ниже — исходное обоснование, когда
+подходила только удалёнка; правила распознавания формата от этого не менялись.
+
+Владелец рассматривал только удалённый формат — страна значения не имела.
 Задача модуля — не пропустить в отклики офисные вакансии и вакансии «с
 помощью в релокации», не выбросив при этом всё остальное.
 
@@ -85,3 +89,28 @@ def detect(*parts: str, source: str = "") -> str:
     if _ONSITE_RE.search(text):
         return ONSITE
     return UNKNOWN
+
+
+# С 24.09 позиция владельца — как в его резюме: живёт в Москве, подходят
+# удалёнка, гибрид и офис в Москве; к переезду не готов. До этого подходила
+# только удалёнка, и московский офис («м. Павелецкая») резался вместе с чужими.
+_MOSCOW_RE = re.compile(r"москв\w*|\bmoscow\b|метро\s+[а-яё]", re.I)
+# «м. Павелецкая» — станция метро; только с заглавной, иначе «м. б.» и т. п.
+_METRO_RE = re.compile(r"\bм\.\s?[А-ЯЁ][а-яё]{3,}")
+_RELOCATION_RE = re.compile(r"переезд\w*|релокац\w*|relocat\w*|visa\s+sponsor\w*", re.I)
+_NO_RELOCATION_RE = re.compile(
+    r"(?:без|не\s+требу\w+)\s+(?:переезд|релокац)\w*|relocation\s+(?:is\s+)?not\s+required|"
+    r"\bno\s+relocation\b", re.I)
+
+
+def onsite_ok(*parts: str) -> bool:
+    """Офис или гибрид, который владельцу подходит: в Москве и без переезда."""
+    text = " ".join(p or "" for p in parts)
+    if _RELOCATION_RE.search(text) and not _NO_RELOCATION_RE.search(text):
+        return False
+    return bool(_MOSCOW_RE.search(text) or _METRO_RE.search(text))
+
+
+def unacceptable(*parts: str, source: str = "") -> bool:
+    """Формат, который владельцу не подходит: офис или релокация не в Москве."""
+    return detect(*parts, source=source) == ONSITE and not onsite_ok(*parts)

@@ -60,22 +60,20 @@ CALL_REPLIES_EN = [
     "Happy to talk. I'm available {slots} — does any of these work for you?",
     "Sounds good. I'm free {slots}, or feel free to suggest another time.",
 ]
-# Формат работы: та же формулировка, что в холодных письмах, — владелец
-# рассматривает только удалённый формат, страна значения не имеет.
+# Формат работы — как в резюме владельца (24.09): живёт в Москве, подходят
+# удалёнка, гибрид и офис в Москве; к переезду не готов, командировки — да.
 FORMAT_REPLIES = [
-    "Рассматриваю только удалённый формат — страна и часовой пояс не важны, "
-    "работал в распределённых командах. Если у вас есть удалённые позиции, "
-    "с радостью обсужу.",
-    "Работаю только удалённо, офис не рассматриваю; переезд — обсуждаемо. Английский C2, "
-    "с распределёнными командами опыт есть — если формат подойдёт, "
-    "буду рад продолжить.",
+    "Живу в Москве: подходит удалённый формат, гибрид или офис в Москве. "
+    "К переезду не готов, командировки возможны.",
+    "Я в Москве — рассматриваю удалённую работу, гибрид или офис в Москве; "
+    "переезд не рассматриваю, в командировки готов. Английский C2.",
 ]
+# Англоязычному (зарубежному) работодателю реалистична удалёнка: переезда нет.
 FORMAT_REPLIES_EN = [
-    "I'm looking for remote-only roles — any country and time zone work for "
-    "me, I've worked in distributed teams. Happy to continue if you have "
-    "remote openings.",
-    "I work remotely only — no office work; relocation is open for discussion. "
-    "English C2, experience in distributed teams — glad to talk if that fits.",
+    "I'm based in Moscow and work remotely; I'm not relocating, but business "
+    "trips are fine. I've worked in distributed teams.",
+    "I work remotely from Moscow — relocation isn't an option for me, business "
+    "trips are fine. English C2, experience in distributed teams.",
 ]
 
 ACK_REPLIES_EN = [

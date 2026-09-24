@@ -46,12 +46,24 @@ def test_silence_is_not_onsite():
         == workformat.UNKNOWN
 
 
-def test_onsite_job_is_not_recommended():
-    onsite = score_job("Python-разработчик", "",
-                       PY_JD + " Формат работы: в офисе, м. Павелецкая.")
-    assert onsite.onsite_only
-    assert not onsite.recommend
-    assert "офис" in onsite.reason
+def test_moscow_office_is_recommended_since_24_09():
+    """Резюме владельца 24.09: живёт в Москве, офис и гибрид в Москве подходят."""
+    for text in (" Формат работы: в офисе, м. Павелецкая.",
+                 " Гибрид, офис в Москве."):
+        moscow = score_job("Python-разработчик", "", PY_JD + text)
+        assert not moscow.onsite_only, text
+        assert moscow.recommend, text
+        assert "Москве — подходит" in moscow.reason
+
+
+def test_office_elsewhere_or_relocation_is_not_recommended():
+    """К переезду владелец не готов: чужой город и релокация — отказ."""
+    for text in (" Формат работы: в офисе в Санкт-Петербурге.",
+                 " Офис в Москве, помогаем с релокацией из регионов.",
+                 " Onsite in Belgrade, relocation package."):
+        job = score_job("Python-разработчик", "", PY_JD + text)
+        assert job.onsite_only, text
+        assert not job.recommend, text
 
 
 def test_remote_job_still_recommended():

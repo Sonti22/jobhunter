@@ -115,9 +115,9 @@ def prepare_one(app_id: int) -> str:
         score = score_job(job.title, job.tag, job.description_raw, source=job.source)
         if not problem and not score.recommend:
             problem = "вакансия больше не проходит отбор: %s" % (score.reason or "скор")
-        if not problem and workformat.detect(job.title, job.tag, job.description_raw or "",
-                                             source=job.source) == workformat.ONSITE:
-            problem = "только офис"
+        if not problem and workformat.unacceptable(job.title, job.tag, job.description_raw or "",
+                                                   source=job.source):
+            problem = "офис не в Москве или нужен переезд"
         if not problem:
             problem = approval_problem(app, job)
         if problem:

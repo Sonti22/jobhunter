@@ -185,21 +185,28 @@ _ROUTINE_TASK = {
 
 
 # Позиции владельца, которые гейт правды не видит (он сверяет технологии и
-# цифры, а не формат работы). 24.09 черновик ответил на «готовы к офису?»
-# «переезд в офис обсуждаем» — самопроверка это пропустила.
-_ASKS_FORMAT = re.compile(r"офис|office|удал[её]н|remote|гибрид|hybrid|переезд|релокац|relocat",
-                          re.I)
-_STATES_REMOTE_ONLY = re.compile(r"только\s+удал[её]нн?\w*|remote[- ]only|only\s+remote|"
-                                 r"remotely\s+only|work\s+remotely\s+only", re.I)
+# цифры, а не формат работы). 24.09 черновик на «готовы к офису?» ответил
+# «переезд в офис обсуждаем» — самопроверка это пропустила. Позиция по
+# резюме владельца: Москва — удалённо, гибрид или офис; к переезду не готов.
+_RELOCATION_YES = re.compile(
+    r"(?<!не\s)готов\w*\s+(?:к\s+)?(?:переезд|релокац)\w*|"
+    # «переезд в офис обсуждаем», но не «переезд не рассматриваю»
+    r"(?:переезд|релокац)\w*(?:(?!\bне\b)[^.!?\n]){0,25}(?:обсужд|возможн|рассматрива)\w*|"
+    r"open\s+to\s+relocat\w*|willing\s+to\s+relocate|can\s+relocate|happy\s+to\s+relocate",
+    re.I)
+_REMOTE_ONLY_RU = re.compile(r"только\s+удал[её]нн?\w*|офис\s+не\s+рассматрива\w*", re.I)
 _FINTECH = re.compile(r"финтех|fintech", re.I)
 
 
 def _tech_stance_problem(incoming: str, text: str) -> str:
     """Почему автоответ на техвопрос нельзя отправлять без владельца; пусто — можно."""
-    if _FINTECH.search(text or ""):
+    t = text or ""
+    if _FINTECH.search(t):
         return "в ответе «финтех» — владелец велел говорить о платёжных интеграциях"
-    if _ASKS_FORMAT.search(incoming or "") and not _STATES_REMOTE_ONLY.search(text or ""):
-        return "спросили про офис или формат, а в ответе нет «только удалённо»"
+    if _RELOCATION_YES.search(t):
+        return "в ответе готовность к переезду — владелец к переезду не готов"
+    if _REMOTE_ONLY_RU.search(t):
+        return "в ответе «только удалённо» — владелец рассматривает и офис в Москве"
     return ""
 
 
