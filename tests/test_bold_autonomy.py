@@ -137,3 +137,44 @@ def test_general_reply_limit_still_caps_bold(db):
     plan = plan_reply(app, "Расскажите, как бы вы построили API", bold=True)
     assert not plan.should_reply
     assert "лимит автоответов" in plan.reason
+
+
+def test_tech_question_draft_is_actually_written(monkeypatch):
+    """План помечал техвопрос «черновиком по фактам», а черновик писать было
+    нечем: в задачах draft_routine_reply не было tech_question, и 24.09 каждый
+    такой вопрос (вопросы GDL IT — месяц) уходил владельцу карточкой."""
+    from types import SimpleNamespace
+
+    from jobhunter.config import get_settings
+    from jobhunter.convo import draft
+
+    monkeypatch.setenv("LLM_ENABLED", "true")
+    get_settings.cache_clear()
+    answer = ("Последний проект — Integration Manager в Linkero на FastAPI и "
+              "PostgreSQL. Работаю только удалённо. Есть опыт платёжных "
+              "интеграций — Stripe и PayPal.")
+    monkeypatch.setattr(draft, "generate",
+                        lambda prompt: SimpleNamespace(ok=True, text=answer,
+                                                       provider="test", error=""))
+    d = draft.draft_routine_reply("tech_question", "Python Backend", "Python, FastAPI",
+                                  "Расскажите о последнем проекте? Есть опыт в финтехе?", [])
+    assert d.ok, d.problem
+    assert d.text == answer
+
+
+def test_tech_question_draft_still_goes_through_the_truth_gate(monkeypatch):
+    """Текст уходит без владельца — выдуманная технология обязана резаться."""
+    from types import SimpleNamespace
+
+    from jobhunter.config import get_settings
+    from jobhunter.convo import draft
+
+    monkeypatch.setenv("LLM_ENABLED", "true")
+    get_settings.cache_clear()
+    invented = "Да, пять лет пишу на Rust и Haskell, строил блокчейн на Solidity."
+    monkeypatch.setattr(draft, "generate",
+                        lambda prompt: SimpleNamespace(ok=True, text=invented,
+                                                       provider="test", error=""))
+    d = draft.draft_routine_reply("tech_question", "Python Backend", "Python",
+                                  "Есть опыт с Rust?", [])
+    assert not d.ok and d.problem.startswith("гейт"), d.problem
