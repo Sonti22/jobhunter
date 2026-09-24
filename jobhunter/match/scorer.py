@@ -19,11 +19,27 @@ LEVEL_WEIGHT = {"expert": 1.0, "working": 0.7, "familiar": 0.35, "none": 0.0}
 FIT_ROLES = re.compile(
     r"(product\s*manager|product\s*owner|technical\s*pm|tech\s*lead|"
     r"backend|back-end|python|software\s*(engineer|architect)|"
-    r"продукт|разработчик|инженер|архитектор|team\s*lead|teamlead|"
+    # «продукт» голым словом было в тексте бьюти-дистрибутора и бренда одежды
+    # (24.09) — оценка ставила им «роль профильная». Только продуктовые роли.
+    r"продакт|продуктов\w*\s+(?:менеджер|оунер)|"
+    r"разработчик|инженер|архитектор|team\s*lead|teamlead|"
     r"ml\s*engineer|mlops|ml\s*systems|computer\s*vision|"
     r"integration\s*engineer|platform\s*engineer|"
     r"devops|\bsre\b|site\s*reliability|infrastructure\s*engineer|"
     r"solution\s*architect|системный\s*архитектор|data\s*engineer)", re.I)
+
+# Роли из headline_variants профиля, которые раньше проходили только за счёт голого
+# «продукт» в тексте. Только по заголовку и тегу: по всему тексту «project manager»
+# и «аналитик» 24.09 пустили креативные агентства, SMM и ассистентов (51 вакансия
+# на живых данных за 14 дней). Project Manager — только технический.
+FIT_TITLE_ROLES = re.compile(
+    r"\bcto\b|(?-i:\bСТО\b)|технич\w+\s+директор|chief\s+(?:technology|product)\s+officer|"
+    r"\bcpo\b|product\s+director|директор\s+по\s+продукт\w*|менеджер\s+продукт\w*|"
+    r"(?:technical|tech|it|software|ai)\s+project\s*manager|"
+    r"project\s*manager\W{0,3}(?:[\w-]+\W{1,3}){0,2}?(?:software|ai|it|saas|разработ\w*)\b|"
+    r"технич\w+\s+(?:менеджер|руководител)\w*\s+проект\w*|"
+    r"systems?\s+analyst|\bba\s+analyst|системн\w+\s+аналитик\w*|"
+    r"qa\s+(?:automation\s+)?engineer|quality\s+assurance\s+engineer|qa\s+automation", re.I)
 
 # Product positions remain valid for this profile, but they no longer receive
 # the same generic role bonus as an engineering vacancy.  The historical
@@ -52,7 +68,21 @@ BUDGET_ROLES = re.compile(
 MISFIT_ROLES = re.compile(
     r"\b(ios|android|swift|kotlin|frontend|front-end|react|vue|angular|"
     r"designer|дизайнер|php|\.net|c#|java\b|golang\b|rust\b|qa\s*manual|"
-    r"unity|gamedev|3d|копирайтер|маркетолог|smm|sales|продаж)", re.I)
+    r"unity|gamedev|3d|копирайтер|маркетолог|smm|sales|продаж)"
+    # 24.09: инженерные роли вне профиля — 1С и железо (ПЛИС/FPGA). Без
+    # фильтра «офис» «Программист 1С ERP» и «Инженер ПЛИС» проходили оценку.
+    r"|\b1[сc]\b|1[сc][- :]|плис|\bfpga\b|\brtl\b|verilog|vhdl|схемотехн\w*", re.I)
+
+# Не инженерные профессии. Мимо — только если в заголовке нет инженерного слова:
+# «Python-разработчик HR-платформы» — наш случай (владелец делал HR-платформу).
+NON_ENGINEERING_ROLES = re.compile(
+    r"продюсер\w*|reels|таргетолог\w*|контент[- ]?(?:менеджер|мейкер)\w*|"
+    r"\bhr\b|hrbp|рекрутер\w*|по\s+персоналу|кадров\w*|"
+    r"\bfmcg\b|beauty|косметик\w*|дистрибуц\w*|мерчендайз\w*|"
+    r"торгов\w+\s+представител\w*", re.I)
+ENGINEERING_WORD = re.compile(
+    r"разработчик\w*|developer|engineer|инженер\w*|программист\w*|devops|backend|"
+    r"python|architect|архитектор\w*|tech\s*lead|team\s*lead|\bsre\b|data\s+engineer", re.I)
 
 # Теги careered — надёжная категория роли. Эти = профнепригодно независимо от
 # случайных совпадений терминов в тексте вакансии.
@@ -118,7 +148,6 @@ class Score:
 def score_job(title: str, tag: str, jd_text: str, profile: Profile | None = None,
               source: str = "") -> Score:
     p = profile or get_profile()
-    blob = " ".join([title or "", tag or "", jd_text or ""])
     jd_terms = _find_terms(jd_text or "") | _find_terms(tag or "")
 
     matched, forbidden = [], []
@@ -132,11 +161,21 @@ def score_job(title: str, tag: str, jd_text: str, profile: Profile | None = None
         elif term in p.forbidden_terms:
             forbidden.append(term)
 
-    fit = bool(FIT_ROLES.search(blob))
+    # Роль ищется по всему тексту: сужение до заголовка на 14 днях живых данных
+    # (24.09) потеряло 147 годных ролей из 440 — «Engineering Manager», «Fullstack
+    # Developer», «Cloud Engineer» в заголовке FIT_ROLES не узнаёт. Мусор режется
+    # точнее — MISFIT_ROLES и NON_ENGINEERING_ROLES по заголовку.
+    # Посты каналов часто теряют должность в заголовке («москва») и пишут её
+    # первой строкой текста: «#москва  Chief Product Officer  Обязанности…».
+    fit = (bool(FIT_ROLES.search(" ".join([title or "", tag or "", jd_text or ""])))
+           or bool(FIT_TITLE_ROLES.search(" ".join([title or "", tag or "",
+                                                     (jd_text or "")[:200]]))))
     tag_l = (tag or "").strip().lower()
     misfit = (tag_l in MISFIT_TAGS or bool(MISFIT_ROLES.search(title or ""))
               or bool(MISFIT_ROLES.search(tag or ""))
-              or bool(BUDGET_ROLES.search(title or "")))
+              or bool(BUDGET_ROLES.search(title or ""))
+              or (bool(NON_ENGINEERING_ROLES.search(title or ""))
+                  and not ENGINEERING_WORD.search(title or "")))
 
     # junior-позиция: ищем в заголовке и в первых строках описания, где обычно
     # стоит грейд. «Senior» в тексте перебивает — бывает «Junior/Senior» вилка.
