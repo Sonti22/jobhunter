@@ -36,8 +36,17 @@ from ..tailor.render import resolve_cv
 from . import eligibility, policy
 
 
+def _from_name(s) -> str:
+    """Имя отправителя: SMTP_FROM_NAME или имя кандидата латиницей из профиля."""
+    if (s.smtp_from_name or "").strip():
+        return s.smtp_from_name.strip()
+    from ..profile import get_profile
+    ident = get_profile().identity
+    return str(ident.get("full_name_en") or ident.get("full_name_ru") or "").strip()
+
+
 def reply_to_addr(app_id: int) -> str:
-    """Адрес вида suren6pro+jh42xa1b2c@gmail.com для ответов по заявке 42.
+    """Адрес вида you+jh42xa1b2c@gmail.com для ответов по заявке 42.
 
     Gmail доставляет письма на адрес с «плюсом» в тот же ящик, а суффикс
     возвращается к нам в заголовке To — и, что важнее, в процитированном
@@ -161,13 +170,13 @@ def build_message(*, to: str, subject: str, body: str, cv_path: str = "",
     """
     s = get_settings()
     msg = EmailMessage()
-    msg["From"] = "%s <%s>" % (s.smtp_from_name, s.smtp_user)
+    msg["From"] = "%s <%s>" % (_from_name(s), s.smtp_user)
     msg["To"] = to
     msg["Subject"] = subject
     domain = (s.smtp_user or "localhost").rsplit("@", 1)[-1] or "localhost"
     msg["Message-ID"] = message_id or make_msgid(domain=domain)
     if app_id:
-        msg["Reply-To"] = "%s <%s>" % (s.smtp_from_name, reply_to_addr(app_id))
+        msg["Reply-To"] = "%s <%s>" % (_from_name(s), reply_to_addr(app_id))
     if in_reply_to:
         msg["In-Reply-To"] = in_reply_to
         refs = list(references or [])[-8:]
@@ -179,7 +188,7 @@ def build_message(*, to: str, subject: str, body: str, cv_path: str = "",
         # не отвечать на такое письмо. Дешёвая защита от петли.
         msg["Auto-Submitted"] = "auto-generated"
 
-    footer = "\n\n—\n%s\n%s" % (s.smtp_from_name, reply_to_addr(app_id)
+    footer = "\n\n—\n%s\n%s" % (_from_name(s), reply_to_addr(app_id)
                                 if app_id else s.smtp_user)
     msg.set_content(body + footer)
     # Через резолвер, а не прямой проверкой пути: путь записан в заявку при
@@ -206,19 +215,18 @@ def _subject_role(job: Job, lang: str) -> str:
 
 
 def _subject(job: Job, lang: str) -> str:
+    """Тема письма. Имя и «кто я» — из профиля (outreach.subject_*), не из кода."""
+    from .. import persona
     if (job.source or "").startswith("direct:"):
         # Письмо человеку, а не в форму отклика: «Application:» тут неуместно.
         company = (job.company_name or "").strip()
         role = _clean_role(job.title or "")
         if lang == "en":
             about = ("%s at %s" % (role, company)) if role and company else (role or company or "your team")
-            return "%s — Suren Hakobyan (backend / tech lead, 7+ yrs)" % about[:80]
-        about = ("%s в %s" % (role, company)) if role and company else (role or company or "ваша команда")
-        return "%s — Сурен Акопян (backend / tech lead, 7+ лет)" % about[:80]
-    role = _subject_role(job, lang)
-    if lang == "en":
-        return "Application: %s — Suren Hakobyan (7+ yrs, backend/tech lead)" % role[:70]
-    return "Отклик: %s — Акопян Сурен (7+ лет, backend/tech lead)" % role[:70]
+        else:
+            about = ("%s в %s" % (role, company)) if role and company else (role or company or "ваша команда")
+        return persona.subject("direct", lang, about=about[:80])
+    return persona.subject("apply", lang, role=_subject_role(job, lang)[:70])
 
 
 # Ящики, куда отклик слать бессмысленно и вредно: это не наём, а закупки,

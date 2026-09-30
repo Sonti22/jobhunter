@@ -12,7 +12,7 @@
 
   msgid     наш Message-ID в In-Reply-To/References — переживает ответ с
             чужого адреса, но требует, чтобы мы сами его проставили
-  plus      адрес suren6pro+jh42xSIG@ в To/Cc/Delivered-To
+  plus      адрес you+jh42xSIG@ в To/Cc/Delivered-To
   alias     From совпал с адресом, с которого уже отвечали по этой заявке
   employer  From → работодатель → его живые заявки
   domain    корпоративный домен From → единственная заявка в эту компанию

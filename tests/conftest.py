@@ -19,6 +19,9 @@ import pytest
 # LLM выключена до того, как какой-либо модуль прочитает настройки: env
 # перекрывает боевой .env, который pydantic читает напрямую с диска.
 os.environ.setdefault("LLM_ENABLED", "false")
+# Холодная рассылка в Telegram по умолчанию выключена (config), а тесты
+# отправителя проверяют именно её. Выключатель проверяется отдельно.
+os.environ.setdefault("TELEGRAM_COLD_ENABLED", "true")
 
 
 @pytest.fixture(autouse=True)

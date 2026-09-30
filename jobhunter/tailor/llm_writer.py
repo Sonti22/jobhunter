@@ -149,13 +149,17 @@ def quality_problem(text: str) -> str:
     return ""
 
 
-# Явное заявление про удалённый формат. Проверяем по тексту, а не доверием
-# к модели: это жёсткое условие владельца, а не пожелание.
+# Явное заявление про формат работы. Проверяем по тексту, а не доверием
+# к модели: это жёсткое условие кандидата, а не пожелание. Удалёнка среди
+# форматов кандидата — письмо обязано её назвать; иначе — офис или гибрид.
 _REMOTE_CLAIM = re.compile(r"удал[ёе]нн?\w*|удал[ёе]нк\w*|\bremote\b", re.I)
+_ONSITE_CLAIM = re.compile(r"офис\w*|гибрид\w*|\boffice\b|\bhybrid\b|on-?site", re.I)
 
 
-def _states_remote(text: str) -> bool:
-    return bool(_REMOTE_CLAIM.search(text or ""))
+def _states_remote(text: str, profile: Profile | None = None) -> bool:
+    from .. import persona
+    rx = _REMOTE_CLAIM if "remote" in persona.formats(profile) else _ONSITE_CLAIM
+    return bool(rx.search(text or ""))
 
 
 def write_message(role: str, jd_text: str, score, source: str,
@@ -178,10 +182,12 @@ def write_message(role: str, jd_text: str, score, source: str,
     from .message import _extract_requirement
     safe_quote = _extract_requirement(jd_text, score.matched_skills, p, role,
                                       lang=lang)
+    from .. import persona
+    format_rule = persona.text("format_rule_llm", lang, p)
     prompt = prompt_message(role, jd_text, facts_for(p, score, lang=lang),
                             allowed_terms_str(p), forbidden_str(p),
                             source, max_chars, safe_quote=safe_quote,
-                            lang=lang)
+                            lang=lang, format_rule=format_rule)
     hint = ""
     for attempt in (1, 2):
         res = generate(prompt + hint)
@@ -211,12 +217,12 @@ def write_message(role: str, jd_text: str, score, source: str,
         # для этого мало: модель регулярно ужимает текст под лимит знаков,
         # выбрасывая ровно то, что кажется ей необязательным. Не выполнила
         # после двух попыток — уходит шаблон, где строка стоит всегда.
-        if not _states_remote(text):
-            hint = (("\n\nPREVIOUS ANSWER REJECTED: it does not say the "
-                     "candidate is looking for REMOTE-ONLY work. State it "
-                     "explicitly.") if en else
+        if not _states_remote(text, p):
+            hint = (("\n\nPREVIOUS ANSWER REJECTED: it does not state the "
+                     "candidate's work format (%s). State it explicitly." % format_rule)
+                    if en else
                     ("\n\nПРЕДЫДУЩИЙ ОТВЕТ ОТКЛОНЁН: в нём не сказан формат "
-                     "кандидата — удалённо, гибрид или офис в Москве. Добавь это явно."))
+                     "кандидата — %s. Добавь это явно." % format_rule))
             continue
         doc = DocModel(lang=lang, kind="message", free_text=text,
                        rendered_bullets=[])

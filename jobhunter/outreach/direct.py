@@ -34,6 +34,7 @@ from pathlib import Path
 
 from sqlalchemy import func, select
 
+from .. import persona
 from ..config import get_settings
 from ..convo.mailmatch import FREEMAIL, org_domain
 from ..db import session_scope
@@ -384,7 +385,7 @@ def prepare_one(app_id: int, fetcher=None) -> str:
             app.transition(Status.GATE_FAILED)
             return "гейт резюме не пройден"
         cv_path, cv_hash = render_cv(res.render, s.cv_out,
-                                     filename_hint="Hakobyan_%s_%s" % (res.cv_slug, _uid(seed_base)),
+                                     filename_hint="%s_%s_%s" % (persona.cv_file_prefix(), res.cv_slug, _uid(seed_base)),
                                      unique_seed=seed_base)
         parsed = verify_parsable(cv_path, res.render)
         if lang == "ru" and s.base_cv_path and Path(s.base_cv_path).is_file():

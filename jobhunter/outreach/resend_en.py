@@ -26,6 +26,7 @@ from datetime import datetime
 
 from sqlalchemy import select
 
+from .. import persona
 from ..config import get_settings
 from ..db import session_scope
 from ..models import Application, ContactKind, Employer, Job, Message, SendLog, Status, utcnow
@@ -117,7 +118,7 @@ def prepare_one(app_id: int) -> str:
             problem = "вакансия больше не проходит отбор: %s" % (score.reason or "скор")
         if not problem and workformat.unacceptable(job.title, job.tag, job.description_raw or "",
                                                    source=job.source):
-            problem = "офис не в Москве или нужен переезд"
+            problem = "офис не в городе кандидата или нужен переезд"
         if not problem:
             problem = approval_problem(app, job)
         if problem:
@@ -129,7 +130,7 @@ def prepare_one(app_id: int) -> str:
             _save(app, skipped="гейт резюме не пройден")
             return "пропуск: гейт резюме"
         cv_path, _ = render_cv(res.render, s.cv_out,
-                               filename_hint="Hakobyan_%s_%s" % (res.cv_slug, _uid(job.external_uuid)),
+                               filename_hint="%s_%s_%s" % (persona.cv_file_prefix(), res.cv_slug, _uid(job.external_uuid)),
                                unique_seed=job.external_uuid + ":en")
         if not verify_parsable(cv_path, res.render)["ok"]:
             _save(app, skipped="резюме не читается парсером")

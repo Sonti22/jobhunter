@@ -109,6 +109,10 @@ def can_send_cold(sess) -> Verdict:
     """
     if kill_switch_active():
         return Verdict(False, "kill-switch: %s" % get_settings().kill_switch.name)
+    # Холодные сообщения незнакомцам с личного аккаунта — то, за что Telegram
+    # ограничивает аккаунт по жалобам. Включается сознательно, в .env.
+    if not get_settings().telegram_cold_enabled:
+        return Verdict(False, "холодная рассылка в Telegram выключена (TELEGRAM_COLD_ENABLED)")
 
     st = get_state(sess)
     if st.manual_only:

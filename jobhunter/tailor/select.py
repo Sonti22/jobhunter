@@ -315,10 +315,12 @@ def _skill_hint(p: Profile, jd_skill_ids: set) -> dict:
 
 
 def _contacts(p: Profile, lang: str) -> str:
+    from .. import persona
     i = p.identity
-    loc = "Москва, Россия" if lang == "ru" else "Moscow, Russia"
-    return "%s  •  %s  •  %s  •  t.me/%s" % (
-        loc, i["phone"], i["email"], i["telegram"].rstrip("/").split("/")[-1])
+    tg = str(i.get("telegram") or "").rstrip("/").split("/")[-1].lstrip("@")
+    parts = [persona.location(lang, p), str(i.get("phone") or ""), str(i.get("email") or ""),
+             ("t.me/" + tg) if tg else ""]
+    return "  •  ".join(x.strip() for x in parts if x.strip())
 
 
 def _langs(p: Profile, lang: str) -> str:

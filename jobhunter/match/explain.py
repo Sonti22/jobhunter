@@ -292,8 +292,8 @@ def explain_job(job, profile=None) -> dict:
             reasons.append("проверить характер ML-задач: " + clause)
     fmt = workformat.detect(title, tag, body, source=_value(job, "source") or "")
     if workformat.unacceptable(title, tag, body, source=_value(job, "source") or ""):
-        gaps.append("офис или релокация не в Москве; владелец к переезду не готов")
-        reasons.append("формат работы не подходит: не Москва или нужен переезд")
+        gaps.append("офис не в городе кандидата или нужен переезд")
+        reasons.append("формат работы не подходит: не тот город или нужен переезд")
     elif fmt == workformat.UNKNOWN:
         unknowns.append("формат работы не указан")
     if not _GEOGRAPHY.search("\n".join((title, body))):

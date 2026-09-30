@@ -15,7 +15,8 @@ from . import workformat
 
 LEVEL_WEIGHT = {"expert": 1.0, "working": 0.7, "familiar": 0.35, "none": 0.0}
 
-# Роли, под которые Сурен реально подходит (по опыту в профиле).
+# Роли, под которые кандидат реально подходит. Настроено под IT: backend,
+# платформа, tech lead, продукт. Другая профессия — правьте FIT_ROLES ниже.
 FIT_ROLES = re.compile(
     r"(product\s*manager|product\s*owner|technical\s*pm|tech\s*lead|"
     r"backend|back-end|python|software\s*(engineer|architect)|"
@@ -110,6 +111,17 @@ SENIOR_RE = re.compile(
     r"|ведущ|старш|главн|архитектор)", re.I)
 
 
+def _years_phrase(p: Profile) -> str:
+    """«7 годах опыта» для причины отказа junior-вакансии."""
+    try:
+        years = int(float(p.claims.get("total_years_software", 0) or 0))
+    except (TypeError, ValueError):
+        years = 0
+    if not years:
+        return "большем опыте"
+    return "%d %s опыта" % (years, "году" if years % 10 == 1 and years % 100 != 11 else "годах")
+
+
 @dataclass
 class Score:
     total: float                         # 0..100
@@ -122,7 +134,7 @@ class Score:
     is_junior: bool = False
     is_middle: bool = False
     work_format: str = workformat.UNKNOWN
-    onsite_moscow: bool = False       # офис/гибрид в Москве без переезда — подходит
+    onsite_fits: bool = False         # офис/гибрид в городе кандидата без переезда — подходит
 
     @property
     def recommend(self) -> bool:
@@ -132,12 +144,12 @@ class Score:
 
     @property
     def onsite_only(self) -> bool:
-        """Офис или релокация, которые владельцу не подходят.
+        """Офис или релокация, которые кандидату не подходят.
 
-        С 24.09 офис и гибрид в Москве подходят, переезд — нет. Молчание о
+        Какой офис подходит — из профиля (город, форматы, переезд). Молчание о
         формате отказом не считается — см. match/workformat.py.
         """
-        return self.work_format == workformat.ONSITE and not self.onsite_moscow
+        return self.work_format == workformat.ONSITE and not self.onsite_fits
 
     @property
     def forbidden_dominant(self) -> bool:
@@ -211,14 +223,16 @@ def score_job(title: str, tag: str, jd_text: str, profile: Profile | None = None
     if product_role:
         reason_bits.append("product-роль без инженерного бонуса")
     if junior:
-        reason_bits.append("junior-позиция при 7 годах опыта")
-    moscow = fmt == workformat.ONSITE and workformat.onsite_ok(title, tag, jd_text)
+        reason_bits.append("junior-позиция при %s" % _years_phrase(p))
+    fits = fmt == workformat.ONSITE and workformat.onsite_ok(title, tag, jd_text)
     if fmt == workformat.ONSITE:
-        reason_bits.append("офис/гибрид в Москве — подходит" if moscow
-                           else "офис или релокация не в Москве")
+        from .. import persona
+        where = persona.city(p) or "городе кандидата"
+        reason_bits.append(("офис/гибрид, %s — подходит" % where) if fits
+                           else ("офис не в городе кандидата (%s) или релокация" % where))
 
     return Score(total=round(total, 1), fit_role=fit, misfit_role=misfit,
                  matched_skills=matched, forbidden_demands=forbidden,
                  jd_terms=sorted(jd_terms), reason="; ".join(reason_bits),
                  is_junior=junior, is_middle=middle, work_format=fmt,
-                 onsite_moscow=moscow)
+                 onsite_fits=fits)

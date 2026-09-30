@@ -6,8 +6,9 @@
 """
 import re
 
+from jobhunter import persona
 from jobhunter.match.scorer import score_job
-from jobhunter.tailor.message import FORMAT_LINE_EN, generate
+from jobhunter.tailor.message import generate
 
 EN_JD = ("We are hiring a Senior Python Engineer. Experience with FastAPI, "
          "PostgreSQL, Docker and Kubernetes required. You will design "
@@ -31,7 +32,7 @@ def test_en_letter_has_no_cyrillic():
 def test_en_letter_states_remote_constraint():
     msg = generate("Senior Python Engineer", EN_JD, _score(),
                    seed_str="x1", source="himalayas.app", lang="en")
-    assert FORMAT_LINE_EN in msg.text
+    assert persona.text("format_line", "en") in msg.text
     assert "remote" in msg.text.lower()
 
 

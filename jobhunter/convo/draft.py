@@ -184,10 +184,10 @@ _ROUTINE_TASK = {
 }
 
 
-# Позиции владельца, которые гейт правды не видит (он сверяет технологии и
+# Позиции кандидата, которые гейт правды не видит (он сверяет технологии и
 # цифры, а не формат работы). 24.09 черновик на «готовы к офису?» ответил
-# «переезд в офис обсуждаем» — самопроверка это пропустила. Позиция по
-# резюме владельца: Москва — удалённо, гибрид или офис; к переезду не готов.
+# «переезд в офис обсуждаем» — самопроверка это пропустила. Позиция берётся из
+# профиля: identity.relocation, identity.work_formats и outreach.never_say.
 _RELOCATION_YES = re.compile(
     r"(?<!не\s)готов\w*\s+(?:к\s+)?(?:переезд|релокац)\w*|"
     # «переезд в офис обсуждаем», но не «переезд не рассматриваю»
@@ -195,18 +195,20 @@ _RELOCATION_YES = re.compile(
     r"open\s+to\s+relocat\w*|willing\s+to\s+relocate|can\s+relocate|happy\s+to\s+relocate",
     re.I)
 _REMOTE_ONLY_RU = re.compile(r"только\s+удал[её]нн?\w*|офис\s+не\s+рассматрива\w*", re.I)
-_FINTECH = re.compile(r"финтех|fintech", re.I)
 
 
 def _tech_stance_problem(incoming: str, text: str) -> str:
     """Почему автоответ на техвопрос нельзя отправлять без владельца; пусто — можно."""
+    from .. import persona
     t = text or ""
-    if _FINTECH.search(t):
-        return "в ответе «финтех» — владелец велел говорить о платёжных интеграциях"
-    if _RELOCATION_YES.search(t):
+    for rx, why in persona.never_say():
+        m = rx.search(t)
+        if m:
+            return "в ответе «%s» — %s" % (m.group(0), why or "владелец просил так не говорить")
+    if not persona.relocation() and _RELOCATION_YES.search(t):
         return "в ответе готовность к переезду — владелец к переезду не готов"
-    if _REMOTE_ONLY_RU.search(t):
-        return "в ответе «только удалённо» — владелец рассматривает и офис в Москве"
+    if set(persona.formats()) - {"remote"} and _REMOTE_ONLY_RU.search(t):
+        return "в ответе «только удалённо» — владелец рассматривает и офис (%s)" % persona.city()
     return ""
 
 

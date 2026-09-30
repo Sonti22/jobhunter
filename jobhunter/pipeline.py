@@ -16,6 +16,7 @@ from pathlib import Path
 
 from sqlalchemy import select
 
+from . import persona
 from .config import get_settings
 from .db import session_scope
 from .match.explain import MAIN_TRACKS, explain_job
@@ -152,13 +153,13 @@ def prepare_application(app_id: int,
 
         # Имя файла — по роли резюме, а не по тегу вакансии. Тег приходит от
         # источника (канал python_djangojobs ставит «Python» всему подряд), и
-        # раньше PM-резюме уезжало рекрутёру файлом Hakobyan_Python_*.pdf.
+        # раньше PM-резюме уезжало рекрутёру файлом <Фамилия>_Python_*.pdf.
         #
         # Хвост — хеш uuid, а не его первые 8 символов: у постов одного канала
         # общий префикс («tg:productjobgo/1», «tg:product_jobs/7» → оба «tg_produ»),
         # из-за чего 16 разных резюме писались в один и тот же файл и затирали
         # друг друга.
-        hint = "Hakobyan_%s_%s" % (res.cv_slug, _uid(job.external_uuid))
+        hint = "%s_%s_%s" % (persona.cv_file_prefix(), res.cv_slug, _uid(job.external_uuid))
         cv_path, cv_hash = render_cv(res.render, s.cv_out, filename_hint=hint,
                                      unique_seed=job.external_uuid)
 

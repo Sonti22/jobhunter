@@ -1020,3 +1020,81 @@ faq:
 # появляется в ЧЕРНОВИКЕ ответа, но отправляет его всё равно владелец.
 salary_expectation: ""
 
+
+# ──────────────────────────────────────────────── ТЕКСТЫ ДЛЯ РАБОТОДАТЕЛЕЙ ──
+# Всё, что бот пишет о кандидате от первого лица: тема письма, вступление,
+# формат работы, ответ «где вы и как готовы работать». Код один на всех —
+# тексты здесь (jobhunter/persona.py). Гейт правды проверяет их, как всё
+# остальное: числа и технологии — только из этого файла.
+#   {about} в теме письма человеку — «роль в компании»; {role} — роль.
+#   intros — вступления для Senior-вакансий, intros_short — если письмо
+#   не влезает в 400 знаков, intros_middle — для Middle-вакансий (без стажа).
+#   office_city_patterns — где подходит офис/гибрид (регулярные выражения).
+#   never_say — слова, которых не должно быть в автоответах.
+outreach:
+  city_ru: Москва
+  location_ru: Москва, Россия
+  location_en: Moscow, Russia
+  office_city_patterns:
+  - москв\w*
+  - \bmoscow\b
+  - метро\s+[а-яё]
+  - (?-i:\bм\.\s?[А-ЯЁ][а-яё]{3,})
+  cv_file_prefix: Hakobyan
+  subject_direct_ru: '{about} — Сурен Акопян (backend / tech lead, 7+ лет)'
+  subject_direct_en: '{about} — Suren Hakobyan (backend / tech lead, 7+ yrs)'
+  subject_apply_ru: 'Отклик: {role} — Акопян Сурен (7+ лет, backend/tech lead)'
+  subject_apply_en: 'Application: {role} — Suren Hakobyan (7+ yrs, backend/tech lead)'
+  format_line_ru: Формат — удалённо, гибрид или офис в Москве; английский C2.
+  format_line_en: 'Remote-only, please — any country works for me. English: C2.'
+  letter_tail_ru: Резюме во вложении. Работаю удалённо, в гибриде или офисе в Москве. Английский C2.
+  letter_tail_en: 'My CV is attached. I work remotely only — any country. English: C2.'
+  format_rule_llm_ru: удалённо, гибрид или офис в Москве (к переезду не готов) — и английский C2
+  format_rule_llm_en: remote-only (any country), English C2
+  format_replies_ru:
+  - 'Живу в Москве: подходит удалённый формат, гибрид или офис в Москве. К переезду не готов, командировки возможны.'
+  - Я в Москве — рассматриваю удалённую работу, гибрид или офис в Москве; переезд не рассматриваю, в командировки готов. Английский C2.
+  format_replies_en:
+  - I'm based in Moscow and work remotely; I'm not relocating, but business trips are fine. I've worked in distributed teams.
+  - I work remotely from Moscow — relocation isn't an option for me, business trips are fine. English C2, experience in distributed teams.
+  intros_ru:
+  - 7+ лет в разработке, вырос из backend-инженера в Tech Lead / архитектора.
+  - Backend-инженер с 7+ годами опыта, последние годы — Tech Lead и архитектура.
+  - 7 лет в бэкенде и продуктовых сервисах, от кода до владения требованиями.
+  - 'Семь лет в разработке: путь от инженера до технического лидера в небольшой команде.'
+  - Инженер с 7-летним стажем; сейчас отвечаю за архитектуру и требования к продукту.
+  - За 7 лет прошёл путь от backend-разработки до владения техническими решениями продукта.
+  - Работаю в разработке 7 лет, последние два года — единственный архитектор в команде.
+  intros_en:
+  - 7+ years in development, grew from backend engineer to tech lead / architect.
+  - Backend engineer with 7+ years, the last few as tech lead owning architecture.
+  - 7 years in backend and product services, from code to owning requirements.
+  - Engineer with 7 years of experience; currently responsible for architecture.
+  intros_short_ru:
+  - 7 лет в разработке, сейчас Tech Lead / архитектор.
+  - 7 лет в бэкенде, последние — Tech Lead и архитектура.
+  - Инженер, 7 лет; сейчас отвечаю за архитектуру и требования.
+  - '7 лет в разработке: от кода до владения требованиями.'
+  - Backend-инженер, 7 лет, ныне технический лидер команды.
+  intros_short_en:
+  - 7 years in development, currently tech lead / architect.
+  - 7 years in backend, lately tech lead and architecture.
+  - Engineer, 7 years; now owning architecture and requirements.
+  intros_middle_ru:
+  - 'Backend-разработчик: Python, FastAPI, PostgreSQL, интеграции.'
+  - Пишу на Python, работаю с REST API, схемами данных и интеграциями.
+  - Backend-инженер, рабочий стек Python / PostgreSQL / Docker.
+  - 'Разрабатываю бэкенд-сервисы: API, база, очереди, тесты.'
+  intros_middle_en:
+  - 'Backend developer: Python, FastAPI, PostgreSQL, integrations.'
+  - I write Python and work with REST APIs, data schemas and integrations.
+  - Backend engineer, working stack Python / PostgreSQL / Docker.
+  interest_ru:
+  - Мне интересна бэкенд- и платформенная разработка в {company}, поэтому пишу вам напрямую.
+  - Хотел бы заниматься бэкендом или платформой в {company} и решил написать напрямую.
+  interest_en:
+  - I'm interested in backend and platform engineering work at {company}, so I'm writing to you directly.
+  - I'd like to work on backend or platform engineering at {company} and wanted to reach a person directly.
+  never_say:
+  - pattern: финтех|fintech
+    why: владелец велел говорить о платёжных интеграциях, не о «финтехе»

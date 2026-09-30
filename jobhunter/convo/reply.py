@@ -2,7 +2,7 @@
 
 Автоматически отвечаем только на: просьбу прислать резюме, вопрос «когда
 удобно созвониться», простое подтверждение. Всё прочее — техвопросы,
-зарплата, оффер, непонятное — уходит Сурену как NEEDS_HUMAN (защёлка).
+зарплата, оффер, непонятное — уходит владельцу как NEEDS_HUMAN (защёлка).
 """
 from __future__ import annotations
 
@@ -60,21 +60,8 @@ CALL_REPLIES_EN = [
     "Happy to talk. I'm available {slots} — does any of these work for you?",
     "Sounds good. I'm free {slots}, or feel free to suggest another time.",
 ]
-# Формат работы — как в резюме владельца (24.09): живёт в Москве, подходят
-# удалёнка, гибрид и офис в Москве; к переезду не готов, командировки — да.
-FORMAT_REPLIES = [
-    "Живу в Москве: подходит удалённый формат, гибрид или офис в Москве. "
-    "К переезду не готов, командировки возможны.",
-    "Я в Москве — рассматриваю удалённую работу, гибрид или офис в Москве; "
-    "переезд не рассматриваю, в командировки готов. Английский C2.",
-]
-# Англоязычному (зарубежному) работодателю реалистична удалёнка: переезда нет.
-FORMAT_REPLIES_EN = [
-    "I'm based in Moscow and work remotely; I'm not relocating, but business "
-    "trips are fine. I've worked in distributed teams.",
-    "I work remotely from Moscow — relocation isn't an option for me, business "
-    "trips are fine. English C2, experience in distributed teams.",
-]
+# Ответ «где вы и как готовы работать» — факт о кандидате: profile.yaml →
+# outreach.format_replies_ru / _en (jobhunter/persona.py).
 
 ACK_REPLIES_EN = [
     "Thank you! Looking forward to hearing from you.",
@@ -258,11 +245,11 @@ def plan_reply(app: Application, incoming_text: str,
         return ReplyPlan(True, rng.choice(ACK_REPLIES_EN if en else ACK_REPLIES),
                          intent=intent.label)
     if intent.label == WORK_FORMAT:
-        # Ответ известен жёстко и одинаков всегда: только удалённый формат.
-        # Шаблон, а не LLM — выдумывать тут нечего, а формулировка уже
-        # выверена и стоит в каждом холодном письме.
-        return ReplyPlan(True, rng.choice(FORMAT_REPLIES_EN if en
-                                          else FORMAT_REPLIES),
+        # Ответ известен заранее и одинаков всегда — формат кандидата из
+        # профиля. Шаблон, а не LLM — выдумывать тут нечего, а формулировка
+        # уже выверена и стоит в каждом холодном письме.
+        from .. import persona
+        return ReplyPlan(True, rng.choice(persona.pool("format_replies", "en" if en else "ru")),
                          intent=intent.label)
     if intent.label == ABOUT:
         # Выверенный владельцем текст, если он есть. Пустой faq больше не

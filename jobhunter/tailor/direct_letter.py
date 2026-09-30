@@ -17,10 +17,11 @@ import random
 import re
 from dataclasses import dataclass
 
+from .. import persona
 from ..profile import Profile, get_profile
 from .gate import DocModel, GateResult, check
 from .llm_writer import quality_problem
-from .message import INTROS, INTROS_EN, _stack_line
+from .message import _stack_line
 
 EXEC, REFERRAL = "exec", "referral"
 _RU_TLD = (".ru", ".by", ".kz", ".su", ".xn--p1ai")
@@ -37,10 +38,9 @@ WHY_ROLE_EN = [
     "I saw that {company} is hiring for {role} and decided to write to you directly.",
     "{company} has an open {role} role that matches what I do, so I'm writing to you directly.",
 ]
-WHY_COMPANY_EN = [
-    "I'm interested in backend and platform engineering work at {company}, so I'm writing to you directly.",
-    "I'd like to work on backend or platform engineering at {company} and wanted to reach a person directly.",
-]
+# Письмо без роли («чем хочу заниматься в {company}»), вступление и хвост с
+# форматом работы — факты о кандидате: profile.yaml → outreach (interest,
+# intros, letter_tail), см. jobhunter/persona.py.
 WHY_REFERRAL_EN = [
     "I saw on your {where} that your team{at_company} is hiring, so I'm writing to you directly.",
     "Your {where} says your team{at_company} is hiring — that's why I'm writing.",
@@ -54,17 +54,12 @@ ASK_REFERRAL_EN = [
     "Would you be open to referring me, or telling me how referrals work on your team?",
     "Would you be open to a referral, or could you tell me the best way to apply?",
 ]
-TAIL_EN = "My CV is attached. I work remotely only — any country. English: C2."
 OPTOUT_EN = "If this isn't relevant, just reply “no” and I won't write again."
 
 WHY_ROLE_RU = [
     "Увидел вашу вакансию «{role}» в {company} и хотел написать человеку, а не только в форму.",
     "Увидел, что {company} ищет «{role}», и решил написать вам напрямую.",
     "В {company} открыта роль «{role}», она совпадает с тем, чем я занимаюсь, — поэтому пишу напрямую.",
-]
-WHY_COMPANY_RU = [
-    "Мне интересна бэкенд- и платформенная разработка в {company}, поэтому пишу вам напрямую.",
-    "Хотел бы заниматься бэкендом или платформой в {company} и решил написать напрямую.",
 ]
 WHY_REFERRAL_RU = [
     "Увидел в вашем {where}, что ваша команда{at_company} нанимает, поэтому пишу напрямую.",
@@ -79,7 +74,6 @@ ASK_REFERRAL_RU = [
     "Готовы ли вы порекомендовать меня — или подсказать, как у вас устроены рекомендации?",
     "Возможна ли рекомендация, или подскажите, как лучше откликнуться?",
 ]
-TAIL_RU = "Резюме во вложении. Работаю удалённо, в гибриде или офисе в Москве. Английский C2."
 OPTOUT_RU = "Если письмо не по адресу — ответьте «нет», больше не напишу."
 
 
@@ -134,15 +128,16 @@ def compose(kind: str, *, company: str, role: str = "", person: str = "", jd_tex
         ask = rng.choice(ASK_REFERRAL_EN if en else ASK_REFERRAL_RU)
     else:
         pool = (WHY_ROLE_EN if en else WHY_ROLE_RU) if fmt["role"] else \
-            (WHY_COMPANY_EN if en else WHY_COMPANY_RU)
+            persona.pool("interest", lang, p)
         why = rng.choice(pool)
         ask = rng.choice(ASK_EXEC_EN if en else ASK_EXEC_RU)
-    intro = rng.choice(INTROS_EN if en else INTROS)
+    intro = rng.choice(persona.pool("intros", lang, p))
     stack = ""
     if jd_text:
         stack = _stack_line(p, score_job(role, "", jd_text, p).matched_skills, lang)
     body = " ".join(x for x in (why.format(**fmt), intro, stack) if x)
-    text = "\n\n".join([greet, body, ask, TAIL_EN if en else TAIL_RU, OPTOUT_EN if en else OPTOUT_RU])
+    text = "\n\n".join([greet, body, ask, persona.text("letter_tail", lang, p),
+                        OPTOUT_EN if en else OPTOUT_RU])
     # Гейт правды проверяет, что владелец не приписал себе лишнего. Название компании
     # и имя адресата — не заявления о навыках, но совпадают с технологиями из словаря:
     # письмо в Kong падало на «kong», а «Hi Ruby,» упало бы на «ruby» (проверка 18.09).

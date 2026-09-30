@@ -15,6 +15,7 @@ import re
 from dataclasses import dataclass
 from difflib import SequenceMatcher
 
+from .. import persona
 from ..profile import Profile, get_profile
 from ..textutil import max_similarity, norm, norm_hash
 from .gate import DocModel, GateResult, _find_terms, check
@@ -83,26 +84,17 @@ BRIDGES = [
 
 REQ_MAX = 70          # цитата требования: длиннее — не влезаем в 400 знаков
 
-# Условие владельца, которое должно стоять в КАЖДОМ письме (с 24.09, как в
-# резюме): живёт в Москве — удалённо, гибрид или офис в Москве, к переезду не
-# готов. Ставится первой же строкой после сути, а не в конце: если формат не
-# совпал, рекрутёр должен понять это раньше, чем потратит время на резюме.
-# Англоязычным (зарубежным) работодателям остаётся удалёнка: переезда нет.
-#
-# Английский C2 — из profile.yaml (languages.en.level = C2), поэтому
-# анти-фабрикация гейт пропускает: заявляем ровно то, что подтверждено
-# профилем (C2 — решение владельца 24.09, как и в резюме).
-FORMAT_LINE = "Формат — удалённо, гибрид или офис в Москве; английский C2."
-# То же условие для англоязычных вакансий. Не перевод-калька, а живая
-# формулировка; проверка _states_remote в llm_writer слово «remote» понимает.
-FORMAT_LINE_EN = "Remote-only, please — any country works for me. English: C2."
+# Условие о формате работы стоит в КАЖДОМ письме первой же строкой после сути:
+# если формат не совпал, рекрутёр должен понять это раньше, чем потратит время
+# на резюме. Текст — факт о кандидате, поэтому живёт в profile.yaml → outreach
+# (persona.text("format_line")), а не здесь.
 
 
 # ── английские пулы ────────────────────────────────────────────────────
 # Зеркала четырёх самых удачных русских скелетов, а не все девять: EN-корпус
 # начинается с нуля, и четырёх структур хватает, чтобы похожесть писем
-# держалась ниже порога. Факты те же: 7 лет, backend → tech lead, стек из
-# профиля. Ничего, что не прошло бы анти-фабрикация гейт.
+# держалась ниже порога. Факты о кандидате — из профиля (persona), стек — из
+# навыков. Ничего, что не прошло бы анти-фабрикация гейт.
 SKELETONS_EN = [
     {
         "id": "e1_role_first",
@@ -133,22 +125,6 @@ BRIDGES_EN = [
     "I've shipped this in real projects.",
 ]
 
-INTROS_EN = [
-    "7+ years in development, grew from backend engineer to tech lead / architect.",
-    "Backend engineer with 7+ years, the last few as tech lead owning architecture.",
-    "7 years in backend and product services, from code to owning requirements.",
-    "Engineer with 7 years of experience; currently responsible for architecture.",
-]
-INTROS_MIDDLE_EN = [
-    "Backend developer: Python, FastAPI, PostgreSQL, integrations.",
-    "I write Python and work with REST APIs, data schemas and integrations.",
-    "Backend engineer, working stack Python / PostgreSQL / Docker.",
-]
-INTROS_SHORT_EN = [
-    "7 years in development, currently tech lead / architect.",
-    "7 years in backend, lately tech lead and architecture.",
-    "Engineer, 7 years; now owning architecture and requirements.",
-]
 ASKS_EN = [
     "Happy to send my CV and discuss details — when works for you?",
     "If this looks relevant, I'll send my CV and we can hop on a call.",
@@ -219,23 +195,11 @@ def _clip(text: str, limit: int) -> str:
                 cut = head
     return cut.rstrip(" ,;:—-") + "…"
 
-# Для Middle-вакансий: без счётчика лет и без «Tech Lead» — тот же принцип,
-# что и в укороченном резюме. Ничего ложного, просто не выпячиваем то, что
-# читается как переквалификация.
-INTROS_MIDDLE = [
-    "Backend-разработчик: Python, FastAPI, PostgreSQL, интеграции.",
-    "Пишу на Python, работаю с REST API, схемами данных и интеграциями.",
-    "Backend-инженер, рабочий стек Python / PostgreSQL / Docker.",
-    "Разрабатываю бэкенд-сервисы: API, база, очереди, тесты.",
-]
 
-INTROS_SHORT = [
-    "7 лет в разработке, сейчас Tech Lead / архитектор.",
-    "7 лет в бэкенде, последние — Tech Lead и архитектура.",
-    "Инженер, 7 лет; сейчас отвечаю за архитектуру и требования.",
-    "7 лет в разработке: от кода до владения требованиями.",
-    "Backend-инженер, 7 лет, ныне технический лидер команды.",
-]
+# Вступления о кандидате (intros, intros_short, intros_middle) — в profile.yaml →
+# outreach. Для Middle-вакансий — без счётчика лет и без «Tech Lead», тот же
+# принцип, что и в укороченном резюме: не выпячиваем то, что читается как
+# переквалификация.
 ASKS_SHORT = [
     "Актуально? Пришлю резюме.",
     "Вакансия открыта? Готов прислать резюме.",
@@ -244,15 +208,6 @@ ASKS_SHORT = [
     "Готов обсудить. Когда вам удобно?",
 ]
 
-INTROS = [
-    "7+ лет в разработке, вырос из backend-инженера в Tech Lead / архитектора.",
-    "Backend-инженер с 7+ годами опыта, последние годы — Tech Lead и архитектура.",
-    "7 лет в бэкенде и продуктовых сервисах, от кода до владения требованиями.",
-    "Семь лет в разработке: путь от инженера до технического лидера в небольшой команде.",
-    "Инженер с 7-летним стажем; сейчас отвечаю за архитектуру и требования к продукту.",
-    "За 7 лет прошёл путь от backend-разработки до владения техническими решениями продукта.",
-    "Работаю в разработке 7 лет, последние два года — единственный архитектор в команде.",
-]
 ASKS = [
     "Готов прислать резюме и обсудить детали — когда удобно?",
     "Если интересно — пришлю резюме и созвонимся, подскажите удобное время.",
@@ -501,10 +456,10 @@ def generate(role: str, jd_text: str, score, profile: Profile | None = None,
 
     # Языковые пулы выбираются один раз: смешение русской интро с английским
     # аском — верный способ выглядеть автоматом.
-    fmt_line = FORMAT_LINE_EN if en else FORMAT_LINE
-    pool_intros = INTROS_EN if en else INTROS
-    pool_intros_mid = INTROS_MIDDLE_EN if en else INTROS_MIDDLE
-    pool_intros_short = INTROS_SHORT_EN if en else INTROS_SHORT
+    fmt_line = persona.text("format_line", lang, p)
+    pool_intros = persona.pool("intros", lang, p)
+    pool_intros_mid = persona.pool("intros_middle", lang, p)
+    pool_intros_short = persona.pool("intros_short", lang, p)
     pool_asks = ASKS_EN if en else ASKS
     pool_asks_short = ASKS_SHORT_EN if en else ASKS_SHORT
     pool_bridges = BRIDGES_EN if en else BRIDGES

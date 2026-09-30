@@ -33,7 +33,8 @@ x-common: &common
     LOG_DIR: /out/logs
     CV_OUT: /out/cv_out
     SENT_ARCHIVE_DIR: /out/logs/sent
-    BASE_CV_PATH: /app/cv_base/Акопян_Сурен_Python.pdf
+    # Резюме-оригинал в папке cv_base/ (имя файла — BASE_CV_FILE в .env).
+    BASE_CV_PATH: /app/cv_base/${BASE_CV_FILE:-resume.pdf}
   volumes:
     - jobhunter-data:/data
     - ./out:/out

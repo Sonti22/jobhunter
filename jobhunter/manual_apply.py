@@ -18,6 +18,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy import or_, select
 
+from . import persona
 from .config import get_settings
 from .db import session_scope
 from .match.scorer import score_job
@@ -105,7 +106,7 @@ def build_cvs(top: int = 20, verbose: bool = True) -> list:
             import hashlib
             tail = (job.company_name or "").replace("/", "").replace(" ", "")[:20] \
                 or hashlib.sha1((job.external_uuid or "").encode()).hexdigest()[:8]
-            hint = "Hakobyan_%s_%s" % (res.cv_slug, tail)
+            hint = "%s_%s_%s" % (persona.cv_file_prefix(), res.cv_slug, tail)
             path, digest = render_cv(res.render, s.cv_out, filename_hint=hint,
                                      unique_seed=job.external_uuid)
             a.cv_path, a.cv_sha256, a.cv_lang = path, digest, res.lang

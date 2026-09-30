@@ -5,9 +5,10 @@
 уровень нужен потому, что 29% собранных вакансий формат не указывают: их не
 режем, но рекрутёр узнаёт ограничение из первой же строки, а не после созвона.
 """
+from jobhunter import persona
 from jobhunter.match import workformat
 from jobhunter.match.scorer import score_job
-from jobhunter.tailor.message import FORMAT_LINE, generate
+from jobhunter.tailor.message import generate
 
 PY_JD = ("Требуется Python-разработчик. Опыт работы с FastAPI, PostgreSQL, "
          "Docker и Kubernetes. Проектирование архитектуры сервисов.")
@@ -53,7 +54,7 @@ def test_moscow_office_is_recommended_since_24_09():
         moscow = score_job("Python-разработчик", "", PY_JD + text)
         assert not moscow.onsite_only, text
         assert moscow.recommend, text
-        assert "Москве — подходит" in moscow.reason
+        assert "Москва — подходит" in moscow.reason
 
 
 def test_office_elsewhere_or_relocation_is_not_recommended():
@@ -85,7 +86,7 @@ def test_letter_always_states_the_constraint():
     for seed in ("a1", "b2", "c3", "d4", "e5"):
         msg = generate("Python-разработчик", PY_JD, score, seed_str=seed,
                        source="ваш пост в @pyjobs")
-        assert FORMAT_LINE in msg.text, "условие пропало при seed=%s" % seed
+        assert persona.text("format_line") in msg.text, "условие пропало при seed=%s" % seed
         assert "удал" in msg.text.lower()
         assert "C2" in msg.text
 

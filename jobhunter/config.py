@@ -51,6 +51,10 @@ class Settings(BaseSettings):
     telegram_api_hash: str = Field(default="")
     telegram_phone: str = Field(default="")
     telegram_session_path: str = Field(default="jobhunter.session")
+    # Холодные сообщения рекрутёрам с личного аккаунта. По умолчанию выключены:
+    # по жалобам получателей Telegram ограничивает аккаунт (@SpamBot). Ответы
+    # тем, кто написал первым, и сбор вакансий из каналов работают и без этого.
+    telegram_cold_enabled: bool = Field(default=False)
     # Публичная лента t.me: читаем несколько страниц за проход и повторяем
     # проходы в течение дня. Это не история всего канала, но существенно
     # уменьшает окно, в котором новая вакансия может быть пропущена.
@@ -139,7 +143,7 @@ class Settings(BaseSettings):
     # Не отвечать, если сами писали недавно: петля из двух автоответчиков
     # сходится к этому интервалу на итерацию и гасится лимитом ответов.
     email_reply_min_gap_min: int = Field(default=30)
-    # Соль для подписи в plus-адресе (suren6pro+jh42xABC123@gmail.com).
+    # Соль для подписи в plus-адресе (you+jh42xABC123@gmail.com).
     # Пусто — подпись считается от api-hash, лишь бы не была предсказуемой.
     mail_bind_secret: str = Field(default="")
 
@@ -188,7 +192,8 @@ class Settings(BaseSettings):
     smtp_port: int = Field(default=587)
     smtp_user: str = Field(default="")
     smtp_app_password: str = Field(default="")
-    smtp_from_name: str = Field(default="Suren Hakobyan")
+    # Пусто — имя латиницей из profile.yaml (identity.full_name_en).
+    smtp_from_name: str = Field(default="")
     # Цель прогрева. Фактический потолок дня — policy.email_daily_cap: старт с
     # email_warmup_start и +email_warmup_step за каждый день без отбивок.
     email_daily_limit: int = Field(default=80)
