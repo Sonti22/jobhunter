@@ -75,7 +75,7 @@ def test_day_before_reminder_has_context(db):
     now = datetime.now(timezone.utc)
     _interview(db, when=now + timedelta(hours=24),
                link="https://calendar.google.com/event?eid=abc",
-               cv="cv_base/Акопян_Сурен_Python.pdf")
+               cv="cv_base/Смирнов_Алексей_Python.pdf")
 
     kinds = {k: t for _, k, t in upcoming(now)}
     assert "iv24" in kinds
@@ -85,7 +85,7 @@ def test_day_before_reminder_has_context(db):
     assert "@hr_acme" in text
     assert "calendar.google.com" in text
     assert "Подготовиться" in text, "план подготовки — половина пользы"
-    assert "Акопян" in text, "напомнить, каким резюме откликались"
+    assert "Смирнов" in text, "напомнить, каким резюме откликались"
 
 
 def test_hour_before_is_short(db):

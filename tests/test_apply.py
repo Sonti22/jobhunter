@@ -109,7 +109,7 @@ def test_identity_is_filled_money_is_not(db, monkeypatch):
     spec = _spec_from_fixture(monkeypatch)
     answers, unresolved = answer_all(spec)
     filled = {a.label: a.value for a in answers}
-    assert filled.get("First Name") == "Suren"
+    assert filled.get("First Name") == "Alexey"
     assert "@" in filled.get("Email", "")
     labels_left = [f.label for f in unresolved]
     assert any("salary" in l.lower() for l in labels_left), \

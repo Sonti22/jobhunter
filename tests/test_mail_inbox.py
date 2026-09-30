@@ -15,7 +15,7 @@ import pytest
 @pytest.fixture(scope="module")
 def db(tmp_path_factory):
     os.environ["DB_PATH"] = str(tmp_path_factory.mktemp("db") / "inbox.db")
-    os.environ["SMTP_USER"] = "suren6pro@gmail.com"
+    os.environ["SMTP_USER"] = "a.smirnov@gmail.com"
     os.environ["SMTP_APP_PASSWORD"] = "test-pass"
     os.environ["LLM_ENABLED"] = "false"
     os.environ["GCAL_ENABLED"] = "false"
@@ -168,7 +168,7 @@ def _mail(*, frm, subject, body, message_id="<x@acme.ru>", extra="",
     """
     ctype = ("Content-Type: text/plain; charset=\"%s\"\r\n" % charset
              if charset else "")
-    headers = ("Message-ID: %s\r\nFrom: %s\r\nTo: suren6pro@gmail.com\r\n"
+    headers = ("Message-ID: %s\r\nFrom: %s\r\nTo: a.smirnov@gmail.com\r\n"
                "Subject: %s\r\nDate: Tue, 26 Aug 2026 10:12:00 +0300\r\n%s%s\r\n"
                % (message_id, frm, subject, ctype, extra)).encode()
     full = headers + ("\r\n" + body).encode("utf-8")
@@ -287,7 +287,7 @@ def test_quoted_history_not_classified(db, app_id, imap):
     from jobhunter.models import Message
 
     body = ("Спасибо, посмотрю.\r\n\r\n"
-            "вт, 26 авг. 2026 г. в 10:12, Suren <suren6pro@gmail.com> написал:\r\n"
+            "вт, 26 авг. 2026 г. в 10:12, Alexey <a.smirnov@gmail.com> написал:\r\n"
             "> Мне удобно: пн 26.08 в 11:00 (UTC+3); ср 28.08 в 16:00.\r\n")
     imap["make"]({11: _mail(frm="hr@acme.ru", subject="Re: Отклик", body=body)})
     asyncio.run(process())
@@ -313,7 +313,7 @@ def test_undeclared_charset_still_cleaned(db, app_id, imap):
     from jobhunter.models import Message
 
     body = ("Спасибо, посмотрю.\r\n\r\n"
-            "вт, 26 авг. 2026 г. в 10:12, Suren <suren6pro@gmail.com> написал:\r\n"
+            "вт, 26 авг. 2026 г. в 10:12, Alexey <a.smirnov@gmail.com> написал:\r\n"
             "> Мне удобно: пн 26.08 в 11:00 (UTC+3).\r\n")
     imap["make"]({12: _mail(frm="hr@acme.ru", subject="Re: Отклик",
                             body=body, charset=None)})

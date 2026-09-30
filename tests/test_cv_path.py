@@ -41,9 +41,9 @@ def test_broken_path_falls_back_to_base(cv):
 def test_file_found_in_current_cv_out(cv):
     """Подогнанное резюме переехало вместе с каталогом — находим по имени."""
     from jobhunter.tailor.render import resolve_cv
-    tailored = cv["out"] / "Hakobyan_Backend_ab12.pdf"
+    tailored = cv["out"] / "Smirnov_Backend_ab12.pdf"
     tailored.write_bytes(b"%PDF-1.4 tailored")
-    broken = "D:/old/place/Hakobyan_Backend_ab12.pdf"
+    broken = "D:/old/place/Smirnov_Backend_ab12.pdf"
     assert resolve_cv(broken) == str(tailored)
 
 

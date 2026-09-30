@@ -13,7 +13,7 @@ profile.yaml. Любой hard-фейл → документ не может уй
         ...
       ],
       free_text="...",             # доп. текст письма вне буллетов (для DM)
-      companies=["1xbet", ...],    # названия компаний, упомянутые в документе
+      companies=["Acme", ...],     # названия компаний, упомянутые в документе
     )
 
 Термины технологий детектируются ТОЛЬКО по фиксированному lexicon/tech_terms.txt.
@@ -184,7 +184,7 @@ def check(doc: DocModel, jd_text: str = "", profile: Profile | None = None,
     for term in composed_terms:                  # unknown — только сочинённое
         if term in p.forbidden_terms:
             continue
-        if term not in p.allowed_terms:
+        if term not in p.allowed_terms and term not in p.location_terms:
             res.failures.append(Failure("lexicon.unknown", "hard", term,
                                         "технология вне профиля (в сочинённом тексте)"))
 

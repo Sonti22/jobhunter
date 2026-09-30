@@ -1,0 +1,1482 @@
+# ═════════════════════════════════════════════════════════════════════════════
+#  ПРОФИЛЬ КАНДИДАТА — ПРИМЕР (вымышленный человек: Алексей Смирнов)
+#
+#  Скопируйте файл в profile.yaml и перепишите под себя:
+#      cp profile.example.yaml profile.yaml
+#
+#  Это ЕДИНСТВЕННЫЙ источник правды о вас. Генератор резюме и писем может
+#  только выбирать и переформулировать то, что лежит здесь. Добавить он не
+#  может: гейт правды (jobhunter/tailor/gate.py) блокирует любую технологию,
+#  число или компанию, которых нет в этом файле. Чем честнее и подробнее
+#  профиль — тем лучше письма.
+#
+#  profile.yaml в .gitignore: в репозиторий он не попадает. Не коммитьте его.
+#  Проверить файл после правки:  python validate_profile.py
+#  Подробно по каждому разделу:   docs/PROFILE.md
+# ═════════════════════════════════════════════════════════════════════════════
+
+# ── meta ─────────────────────────────────────────────────────────────────────
+# timeline_start — с какого месяца считать общий стаж (ГГГГ-ММ).
+meta:
+  version: 1
+  source_document: resume.pdf
+  updated_at: '2026-09-30'
+  compiled_at: '2026-09-30'
+  timeline_start: 2019-01
+
+# ── identity: кто вы ─────────────────────────────────────────────────────────
+# Контакты попадают в шапку резюме. work_formats: remote / hybrid_<город> /
+# office_<город> — важна только первая часть (remote, hybrid, office).
+# relocation: true — подходит офис в любом городе; false — только ваш город
+# (outreach.office_city_patterns ниже).
+# headline_variants — заголовки резюме. Генератор выбирает ТОЛЬКО из списка.
+identity:
+  full_name_ru: Смирнов Алексей Викторович
+  full_name_en: Alexey Smirnov
+  birth_date: '1996-05-14'
+  location: Москва, Россия
+  citizenship: Россия
+  work_authorization: Гражданство РФ
+  relocation: false
+  business_trips: true
+  work_formats:
+  - remote
+  - hybrid_moscow
+  - office_moscow
+  phone: +7 (900) 000-00-00
+  email: alexey.smirnov@example.com
+  telegram: https://t.me/example_candidate
+  headline_variants:
+  - Senior Technical Product Manager
+  - Technical Product Manager
+  - Technical Product Manager / Tech Lead
+  - Tech Lead / Software Architect
+  - Senior Backend Engineer / Tech Lead
+  - Senior Backend Engineer (Python)
+  - DevOps / Platform Engineer
+  - Infrastructure Engineer
+  - Backend Engineer / ML Systems Integrator
+  - Python Engineer (ML/CV systems)
+  - Data Engineer (Python / SQL)
+  - Systems Analyst / Requirements Engineer
+  - QA Automation Engineer (Python)
+  - Engineering Manager / Tech Lead
+  - Project Manager (Tech)
+
+# ── languages ────────────────────────────────────────────────────────────────
+# Уровень английского (code: en) попадает в письма («English: C2»).
+languages:
+- code: ru
+  name_ru: Русский
+  name_en: Russian
+  level: C2
+  note: родной
+- code: en
+  name_ru: Английский
+  name_en: English
+  level: C2
+
+# ── education ────────────────────────────────────────────────────────────────
+education:
+- id: edu_1
+  institution_ru: Северный политехнический институт
+  institution_en: Northern Polytechnic Institute
+  city: Москва
+  degree_ru: Высшее
+  degree_en: Higher education
+  field_ru: Прикладная информатика
+  field_en: Applied Computer Science
+  year: 2019
+
+# ── skills: навыки ───────────────────────────────────────────────────────────
+# level: expert | working | familiar | none
+#   expert   — многолетнее ежедневное использование, защитите на интервью
+#   working  — уверенно решали реальные задачи
+#   familiar — трогали; нельзя в заголовок и рядом с «глубокий/экспертный»
+#   none     — НЕ использовали; упоминание в тексте — отказ гейта
+# aliases — как навык пишут в вакансиях. years — не больше стажа, где он был.
+# evidence_ids — id мест работы (experience), где навык применялся.
+skills:
+- id: python
+  canonical: Python
+  aliases:
+  - python3
+  - py
+  - cpython
+  level: expert
+  years: 7
+  evidence_ids:
+  - exp_gamedev
+  - exp_vision
+  - exp_hrtech
+  - exp_platform
+  - exp_rnd_voice
+- id: bash
+  canonical: Bash
+  aliases:
+  - shell
+  - sh
+  level: working
+  years: 3
+  evidence_ids:
+  - exp_gamedev
+  - exp_vision
+- id: sql
+  canonical: SQL
+  aliases: []
+  level: expert
+  years: 3
+  evidence_ids:
+  - exp_gamedev
+  - exp_hrtech
+- id: css
+  canonical: CSS
+  aliases: []
+  level: familiar
+  years: 1
+  evidence_ids:
+  - exp_hrtech
+- id: fastapi
+  canonical: FastAPI
+  aliases: []
+  level: expert
+  years: 5
+  evidence_ids:
+  - exp_gamedev
+  - exp_hrtech
+  - exp_rnd_voice
+- id: django
+  canonical: Django
+  aliases:
+  - django framework
+  - django rest framework
+  - drf
+  level: expert
+  years: 3
+  evidence_ids:
+  - exp_gamedev
+  - exp_hrtech
+- id: sqlalchemy
+  canonical: SQLAlchemy
+  aliases: []
+  level: working
+  years: 1
+  evidence_ids:
+  - exp_hrtech
+- id: pytest
+  canonical: PyTest
+  aliases:
+  - pytest
+  level: expert
+  years: 5
+  evidence_ids:
+  - exp_gamedev
+  - exp_vision
+  - exp_hrtech
+- id: asyncio
+  canonical: asyncio
+  aliases:
+  - async/await
+  - асинхронный python
+  level: expert
+  years: 3
+  evidence_ids:
+  - exp_gamedev
+  - exp_vision
+- id: alembic
+  canonical: Alembic
+  aliases: []
+  level: working
+  years: 2
+  evidence_ids:
+  - exp_gamedev
+- id: postgresql
+  canonical: PostgreSQL
+  aliases:
+  - postgres
+  - psql
+  level: expert
+  years: 5
+  evidence_ids:
+  - exp_gamedev
+  - exp_vision
+  - exp_hrtech
+- id: mongodb
+  canonical: MongoDB
+  aliases:
+  - mongo
+  - nosql
+  level: working
+  years: 5
+  evidence_ids:
+  - exp_gamedev
+  - exp_vision
+  - exp_rnd_voice
+- id: redis
+  canonical: Redis
+  aliases: []
+  level: working
+  years: 3
+  evidence_ids:
+  - exp_gamedev
+  - exp_rnd_voice
+- id: rest_api
+  canonical: REST API
+  aliases:
+  - rest
+  - restful
+  level: expert
+  years: 3
+  evidence_ids:
+  - exp_gamedev
+  - exp_hrtech
+- id: openapi
+  canonical: OpenAPI
+  aliases:
+  - swagger
+  level: expert
+  years: 2
+  evidence_ids:
+  - exp_gamedev
+- id: grpc
+  canonical: gRPC
+  aliases: []
+  level: working
+  years: 2
+  evidence_ids:
+  - exp_gamedev
+- id: graphql
+  canonical: GraphQL
+  aliases:
+  - graphql subscriptions
+  level: working
+  years: 3
+  evidence_ids:
+  - exp_vision
+  - exp_hrtech
+- id: websocket
+  canonical: WebSocket
+  aliases:
+  - websockets
+  level: working
+  years: 3
+  evidence_ids:
+  - exp_hrtech
+  - exp_rnd_voice
+- id: webhooks
+  canonical: Webhooks
+  aliases:
+  - вебхуки
+  - вебхук
+  level: working
+  years: 3
+  evidence_ids:
+  - exp_gamedev
+  - exp_hrtech
+- id: stripe
+  canonical: Stripe
+  aliases: []
+  level: working
+  years: 2
+  evidence_ids:
+  - exp_gamedev
+- id: paypal
+  canonical: PayPal
+  aliases: []
+  level: working
+  years: 2
+  evidence_ids:
+  - exp_gamedev
+- id: s3
+  canonical: S3
+  aliases:
+  - amazon s3
+  - object storage
+  level: working
+  years: 2
+  evidence_ids:
+  - exp_gamedev
+- id: rabbitmq
+  canonical: RabbitMQ
+  aliases: []
+  level: working
+  years: 3
+  evidence_ids:
+  - exp_gamedev
+  - exp_vision
+- id: kafka
+  canonical: Kafka
+  aliases:
+  - apache kafka
+  level: working
+  years: 3
+  evidence_ids:
+  - exp_gamedev
+  - exp_vision
+- id: docker
+  canonical: Docker
+  aliases:
+  - docker-compose
+  - контейнеризация
+  level: expert
+  years: 5
+  evidence_ids:
+  - exp_gamedev
+  - exp_vision
+  - exp_hrtech
+- id: kubernetes
+  canonical: Kubernetes
+  aliases:
+  - k8s
+  - helm
+  - кубер
+  level: working
+  years: 2
+  evidence_ids:
+  - exp_gamedev
+- id: gitlab_ci
+  canonical: GitLab CI
+  aliases:
+  - gitlab-ci
+  - gitlab ci/cd
+  level: expert
+  years: 5
+  evidence_ids:
+  - exp_gamedev
+  - exp_vision
+  - exp_hrtech
+- id: jenkins
+  canonical: Jenkins
+  aliases: []
+  level: working
+  years: 1
+  evidence_ids:
+  - exp_vision
+- id: azure_devops
+  canonical: Azure DevOps
+  aliases:
+  - azure
+  - azure pipelines
+  - azure devops pipelines
+  level: working
+  years: 1
+  evidence_ids:
+  - exp_vision
+- id: linux
+  canonical: Linux
+  aliases: []
+  level: expert
+  years: 3
+  evidence_ids:
+  - exp_gamedev
+  - exp_vision
+- id: git
+  canonical: Git
+  aliases:
+  - github
+  - gitlab
+  level: expert
+  years: 5
+  evidence_ids:
+  - exp_gamedev
+  - exp_vision
+  - exp_hrtech
+- id: kibana
+  canonical: Kibana
+  aliases:
+  - elk
+  - elasticsearch
+  level: working
+  years: 2
+  evidence_ids:
+  - exp_gamedev
+- id: prometheus
+  canonical: Prometheus
+  aliases: []
+  level: working
+  years: 1
+  evidence_ids:
+  - exp_vision
+- id: grafana
+  canonical: Grafana
+  aliases: []
+  level: working
+  years: 1
+  evidence_ids:
+  - exp_vision
+- id: profiling
+  canonical: Профилирование
+  aliases:
+  - py-spy
+  - cprofile
+  - torch.profiler
+  - nsight systems
+  level: working
+  years: 3
+  evidence_ids:
+  - exp_gamedev
+  - exp_vision
+- id: microservices
+  canonical: Микросервисы
+  aliases:
+  - microservices
+  - распределённые системы
+  - distributed systems
+  level: expert
+  years: 6
+  evidence_ids:
+  - exp_gamedev
+  - exp_vision
+  - exp_hrtech
+  - exp_platform
+- id: ddd
+  canonical: DDD
+  aliases:
+  - domain-driven design
+  level: working
+  years: 1
+  evidence_ids:
+  - exp_platform
+- id: cqrs
+  canonical: CQRS
+  aliases: []
+  level: working
+  years: 1
+  evidence_ids:
+  - exp_platform
+- id: event_sourcing
+  canonical: Event Sourcing
+  aliases: []
+  level: working
+  years: 1
+  evidence_ids:
+  - exp_platform
+- id: saga
+  canonical: Saga
+  aliases:
+  - saga pattern
+  level: working
+  years: 1
+  evidence_ids:
+  - exp_platform
+- id: algorithms
+  canonical: Алгоритмы и структуры данных
+  aliases:
+  - algorithms
+  - data structures
+  level: working
+  years: 2
+  evidence_ids:
+  - exp_gamedev
+- id: agile
+  canonical: Agile
+  aliases:
+  - scrum
+  - спринты
+  - груминг
+  - ретро
+  level: expert
+  years: 6
+  evidence_ids:
+  - exp_gamedev
+  - exp_vision
+  - exp_hrtech
+  - exp_platform
+- id: code_review
+  canonical: Code Review
+  aliases:
+  - ревью кода
+  - mr review
+  level: expert
+  years: 6
+  evidence_ids:
+  - exp_gamedev
+  - exp_vision
+  - exp_hrtech
+  - exp_platform
+- id: tdd
+  canonical: TDD
+  aliases:
+  - test-driven development
+  level: working
+  years: 1
+  evidence_ids:
+  - exp_vision
+- id: mentoring
+  canonical: Менторинг
+  aliases:
+  - mentoring
+  - наставничество
+  level: working
+  years: 2
+  evidence_ids:
+  - exp_gamedev
+  - exp_platform
+- id: tech_docs
+  canonical: Техническая документация
+  aliases:
+  - adr
+  - архитектурная документация
+  - диаграммы
+  level: working
+  years: 1
+  evidence_ids:
+  - exp_platform
+- id: prioritization
+  canonical: Приоритизация
+  aliases:
+  - оценка и приоритизация задач
+  - prioritization
+  - backlog
+  - груминг бэклога
+  - приоритизация задач
+  level: working
+  years: 2
+  evidence_ids:
+  - exp_platform
+  - exp_hrtech
+- id: planning
+  canonical: Планирование
+  aliases:
+  - стратегическое планирование
+  - тактическое планирование
+  - planning
+  - планирование спринтов
+  - sprint planning
+  level: working
+  years: 2
+  evidence_ids:
+  - exp_platform
+  - exp_hrtech
+- id: stakeholder_mgmt
+  canonical: Работа со стейкхолдерами
+  aliases:
+  - stakeholder
+  - stakeholder management
+  - коммуникация с бизнесом
+  - работа с бизнесом
+  - нетехническая аудитория
+  level: working
+  years: 2
+  evidence_ids:
+  - exp_platform
+  - exp_vision
+- id: risk_mgmt
+  canonical: Управление рисками и техдолгом
+  aliases:
+  - управление рисками
+  - управление техническим долгом
+  - техдолг
+  - risk management
+  - technical debt
+  level: working
+  years: 1
+  evidence_ids:
+  - exp_platform
+- id: team_leadership
+  canonical: Техническое лидерство
+  aliases:
+  - team leadership
+  - техническое лидерство
+  - координация команды
+  - распределение задач
+  - tech lead
+  level: working
+  years: 2
+  evidence_ids:
+  - exp_platform
+  - exp_hrtech
+- id: requirements
+  canonical: Работа с требованиями
+  aliases:
+  - требования
+  - технические требования
+  - requirements
+  - согласование требований
+  - формирование требований
+  - спецификация
+  - спецификации
+  level: working
+  years: 4
+  evidence_ids:
+  - exp_vision
+  - exp_hrtech
+  - exp_platform
+- id: opencv
+  canonical: OpenCV
+  aliases: []
+  level: working
+  years: 1
+  evidence_ids:
+  - exp_vision
+- id: yolov8
+  canonical: Ultralytics YOLOv8
+  aliases:
+  - yolo
+  - yolov8
+  level: working
+  years: 1
+  evidence_ids:
+  - exp_vision
+- id: tracking
+  canonical: ByteTrack/DeepSORT
+  aliases:
+  - bytetrack
+  - deepsort
+  level: familiar
+  years: 1
+  evidence_ids:
+  - exp_vision
+- id: video_pipeline
+  canonical: RTSP/FFmpeg/GStreamer
+  aliases:
+  - rtsp
+  - ffmpeg
+  - gstreamer
+  - video ingest
+  level: working
+  years: 3
+  evidence_ids:
+  - exp_vision
+  - exp_hrtech
+- id: cuda
+  canonical: CUDA/TensorRT
+  aliases:
+  - cuda
+  - tensorrt
+  - gpu инференс
+  level: familiar
+  years: 1
+  evidence_ids:
+  - exp_vision
+- id: classic_ml
+  canonical: Классическое машинное обучение
+  aliases:
+  - classic ml
+  - machine learning
+  level: familiar
+  years: 1
+  evidence_ids:
+  - exp_vision
+- id: llm_stack
+  canonical: LLM-инференс
+  aliases:
+  - vllm
+  - openai
+  - openai api
+  - gpt
+  - prompt-тюнинг
+  - langchain
+  level: working
+  years: 1
+  evidence_ids:
+  - exp_rnd_voice
+- id: speech
+  canonical: STT/TTS
+  aliases:
+  - whisper
+  - elevenlabs
+  - speech-to-text
+  - text-to-speech
+  level: working
+  years: 1
+  evidence_ids:
+  - exp_rnd_voice
+- id: n8n
+  canonical: n8n
+  aliases: []
+  level: working
+  years: 1
+  evidence_ids:
+  - exp_rnd_voice
+- id: mcp
+  canonical: MCP
+  aliases:
+  - model context protocol
+  level: familiar
+  years: 1
+  evidence_ids:
+  - exp_rnd_voice
+- id: nginx
+  canonical: Nginx
+  aliases: []
+  level: working
+  years: 1
+  evidence_ids:
+  - exp_platform
+- id: clickhouse
+  canonical: ClickHouse
+  aliases: []
+  level: working
+  years: 1
+  evidence_ids:
+  - exp_platform
+- id: elasticsearch
+  canonical: Elasticsearch
+  aliases:
+  - elastic
+  - elk
+  level: working
+  years: 1
+  evidence_ids:
+  - exp_platform
+- id: react
+  canonical: React
+  aliases: []
+  level: familiar
+  years: 1
+  evidence_ids:
+  - exp_platform
+- id: aws
+  canonical: AWS
+  aliases:
+  - amazon web services
+  level: familiar
+  years: 1
+  evidence_ids:
+  - exp_platform
+  - exp_gamedev
+- id: helm
+  canonical: Helm
+  aliases: []
+  level: working
+  years: 2
+  evidence_ids:
+  - exp_gamedev
+
+# ── experience: опыт ─────────────────────────────────────────────────────────
+# Каждый пункт (bullet) — факт, который бот может процитировать. skills —
+# какие навыки он подтверждает, metrics — числа, которые разрешено называть
+# (любое другое число в письме гейт отклонит). is_own_project: true — свой
+# проект, а не найм: бот так и пишет.
+experience:
+- id: exp_platform
+  company: Nordlane
+  role_ru: Tech Lead / Software Architect
+  role_en: Tech Lead / Software Architect
+  start: 2025-09
+  end: null
+  is_current: true
+  team_size_note: маленькая команда, единственный архитектор
+  bullets:
+  - id: b_plt_1
+    text_ru: 'Прорабатывал multi-worker архитектуру мессенджер-сервера: группы workers для разных типов нагрузки,
+      маршрутизация через Nginx и независимое горизонтальное масштабирование bottleneck-компонентов.'
+    text_en: 'Designed the multi-worker мессенджер-сервера architecture: worker groups per load type, routing through
+      Nginx, and independent horizontal scaling of bottleneck components.'
+    skills:
+    - nginx
+    - microservices
+    - python
+    metrics: []
+  - id: b_plt_2
+    text_ru: Проектировал topology PostgreSQL + Redis, сценарии деградации и поведение workers при отказе критических
+      зависимостей.
+    text_en: Designed the PostgreSQL + Redis topology, degradation scenarios, and worker behaviour on failure of
+      critical dependencies.
+    skills:
+    - postgresql
+    - redis
+    - microservices
+    metrics: []
+  - id: b_plt_3
+    text_ru: Закладывал bounded queues и backpressure, чтобы при всплесках нагрузки очереди не росли бесконтрольно
+      до OOM.
+    text_en: Built in bounded queues and backpressure so that load spikes could not grow queues uncontrollably into
+      OOM.
+    skills:
+    - microservices
+    - profiling
+    metrics: []
+  - id: b_plt_4
+    text_ru: 'Реализовывал fail-fast / no silent degradation: health/degraded состояния, 503 при невозможности безопасно
+      обслуживать запросы и понятные сигналы для балансировщика и мониторинга.'
+    text_en: 'Implemented fail-fast / no-silent-degradation: health/degraded states, 503 when requests cannot be
+      served safely, and clear signals for the load balancer and monitoring.'
+    skills:
+    - nginx
+    - prometheus
+    - microservices
+    metrics:
+    - value: '503'
+      unit: http_status
+      claim: код ответа, когда сервис не может безопасно обслужить запрос
+  - id: b_plt_5
+    text_ru: 'Настраивал observability: requests/sec, error rate, p50/p95/p99, worker utilisation, queue saturation,
+      PostgreSQL/Redis health и сквозные trace_id.'
+    text_en: 'Set up observability: requests/sec, error rate, p50/p95/p99, worker utilisation, queue saturation,
+      PostgreSQL/Redis health, and end-to-end trace_id.'
+    skills:
+    - prometheus
+    - grafana
+    - profiling
+    metrics: []
+  - id: b_plt_6
+    text_ru: Организовал deterministic unit/integration tests, E2E-проверки основных пользовательских сценариев,
+      runbooks и rollback-сценарии.
+    text_en: Established deterministic unit/integration tests, E2E checks of the core user flows, runbooks, and
+      rollback scenarios.
+    skills:
+    - pytest
+    - tdd
+    metrics: []
+  - id: b_plt_7
+    text_ru: 'Разрабатывал Integration Manager на FastAPI + React: registry приложений, permissions, allow/deny
+      policy, security validation и административные ограничения.'
+    text_en: 'Built the Integration Manager on FastAPI + React: application registry, permissions, allow/deny policy,
+      security validation, and administrative restrictions.'
+    skills:
+    - fastapi
+    - react
+    - rest_api
+    - python
+    metrics: []
+  - id: b_plt_8
+    text_ru: Проектировал API и интеграции с учётом таймаутов, повторных вызовов, безопасной деградации и контроля
+      доступа.
+    text_en: Designed APIs and integrations around timeouts, retries, safe degradation, and access control.
+    skills:
+    - rest_api
+    - openapi
+    metrics: []
+  - id: b_plt_9
+    text_ru: Координировал команду, распределял задачи, проводил code review, участвовал в планировании спринтов,
+      наставлял разработчиков и взаимодействовал с Product Manager и бизнесом.
+    text_en: Coordinated the team, distributed tasks, ran code reviews, took part in sprint planning, mentored developers,
+      and worked with the Product Manager and the business.
+    skills:
+    - team_leadership
+    - code_review
+    - mentoring
+    - agile
+    - stakeholder_mgmt
+    metrics: []
+  - id: b_plt_10
+    text_ru: Вёл архитектурную и техническую документацию; контролировал технический долг, риски и соответствие
+      best practices.
+    text_en: Maintained architecture and technical documentation; kept technical debt, risks, and best-practice
+      compliance under control.
+    skills:
+    - tech_docs
+    - risk_mgmt
+    metrics: []
+  - id: b_plt_11
+    text_ru: AWS/S3 и облачные backend-сценарии; ClickHouse для хранения и аналитической агрегации событий и технических
+      метрик.
+    text_en: AWS/S3 and cloud backend scenarios; ClickHouse for storage and analytical aggregation of events and
+      technical metrics.
+    skills:
+    - s3
+    - clickhouse
+    metrics: []
+  - id: b_plt_12
+    text_ru: Elasticsearch/Kibana для поиска по логам и расследования инцидентов; GraphQL API и subscriptions для
+      real-time сценариев.
+    text_en: Elasticsearch/Kibana for log search and incident investigation; GraphQL API and subscriptions for real-time
+      scenarios.
+    skills:
+    - elasticsearch
+    - kibana
+    - graphql
+    metrics: []
+  - id: b_plt_13
+    text_ru: Linux/Bash для диагностики процессов и ресурсов, journalctl/systemd и автоматизации operational-задач
+      и CI/CD.
+    text_en: Linux/Bash for process and resource diagnostics, journalctl/systemd, and automation of operational
+      and CI/CD tasks.
+    skills:
+    - linux
+    metrics: []
+  company_en: Nordlane
+- id: exp_hrtech
+  company: StaffHub
+  role_ru: Tech Lead / Fullstack-разработчик
+  role_en: Tech Lead / Fullstack Engineer
+  start: 2024-02
+  end: 2025-09
+  is_current: false
+  domain_note: 'внутренние модули системы: проекты, сотрудники, локации, политики отпусков'
+  bullets:
+  - id: b_hrt_1
+    text_ru: Писал и расширял REST API для внутренних модулей системы (проекты, сотрудники, локации, политики отпусков)
+      на FastAPI и Django REST Framework.
+    text_en: Wrote and extended REST APIs for internal system modules (projects, employees, locations, leave policies)
+      using FastAPI and Django REST Framework.
+    skills:
+    - rest_api
+    - fastapi
+    - django
+    metrics: []
+  - id: b_hrt_2
+    text_ru: 'Реализовывал интеграцию с внешними поставщиками данных для получения данных о сотрудниках: обрабатывал
+      авторизацию, подписывал запросы, валидировал ответы.'
+    text_en: 'Implemented integration with external data providers for employee data: handled authorisation, signed
+      requests, validated responses.'
+    skills:
+    - rest_api
+    - webhooks
+    metrics: []
+  - id: b_hrt_3
+    text_ru: 'Реализовывал логику смены состояний сотрудника (приём, увольнение, перевод) через три канала: UI,
+      API и базу данных, с валидаторами целостности.'
+    text_en: Implemented employee state transitions (hire, termination, transfer) across three channels — UI, API
+      and database — with integrity validators.
+    skills:
+    - postgresql
+    - rest_api
+    metrics: []
+  - id: b_hrt_4
+    text_ru: Проектировал и оптимизировал SQL-запросы, участвовал в разработке и миграции схем данных, писал бизнес-логику
+      на уровне SQL и ORM.
+    text_en: Designed and optimised SQL queries, worked on schema design and migrations, wrote business logic at
+      SQL and ORM level.
+    skills:
+    - postgresql
+    - sql
+    - sqlalchemy
+    - django
+    metrics: []
+  - id: b_hrt_5
+    text_ru: Покрывал backend-логику unit- и интеграционными тестами на PyTest с mock-объектами и factories.
+    text_en: Covered backend logic with unit and integration tests in PyTest using mocks and factories.
+    skills:
+    - pytest
+    metrics: []
+  - id: b_hrt_6
+    text_ru: Настраивал пайплайны в GitLab CI, автоматизировал запуск тестов при каждом коммите, работал с DevOps
+      над окружениями (Docker, .env-шаблоны, миграции).
+    text_en: Set up GitLab CI pipelines, automated test runs on every commit, worked with DevOps on environments
+      (Docker, .env templates, migrations).
+    skills:
+    - gitlab_ci
+    - docker
+    metrics: []
+  - id: b_hrt_7
+    text_ru: Реализовывал кастомные валидаторы, ограничивающие доступ к данным по ролям, проверял целостность данных
+      при массовых обновлениях.
+    text_en: Implemented custom validators restricting data access by role; verified data integrity during bulk
+      updates.
+    skills:
+    - rest_api
+    - postgresql
+    metrics: []
+  - id: b_hrt_8
+    text_ru: Готовил сервис к событиям реального времени (WebSocket / GraphQL subscriptions) и idempotent-обработке.
+    text_en: Prepared the service for real-time events (WebSocket / GraphQL subscriptions) and idempotent processing.
+    skills:
+    - websocket
+    - graphql
+    metrics: []
+  - id: b_hrt_9
+    text_ru: 'Активно участвовал в ревью чужого кода, работал в Scrum-команде: планирования, daily, ретро, демо.'
+    text_en: Actively reviewed other people's code; worked in a Scrum team — planning, dailies, retros, demos.
+    skills:
+    - code_review
+    - agile
+    metrics: []
+  company_en: StaffHub
+- id: exp_vision
+  company: Орбита Видео
+  company_en: Orbita Vision
+  role_ru: Python-разработчик
+  role_en: Python Developer
+  start: 2022-06
+  end: 2024-02
+  is_current: false
+  bullets:
+  - id: b_vis_1
+    text_ru: 'Разрабатывал и поддерживал микросервисы на Python: проектировал архитектуру, писал новый код и оптимизировал
+      существующие модули.'
+    text_en: 'Developed and maintained Python microservices: designed architecture, wrote new code and optimised
+      existing modules.'
+    skills:
+    - python
+    - microservices
+    metrics: []
+  - id: b_vis_2
+    text_ru: Внедрял решения совместно с архитекторами и аналитиками, участвовал в оценке и согласовании технических
+      требований.
+    text_en: Delivered solutions together with architects and analysts; took part in estimation and sign-off of
+      technical requirements.
+    skills:
+    - agile
+    - requirements
+    - stakeholder_mgmt
+    metrics: []
+  - id: b_vis_3
+    text_ru: Писал и поддерживал unit- и интеграционные тесты (TDD), обеспечивая надёжность и читаемость кода.
+    text_en: Wrote and maintained unit and integration tests (TDD), keeping the code reliable and readable.
+    skills:
+    - pytest
+    - tdd
+    metrics: []
+  - id: b_vis_4
+    text_ru: Интегрировал изменения в CI/CD-конвейеры (Jenkins, Azure DevOps), настраивал автоматические прогоны
+      тестов и проверок безопасности.
+    text_en: Integrated changes into CI/CD pipelines (Jenkins, Azure DevOps), configured automated test and security-check
+      runs.
+    skills:
+    - jenkins
+    - azure_devops
+    metrics: []
+  - id: b_vis_5
+    text_ru: Разворачивал и отлаживал сервисы в Linux-окружении, работал с асинхронным (asyncio) и многопоточным
+      кодом.
+    text_en: Deployed and debugged services in Linux, worked with async (asyncio) and multithreaded code.
+    skills:
+    - linux
+    - asyncio
+    metrics: []
+  - id: b_vis_6
+    text_ru: Настраивал взаимодействие с брокерами сообщений (RabbitMQ, Kafka) и базами данных (PostgreSQL, MongoDB).
+    text_en: Set up interaction with message brokers (RabbitMQ, Kafka) and databases (PostgreSQL, MongoDB).
+    skills:
+    - rabbitmq
+    - kafka
+    - postgresql
+    - mongodb
+    metrics: []
+  - id: b_vis_7
+    text_ru: Проектировал real-time пайплайны (входные очереди, кэши, батчинг) под низкую p95-латентность, настраивал
+      метрики fps и latency.
+    text_en: Designed real-time pipelines (input queues, caches, batching) for low p95 latency; set up fps and latency
+      metrics.
+    skills:
+    - prometheus
+    - grafana
+    - redis
+    metrics: []
+  - id: b_vis_8
+    text_ru: Расширял сервисы CV-инференсом на GPU (CUDA/TensorRT), интеграцией RTSP→FFmpeg/GStreamer и GraphQL-слоем.
+    text_en: Extended services with GPU CV inference (CUDA/TensorRT), RTSP→FFmpeg/GStreamer integration and a GraphQL
+      layer.
+    skills:
+    - cuda
+    - video_pipeline
+    - graphql
+    - opencv
+    - yolov8
+    metrics: []
+  - id: b_vis_9
+    text_ru: Внедрял профилирование горячих путей (torch.profiler, py-spy) и алерты (Prometheus/Grafana) для SLA
+      по задержкам.
+    text_en: Introduced hot-path profiling (torch.profiler, py-spy) and alerting (Prometheus/Grafana) for latency
+      SLAs.
+    skills:
+    - profiling
+    - prometheus
+    - grafana
+    metrics: []
+  - id: b_vis_10
+    text_ru: Проводил code review в GitLab/GitHub, следил за соблюдением внутренних стандартов и best practices.
+    text_en: Ran code review in GitLab/GitHub, enforced internal standards and best practices.
+    skills:
+    - code_review
+    - git
+    metrics: []
+- id: exp_rnd_voice
+  company: 'Собственный продукт (R&D): голосовой ассистент / мультимодальная платформа'
+  company_en: 'Own product (R&D): voice assistant / multimodal platform'
+  role_ru: Python Developer / AI Systems Integrator
+  role_en: Python Developer / AI Systems Integrator
+  start: 2021-01
+  end: 2022-06
+  is_current: false
+  is_own_project: true
+  note: Собственный проект, не коммерческий найм. Помечать честно.
+  bullets:
+  - id: b_rnd_1
+    text_ru: Интегрировал пайплайн STT (Whisper) → LLM (vLLM/OpenAI) → TTS (ElevenLabs) в голосовой помощник с памятью
+      контекста.
+    text_en: Integrated an STT (Whisper) → LLM (vLLM/OpenAI) → TTS (ElevenLabs) pipeline into a voice assistant
+      with context memory.
+    skills:
+    - speech
+    - llm_stack
+    - python
+    metrics: []
+  - id: b_rnd_2
+    text_ru: 'Автоматизировал сценарии через n8n: создавал графы действий от запуска LLM до отправки email, связывал
+      входной текст с внешними API.'
+    text_en: 'Automated scenarios in n8n: built action graphs from LLM invocation to sending email, wired input
+      text to external APIs.'
+    skills:
+    - n8n
+    - rest_api
+    metrics: []
+  - id: b_rnd_3
+    text_ru: Реализовал обработку команд через websocket-адаптер с поддержкой MCP-подобной схемы.
+    text_en: Implemented command handling through a websocket adapter with an MCP-like schema.
+    skills:
+    - websocket
+    - mcp
+    metrics: []
+  - id: b_rnd_4
+    text_ru: Создал модуль централизованного логирования действий и сообщений LLM, вёл статистику инференса, ошибок
+      STT/TTS и производительности.
+    text_en: Built centralised logging of actions and LLM messages; tracked inference statistics, STT/TTS errors
+      and performance.
+    skills:
+    - python
+    - mongodb
+    metrics: []
+  - id: b_rnd_5
+    text_ru: 'Разделил функциональность по слоям (распознавание, логика, действие, ответ) и разработал систему агентов:
+      планировщик, исполнитель, аналитик.'
+    text_en: 'Split functionality into layers (recognition, logic, action, response) and built an agent system:
+      planner, executor, analyst.'
+    skills:
+    - python
+    - microservices
+    metrics: []
+  - id: b_rnd_6
+    text_ru: Система обрабатывает голосовые запросы и отвечает голосом менее чем за 2 секунды.
+    text_en: The system processes voice requests and answers by voice in under 2 seconds.
+    skills:
+    - speech
+    - llm_stack
+    metrics:
+    - value: 2
+      unit: сек
+      claim: полный голосовой ответ
+  - id: b_rnd_7
+    text_ru: Формализовал подход к метрикам p50/p95 и стабилизации задержек пайплайна, практиковал async-рефакторинг
+      и кэширование.
+    text_en: Formalised p50/p95 metrics and pipeline latency stabilisation; practised async refactoring and caching.
+    skills:
+    - asyncio
+    - redis
+    - profiling
+    metrics: []
+  - id: b_rnd_8
+    text_ru: Ассистент прошёл пилот в виде Telegram-бота и локального десктоп-приложения.
+    text_en: The assistant was piloted as a Telegram bot and a local desktop application.
+    skills:
+    - python
+    metrics: []
+- id: exp_gamedev
+  company: Pixel Forge
+  role_ru: Python-разработчик
+  role_en: Python Developer
+  start: 2019-01
+  end: 2021-01
+  is_current: false
+  city: Москва
+  bullets:
+  - id: b_gms_1
+    text_ru: 'Делал микросервисы на FastAPI и Django: разбирал монолит, создавал новые сервисы, подключал PostgreSQL
+      и MongoDB.'
+    text_en: 'Built microservices in FastAPI and Django: broke apart the monolith, created new services, connected
+      PostgreSQL and MongoDB.'
+    skills:
+    - fastapi
+    - django
+    - microservices
+    - postgresql
+    - mongodb
+    metrics: []
+  - id: b_gms_2
+    text_ru: 'Проектировал API вместе с фронтендом: договаривался о виде endpoint-ов, описывал OpenAPI, выкладывал
+      Swagger на общий сервер, использовал gRPC там, где нужна скорость.'
+    text_en: 'Designed APIs together with frontend: agreed endpoint shapes, wrote OpenAPI, published Swagger on
+      a shared server, used gRPC where speed mattered.'
+    skills:
+    - openapi
+    - rest_api
+    - grpc
+    metrics: []
+  - id: b_gms_3
+    text_ru: Писал unit- и интеграционные тесты на PyTest, подключал линтеры (flake8, black, mypy) с падением сборки
+      при нарушениях.
+    text_en: Wrote unit and integration tests in PyTest; wired in linters (flake8, black, mypy) that break the build
+      on violations.
+    skills:
+    - pytest
+    - gitlab_ci
+    metrics: []
+  - id: b_gms_4
+    text_ru: Собирал образы в Docker, использовал docker-compose локально, катил в Kubernetes через Helm; настроил
+      в GitLab CI цепочку «линтеры → тесты → сборка → стейдж → автотесты → прод».
+    text_en: 'Built Docker images, used docker-compose locally, deployed to Kubernetes via Helm; set up a GitLab
+      CI chain: linters → tests → build → staging → e2e → production.'
+    skills:
+    - docker
+    - kubernetes
+    - gitlab_ci
+    metrics: []
+  - id: b_gms_5
+    text_ru: Профилировал код (py-spy, cProfile), переводил горячие пути на async и кэшировал в Redis — p95 сократилась
+      почти в два раза.
+    text_en: Profiled code (py-spy, cProfile), moved hot paths to async and cached in Redis — p95 nearly halved.
+    skills:
+    - profiling
+    - asyncio
+    - redis
+    metrics:
+    - value: 2
+      unit: x
+      claim: сокращение p95
+  - id: b_gms_6
+    text_ru: Подключал Stripe, PayPal и S3, обрабатывал асинхронные задачи на RabbitMQ и Kafka, писал ретраи и dead-letter
+      очереди.
+    text_en: Integrated Stripe, PayPal and S3; processed async jobs on RabbitMQ and Kafka; wrote retries and dead-letter
+      queues.
+    skills:
+    - stripe
+    - paypal
+    - s3
+    - rabbitmq
+    - kafka
+    metrics: []
+  - id: b_gms_7
+    text_ru: В PostgreSQL ставил индексы, писал сложные запросы и миграции на Alembic; MongoDB держал для гибких
+      схем с агрегациями через pipeline.
+    text_en: In PostgreSQL added indexes, wrote complex queries and Alembic migrations; kept MongoDB for flexible
+      schemas with aggregation pipelines.
+    skills:
+    - postgresql
+    - sql
+    - alembic
+    - mongodb
+    metrics: []
+  - id: b_gms_8
+    text_ru: Дежурил по алертам, разбирал инциденты в Kibana, чинил баги на горячую, ввёл feature-flags для безопасного
+      отката релизов.
+    text_en: Was on call for alerts, investigated incidents in Kibana, fixed bugs hot, introduced feature flags
+      for safe release rollback.
+    skills:
+    - kibana
+    metrics: []
+  - id: b_gms_9
+    text_ru: Ревьюил чужие merge request-ы, смотрел не только стиль, но и архитектуру; в спринтах вёл груминг, планирование,
+      демо и ретро.
+    text_en: Reviewed other people's merge requests looking at architecture, not only style; ran grooming, planning,
+      demos and retros.
+    skills:
+    - code_review
+    - agile
+    metrics: []
+  - id: b_gms_10
+    text_ru: Менторил джунов, проводил внутренние мини-лекции по качеству кода, разбирал вместе баги и делал рефакторинги.
+    text_en: Mentored juniors, ran internal talks on code quality, debugged and refactored together with the team.
+    skills:
+    - mentoring
+    metrics: []
+  company_en: Pixel Forge
+
+# ── never_claim: чего у вас НЕТ ──────────────────────────────────────────────
+# Технологии, которые часто просят, но вы с ними не работали. Упоминание
+# в письме или резюме — жёсткий отказ гейта. Побеждает skills при конфликте.
+never_claim:
+- id: csharp
+  canonical: C#
+  aliases:
+  - c sharp
+  - csharp
+  - си шарп
+- id: dotnet
+  canonical: .NET
+  aliases:
+  - dotnet
+  - asp.net
+  - net core
+  - .net core
+  - entity framework
+- id: github_actions
+  canonical: GitHub Actions
+  aliases:
+  - gh actions
+  - github workflows
+- id: java
+  canonical: Java
+  aliases:
+  - spring
+  - spring boot
+  - jvm
+  - kotlin
+- id: golang
+  canonical: Go
+  aliases:
+  - golang
+- id: php
+  canonical: PHP
+  aliases:
+  - laravel
+  - symfony
+- id: ruby
+  canonical: Ruby
+  aliases:
+  - rails
+  - ruby on rails
+- id: rust
+  canonical: Rust
+  aliases: []
+- id: terraform
+  canonical: Terraform
+  aliases:
+  - iac
+  - pulumi
+- id: aws_managed
+  canonical: Lambda
+  aliases:
+  - ecs
+  - eks
+  - dynamodb
+  - cloudformation
+  note: Из AWS в резюме только S3 и облачные backend-сценарии.
+- id: frontend_frameworks
+  canonical: Vue
+  aliases:
+  - angular
+  - svelte
+  - next.js
+  - typescript
+  note: React заявлен в резюме (Integration Manager); остальной фронтенд — нет.
+- id: product_analytics
+  canonical: Amplitude
+  aliases:
+  - mixpanel
+  - posthog
+  - ga4
+  note: Продуктовая аналитика в резюме не заявлена. Если использовал — перенеси в skills.
+
+# ── claims: сводные цифры ────────────────────────────────────────────────────
+# total_years_software — общий стаж; им подписываются письма («7+ лет»).
+claims:
+  total_years_software: 7
+  years_hands_on_engineer: 3.5
+  years_requirements_ownership: 4
+  years_product_module_ownership: 2
+
+# ── faq: ваши готовые ответы на типовые вопросы рекрутёров ───────────────────
+# Бот отвечает ими ДОСЛОВНО, без нейросети. Вопрос, которого тут нет, уходит
+# вам карточкой в бот-пульт. id известных тем: about_me, last_project,
+# location_and_format, start_date, salary, payments_experience.
+faq:
+- id: about_me
+  answer_ru: 'Backend-разработчик на Python, больше шести лет в коммерческой разработке; последний год — Tech Lead
+    / архитектор интеграционной платформы в Nordlane, веду команду. Проектирую отказоустойчивые распределённые системы:
+    интеграции с внешними API, очереди с backpressure, идемпотентная обработка, observability. Стек: Python, FastAPI,
+    Django, PostgreSQL, ClickHouse, Redis, Kafka, RabbitMQ, Docker, Kubernetes. Живу в Москве; удалённо, гибрид
+    или офис в Москве; английский C2, могу выйти сразу.'
+  answer_en: 'Python backend engineer with more than six years of commercial experience; for the last year Tech
+    Lead and software architect of an integration platform at Nordlane, leading the team. I design fault-tolerant
+    distributed systems: external API integrations, queues with backpressure, idempotent processing, observability.
+    Stack: Python, FastAPI, Django, PostgreSQL, ClickHouse, Redis, Kafka, RabbitMQ, Docker, Kubernetes. Based in
+    Moscow, working remotely (not relocating), English C2, available immediately.'
+- id: last_project
+  answer_ru: 'Последний проект — Integration Manager в Nordlane: единая точка подключения внешних сервисов к платформе
+    (FastAPI + React): реестр интеграций, права доступа, allow/deny-политики и проверка безопасности. Подключение
+    новой интеграции сократилось с пяти дней до одного. Там же ввёл стандарт внешних вызовов — таймауты, ретраи
+    с backoff, идемпотентность, backpressure; после этого инциденты с переполнением очередей прекратились. События
+    и метрики — в ClickHouse, наблюдаемость — Prometheus и Grafana, прод — Kubernetes и GitLab CI.'
+  answer_en: 'My latest project is the Integration Manager at Nordlane: a single entry point for connecting external
+    services to the platform (FastAPI + React) — an integration registry, permissions, allow/deny policies and security
+    validation. Onboarding a new integration went from five days to one. I also introduced a standard for external
+    calls — timeouts, retries with backoff, idempotency, backpressure — after which queue-overflow incidents stopped.
+    Events and metrics live in ClickHouse, observability is Prometheus and Grafana, production runs on Kubernetes
+    with GitLab CI.'
+- id: location_and_format
+  answer_ru: Живу в Москве. Подходит удалённый формат, гибрид или офис в Москве. К переезду не готов, командировки
+    возможны. Могу выйти сразу.
+  answer_en: I'm based in Moscow and work remotely; I'm not relocating, but business trips are fine. I can start
+    immediately.
+- id: start_date
+  answer_ru: Могу выйти сразу.
+  answer_en: I can start immediately.
+- id: salary
+  answer_ru: Ожидания хочу сверить с вилкой позиции — подскажете, какой бюджет предусмотрен?
+  answer_en: I'd like to align my expectations with the role's range — could you share the budget?
+- id: payments_experience
+  answer_ru: Есть опыт платёжных интеграций — Stripe, PayPal, ЮKassa, Telegram Stars — и леджера со сверкой балансов,
+    идемпотентными зачислениями и атомарными списаниями.
+  answer_en: 'I have hands-on experience with payment integrations — Stripe, PayPal, YooKassa, Telegram Stars —
+    and with a ledger: balance reconciliation, idempotent credits and atomic debits.'
+salary_expectation: ''
+
+# ── outreach: что бот пишет о вас от первого лица ────────────────────────────
+# Тема письма, вступления, строка о формате работы, ответы «где вы и как
+# готовы работать». Числа и технологии здесь тоже проверяет гейт правды.
+#   subject_direct_* — письмо человеку; {about} = «роль в компании»
+#   subject_apply_*  — отклик в форму; {role} = роль
+#   intros_*         — вступления для Senior-вакансий; intros_short_* —
+#                      если письмо не влезает в 400 знаков; intros_middle_* —
+#                      для Middle-вакансий (без стажа и «Tech Lead»)
+#   interest_*       — письмо компании без открытой роли; {company} = компания
+#   format_line_*    — строка о формате в КАЖДОМ письме
+#   letter_tail_*    — последняя строка прямого письма
+#   format_rule_llm_* — формат своими словами для нейросети
+#   format_replies_* — ответ на «где вы / готовы ли к офису?»
+#   office_city_patterns — где подходит офис/гибрид (регулярные выражения)
+#   never_say        — слова, которых не должно быть в автоответах
+#   cv_file_prefix   — начало имени файла резюме: Smirnov_Python_ab12.pdf
+outreach:
+  city_ru: Москва
+  location_ru: Москва, Россия
+  location_en: Moscow, Russia
+  office_city_patterns:
+  - москв\w*
+  - \bmoscow\b
+  - метро\s+[а-яё]
+  - (?-i:\bм\.\s?[А-ЯЁ][а-яё]{3,})
+  cv_file_prefix: Smirnov
+  subject_direct_ru: '{about} — Алексей Смирнов (backend / tech lead, 7+ лет)'
+  subject_direct_en: '{about} — Alexey Smirnov (backend / tech lead, 7+ yrs)'
+  subject_apply_ru: 'Отклик: {role} — Смирнов Алексей (7+ лет, backend/tech lead)'
+  subject_apply_en: 'Application: {role} — Alexey Smirnov (7+ yrs, backend/tech lead)'
+  format_line_ru: Формат — удалённо, гибрид или офис в Москве; английский C2.
+  format_line_en: 'Remote-only, please — any country works for me. English: C2.'
+  letter_tail_ru: Резюме во вложении. Работаю удалённо, в гибриде или офисе в Москве. Английский C2.
+  letter_tail_en: 'My CV is attached. I work remotely only — any country. English: C2.'
+  format_rule_llm_ru: удалённо, гибрид или офис в Москве (к переезду не готов) — и английский C2
+  format_rule_llm_en: remote-only (any country), English C2
+  format_replies_ru:
+  - 'Живу в Москве: подходит удалённый формат, гибрид или офис в Москве. К переезду не готов, командировки возможны.'
+  - Я в Москве — рассматриваю удалённую работу, гибрид или офис в Москве; переезд не рассматриваю, в командировки
+    готов. Английский C2.
+  format_replies_en:
+  - I'm based in Moscow and work remotely; I'm not relocating, but business trips are fine. I've worked in distributed
+    teams.
+  - I work remotely from Moscow — relocation isn't an option for me, business trips are fine. English C2, experience
+    in distributed teams.
+  intros_ru:
+  - 7+ лет в разработке, вырос из backend-инженера в Tech Lead / архитектора.
+  - Backend-инженер с 7+ годами опыта, последние годы — Tech Lead и архитектура.
+  - 7 лет в бэкенде и продуктовых сервисах, от кода до владения требованиями.
+  - 'Семь лет в разработке: путь от инженера до технического лидера в небольшой команде.'
+  - Инженер с 7-летним стажем; сейчас отвечаю за архитектуру и требования к продукту.
+  - За 7 лет прошёл путь от backend-разработки до владения техническими решениями продукта.
+  - Работаю в разработке 7 лет, последние два года — единственный архитектор в команде.
+  intros_en:
+  - 7+ years in development, grew from backend engineer to tech lead / architect.
+  - Backend engineer with 7+ years, the last few as tech lead owning architecture.
+  - 7 years in backend and product services, from code to owning requirements.
+  - Engineer with 7 years of experience; currently responsible for architecture.
+  intros_short_ru:
+  - 7 лет в разработке, сейчас Tech Lead / архитектор.
+  - 7 лет в бэкенде, последние — Tech Lead и архитектура.
+  - Инженер, 7 лет; сейчас отвечаю за архитектуру и требования.
+  - '7 лет в разработке: от кода до владения требованиями.'
+  - Backend-инженер, 7 лет, ныне технический лидер команды.
+  intros_short_en:
+  - 7 years in development, currently tech lead / architect.
+  - 7 years in backend, lately tech lead and architecture.
+  - Engineer, 7 years; now owning architecture and requirements.
+  intros_middle_ru:
+  - 'Backend-разработчик: Python, FastAPI, PostgreSQL, интеграции.'
+  - Пишу на Python, работаю с REST API, схемами данных и интеграциями.
+  - Backend-инженер, рабочий стек Python / PostgreSQL / Docker.
+  - 'Разрабатываю бэкенд-сервисы: API, база, очереди, тесты.'
+  intros_middle_en:
+  - 'Backend developer: Python, FastAPI, PostgreSQL, integrations.'
+  - I write Python and work with REST APIs, data schemas and integrations.
+  - Backend engineer, working stack Python / PostgreSQL / Docker.
+  interest_ru:
+  - Мне интересна бэкенд- и платформенная разработка в {company}, поэтому пишу вам напрямую.
+  - Хотел бы заниматься бэкендом или платформой в {company} и решил написать напрямую.
+  interest_en:
+  - I'm interested in backend and platform engineering work at {company}, so I'm writing to you directly.
+  - I'd like to work on backend or platform engineering at {company} and wanted to reach a person directly.
+  never_say:
+  - pattern: финтех|fintech
+    why: 'пример: кандидат просил говорить о платёжных интеграциях, не о «финтехе»'

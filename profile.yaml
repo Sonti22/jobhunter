@@ -597,7 +597,7 @@ experience:
         skills: [nginx, prometheus, microservices]
         # 503 — HTTP-статус из текста буллета; без метрики гейт чисел режет его
         # как неподтверждённое число.
-        metrics: [{value: "503", unit: "http_status"}]
+        metrics: [{value: "503", unit: "http_status", claim: "код ответа, когда сервис не может безопасно обслужить запрос"}]
       - id: b_lnk_5
         text_ru: "Настраивал observability: requests/sec, error rate, p50/p95/p99, worker utilisation, queue saturation, PostgreSQL/Redis health и сквозные trace_id."
         text_en: "Set up observability: requests/sec, error rate, p50/p95/p99, worker utilisation, queue saturation, PostgreSQL/Redis health, and end-to-end trace_id."

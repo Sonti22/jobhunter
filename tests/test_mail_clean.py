@@ -13,7 +13,7 @@ from jobhunter.textutil import clean_email_body, html_to_text, strip_quoted_repl
 # в котором стоят предложенные нами слоты.
 REPLY_WITH_QUOTED_SLOTS = """Спасибо, посмотрю и вернусь с ответом.
 
-вт, 26 авг. 2026 г. в 10:12, Suren Hakobyan <suren6pro@gmail.com> написал:
+вт, 26 авг. 2026 г. в 10:12, Alexey Smirnov <a.smirnov@gmail.com> написал:
 > Здравствуйте! Готов созвониться. Мне удобно:
 > пн 26.08 в 11:00 (UTC+3); ср 28.08 в 16:00 (UTC+3).
 > Подскажите, какое время подойдёт вам?
@@ -21,7 +21,7 @@ REPLY_WITH_QUOTED_SLOTS = """Спасибо, посмотрю и вернусь 
 
 OUTLOOK_REPLY = """Добрый день! Вакансия ещё актуальна.
 
-От: Suren Hakobyan <suren6pro@gmail.com>
+От: Alexey Smirnov <a.smirnov@gmail.com>
 Отправлено: вторник, 26 августа 2026 г. 10:12
 Кому: HR <hr@company.ru>
 Тема: Отклик: Python Backend

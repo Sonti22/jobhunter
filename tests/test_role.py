@@ -154,7 +154,7 @@ def test_cv_slug_not_taken_from_tag():
     """Тег источника не должен попадать в имя файла.
 
     Канал python_djangojobs ставит тег «Python» продуктовым вакансиям — из-за
-    этого PM-резюме уходило рекрутёру файлом Hakobyan_Python_*.pdf.
+    этого PM-резюме уходило рекрутёру файлом Smirnov_Python_*.pdf.
     """
     res = tailor("Product Manager", "Python",
                  "Roadmap, discovery, приоритизация, работа со стейкхолдерами.")

@@ -15,9 +15,9 @@ import pytest
 @pytest.fixture(scope="module")
 def db(tmp_path_factory):
     os.environ["DB_PATH"] = str(tmp_path_factory.mktemp("db") / "mail.db")
-    os.environ["SMTP_USER"] = "suren6pro@gmail.com"
+    os.environ["SMTP_USER"] = "a.smirnov@gmail.com"
     os.environ["SMTP_APP_PASSWORD"] = "test-pass"
-    os.environ["SMTP_FROM_NAME"] = "Suren Hakobyan"
+    os.environ["SMTP_FROM_NAME"] = "Alexey Smirnov"
     os.environ["LLM_ENABLED"] = "false"
     os.environ["GCAL_ENABLED"] = "false"
     from jobhunter.config import get_settings

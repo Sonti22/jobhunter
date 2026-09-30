@@ -22,6 +22,10 @@ os.environ.setdefault("LLM_ENABLED", "false")
 # Холодная рассылка в Telegram по умолчанию выключена (config), а тесты
 # отправителя проверяют именно её. Выключатель проверяется отдельно.
 os.environ.setdefault("TELEGRAM_COLD_ENABLED", "true")
+# Тесты проверяют код, а не чей-то настоящий профиль: вымышленный кандидат из
+# profile.example.yaml есть в любой копии репозитория, profile.yaml — нет.
+os.environ.setdefault("PROFILE_PATH", os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "profile.example.yaml"))
 
 
 @pytest.fixture(autouse=True)

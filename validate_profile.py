@@ -5,7 +5,8 @@
 самого источника правды: битые ссылки, конфликты уровней, завышенные годы.
 Запускать после каждой правки profile.yaml.
 
-    python validate_profile.py
+    python validate_profile.py                 # profile.yaml
+    python validate_profile.py profile.example.yaml
 """
 import sys
 from datetime import date
@@ -29,7 +30,8 @@ def months(start: str, end) -> int:
 
 
 def main() -> int:
-    profile = yaml.safe_load((ROOT / "profile.yaml").read_text(encoding="utf-8"))
+    path = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "profile.yaml"
+    profile = yaml.safe_load(path.read_text(encoding="utf-8"))
     errors, warnings = [], []
 
     exp = profile["experience"]
@@ -105,7 +107,7 @@ def main() -> int:
                             % (months(prev["end"], nxt["start"]), prev["id"], nxt["id"]))
 
     # ── отчёт ──
-    print("profile.yaml")
+    print(path.name)
     print("  опыт        : %d записей, %d буллетов" % (len(exp), len(bullet_ids)))
     print("  навыки      : %d (expert %d, working %d, familiar %d)"
           % (len(skills),

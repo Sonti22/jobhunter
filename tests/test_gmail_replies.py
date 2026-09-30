@@ -18,7 +18,7 @@ from sqlalchemy import select
 from jobhunter.convo import mailmatch
 from jobhunter.convo.classify import classify
 
-ASTORIA = """Dear Suren,
+ASTORIA = """Dear Alexey,
 
 Thank you for your interest in Astoria AI. We reviewed your application and we believe that there could be a potential fit.
 
@@ -49,10 +49,10 @@ Wishing you all the very best,"""
 @pytest.mark.parametrize("text,expected", [
     (ASTORIA, "task_request"),
     (SEARCH_ATLAS, "apply_link"),
-    ("Сурен, добрый день!\nНа данный момент мы остановили поиск на данную вакансию, "
+    ("Алексей, добрый день!\nНа данный момент мы остановили поиск на данную вакансию, "
      "т.к. определились с финальными кандидатами.\nБольшое спасибо за ваш интерес!",
      "rejection"),
-    ("Hi Suren,\n\nThanks for your interest! We are only hiring in the U.S. right now so\n"
+    ("Hi Alexey,\n\nThanks for your interest! We are only hiring in the U.S. right now so\n"
      "this is not a fit.", "rejection"),
     ("Пройдите AI-интервью по ссылке, это займёт 20 минут", "task_request"),
     ("Could you complete a take-home assignment?", "task_request"),
@@ -265,7 +265,7 @@ def test_build_context_indexes_company_domain(db):
 
 # ── находки 18.09 ──
 
-ZAPIER = """Hi Suren,
+ZAPIER = """Hi Alexey,
 
 Thanks so much for reaching out and for your interest in Zapier! We really
 appreciate the initiative.

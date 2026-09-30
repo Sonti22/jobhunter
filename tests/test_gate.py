@@ -32,8 +32,8 @@ def real_bullet(sid, lang="ru"):
 def test_clean_cv_passes():
     doc = DocModel(lang="ru", headline="Senior Technical Product Manager",
                    summary="Backend-разработчик, вырос в Tech Lead.",
-                   rendered_bullets=[real_bullet("b_1xb_1"), real_bullet("b_dmg_1")],
-                   companies=["1xbet", "DominiGames"])
+                   rendered_bullets=[real_bullet("b_hrt_1"), real_bullet("b_gms_1")],
+                   companies=["StaffHub", "Pixel Forge"])
     res = check(doc)
     assert res.passed, rule_ids(res)
 
@@ -41,11 +41,11 @@ def test_clean_cv_passes():
 def test_clean_paraphrase_passes():
     # переформулировка в пределах порога провенанса
     doc = DocModel(lang="ru",
-                   rendered_bullets=[{"source_id": "b_1xb_1",
+                   rendered_bullets=[{"source_id": "b_hrt_1",
                        "text": "Писал и расширял REST API для внутренних модулей "
                                "(проекты, сотрудники, локации) на FastAPI и Django REST Framework.",
                        "section": "experience"}],
-                   companies=["1xbet"])
+                   companies=["StaffHub"])
     res = check(doc)
     assert res.passed, rule_ids(res)
 
@@ -54,7 +54,7 @@ def test_clean_paraphrase_passes():
 
 def test_forbidden_csharp():
     doc = DocModel(lang="ru", headline="C# / .NET разработчик",
-                   rendered_bullets=[real_bullet("b_ksp_1")], companies=["Лаборатория Касперского"])
+                   rendered_bullets=[real_bullet("b_vis_1")], companies=["Орбита Видео"])
     res = check(doc)
     assert not res.passed
     assert "lexicon.forbidden" in rule_ids(res)
@@ -62,38 +62,38 @@ def test_forbidden_csharp():
 
 def test_forbidden_dotnet_synonym():
     doc = DocModel(lang="en", summary="Built services in ASP.NET Core.",
-                   rendered_bullets=[real_bullet("b_ksp_1", "en")],
-                   companies=["Kaspersky Lab"])
+                   rendered_bullets=[real_bullet("b_vis_1", "en")],
+                   companies=["Orbita Vision"])
     res = check(doc)
     assert "lexicon.forbidden" in rule_ids(res)
 
 
 def test_forbidden_github_actions():
     doc = DocModel(lang="ru", summary="Настраивал GitHub Actions для CI.",
-                   rendered_bullets=[real_bullet("b_dmg_4")], companies=["DominiGames"])
+                   rendered_bullets=[real_bullet("b_gms_4")], companies=["Pixel Forge"])
     res = check(doc)
     assert "lexicon.forbidden" in rule_ids(res)
 
 
 def test_forbidden_java_spring():
     doc = DocModel(lang="ru", headline="Java / Spring Boot Engineer",
-                   rendered_bullets=[real_bullet("b_dmg_1")], companies=["DominiGames"])
+                   rendered_bullets=[real_bullet("b_gms_1")], companies=["Pixel Forge"])
     assert "lexicon.forbidden" in rule_ids(check(doc))
 
 
 def test_unknown_tech_terraform():
     # terraform в never_claim → forbidden; проверим именно unknown на чём-то вне обоих
     doc = DocModel(lang="ru", summary="Работал с CockroachDB в проде.",
-                   rendered_bullets=[real_bullet("b_dmg_1")], companies=["DominiGames"])
+                   rendered_bullets=[real_bullet("b_gms_1")], companies=["Pixel Forge"])
     res = check(doc)
     assert "lexicon.unknown" in rule_ids(res)
 
 
 def test_invented_number_metric():
     doc = DocModel(lang="ru",
-                   rendered_bullets=[{"source_id": "b_dmg_5",
+                   rendered_bullets=[{"source_id": "b_gms_5",
                        "text": "Профилировал код и увеличил выручку на 47%.",
-                       "section": "experience"}], companies=["DominiGames"])
+                       "section": "experience"}], companies=["Pixel Forge"])
     res = check(doc)
     assert "numbers.unbacked" in rule_ids(res)
 
@@ -101,7 +101,7 @@ def test_invented_number_metric():
 def test_invented_multiplier():
     # множитель «в 8 раз» не подтверждён метрикой-множителем (есть только 2x у p95)
     doc = DocModel(lang="ru", summary="Вырастил выручку в 8 раз.",
-                   rendered_bullets=[real_bullet("b_dmg_1")], companies=["DominiGames"])
+                   rendered_bullets=[real_bullet("b_gms_1")], companies=["Pixel Forge"])
     res = check(doc)
     assert "numbers.unbacked" in rule_ids(res)
 
@@ -109,22 +109,22 @@ def test_invented_multiplier():
 def test_backed_multiplier_2x_passes():
     # «в 2 раза» подтверждён метрикой p95 (value 2, unit x)
     doc = DocModel(lang="ru", summary="Сократил p95 в 2 раза.",
-                   rendered_bullets=[real_bullet("b_dmg_5")], companies=["DominiGames"])
+                   rendered_bullets=[real_bullet("b_gms_5")], companies=["Pixel Forge"])
     res = check(doc)
     assert "numbers.unbacked" not in rule_ids(res), rule_ids(res)
 
 
 def test_backed_number_passes():
-    # p95 в 2 раза — есть в metrics b_dmg_5
-    doc = DocModel(lang="ru", rendered_bullets=[real_bullet("b_dmg_5")],
-                   companies=["DominiGames"])
+    # p95 в 2 раза — есть в metrics b_gms_5
+    doc = DocModel(lang="ru", rendered_bullets=[real_bullet("b_gms_5")],
+                   companies=["Pixel Forge"])
     res = check(doc)
     assert "numbers.unbacked" not in rule_ids(res)
 
 
 def test_skill_years_inflation():
     doc = DocModel(lang="ru", summary="10 лет Kubernetes в проде.",
-                   rendered_bullets=[real_bullet("b_dmg_4")], companies=["DominiGames"])
+                   rendered_bullets=[real_bullet("b_gms_4")], companies=["Pixel Forge"])
     res = check(doc)
     assert "years.skill_inflation" in rule_ids(res)
 
@@ -132,7 +132,7 @@ def test_skill_years_inflation():
 def test_level_inflation_familiar_in_headline():
     # cuda — familiar; в заголовке нельзя
     doc = DocModel(lang="ru", headline="Эксперт по CUDA и TensorRT",
-                   rendered_bullets=[real_bullet("b_ksp_8")], companies=["Лаборатория Касперского"])
+                   rendered_bullets=[real_bullet("b_vis_8")], companies=["Орбита Видео"])
     res = check(doc)
     assert "lexicon.level_inflation" in rule_ids(res)
 
@@ -149,7 +149,7 @@ def test_level_inflation_superlative():
 
 
 def test_invented_company():
-    doc = DocModel(lang="ru", rendered_bullets=[real_bullet("b_ksp_1")],
+    doc = DocModel(lang="ru", rendered_bullets=[real_bullet("b_vis_1")],
                    companies=["Яндекс"])
     res = check(doc)
     assert "entity.unknown_company" in rule_ids(res)
@@ -174,9 +174,9 @@ def test_bullet_bad_source():
 def test_provenance_drift():
     # source_id настоящий, но текст не имеет к нему отношения
     doc = DocModel(lang="ru",
-                   rendered_bullets=[{"source_id": "b_dmg_1",
+                   rendered_bullets=[{"source_id": "b_gms_1",
                        "text": "Организовывал корпоративы и заказывал пиццу для офиса.",
-                       "section": "experience"}], companies=["DominiGames"])
+                       "section": "experience"}], companies=["Pixel Forge"])
     res = check(doc)
     assert "provenance.drift" in rule_ids(res)
 
@@ -191,11 +191,11 @@ def test_dm_inherits_gate_forbidden():
 
 
 def test_promotion_recorded():
-    # JD просит Kafka (working у Сурена) — промоушен фиксируется, не хард
+    # JD просит Kafka (working у кандидата) — промоушен фиксируется, не хард
     jd = "We need strong Kafka and PostgreSQL experience."
     doc = DocModel(lang="en", summary="Set up interaction with Kafka and PostgreSQL.",
-                   rendered_bullets=[real_bullet("b_ksp_6", "en")],
-                   companies=["Kaspersky Lab"])
+                   rendered_bullets=[real_bullet("b_vis_6", "en")],
+                   companies=["Orbita Vision"])
     res = check(doc, jd_text=jd)
     assert res.passed, rule_ids(res)
     assert "kafka" in res.promoted_terms
@@ -206,12 +206,12 @@ def test_jd_wants_csharp_but_cv_stays_clean():
     jd = "Senior role. Stack: C#, .NET, PostgreSQL, GitHub Actions."
     doc = DocModel(lang="ru", headline="Senior Technical Product Manager",
                    summary="Владею PostgreSQL, проектирую API.",
-                   rendered_bullets=[real_bullet("b_1xb_4")], companies=["1xbet"])
+                   rendered_bullets=[real_bullet("b_hrt_4")], companies=["StaffHub"])
     res = check(doc, jd_text=jd)
     assert res.passed, rule_ids(res)
     # и наоборот: если бы просочился C#, упало бы
     doc2 = DocModel(lang="ru", headline="C# Technical Product Manager",
-                    rendered_bullets=[real_bullet("b_1xb_4")], companies=["1xbet"])
+                    rendered_bullets=[real_bullet("b_hrt_4")], companies=["StaffHub"])
     assert not check(doc2, jd_text=jd).passed
 
 

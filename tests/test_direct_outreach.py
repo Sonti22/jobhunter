@@ -249,7 +249,7 @@ def test_subject_is_personal_not_an_application_form(db):
     from jobhunter.models import Job
     from jobhunter.outreach.mailer import _subject
     job = Job(source="direct:exec", title="Platform Engineer", company_name="Acme")
-    assert _subject(job, "en") == "Platform Engineer at Acme — Suren Hakobyan (backend / tech lead, 7+ yrs)"
+    assert _subject(job, "en") == "Platform Engineer at Acme — Alexey Smirnov (backend / tech lead, 7+ yrs)"
     assert "Application:" not in _subject(Job(source="direct:referral", company_name="BigCo"), "en")
 
 

@@ -31,7 +31,7 @@ def db(tmp_path_factory):
 
 @pytest.fixture(scope="module")
 def cv_file(tmp_path_factory):
-    p = tmp_path_factory.mktemp("cv") / "Suren_Hakobyan_en.pdf"
+    p = tmp_path_factory.mktemp("cv") / "Alexey_Smirnov_en.pdf"
     p.write_bytes(b"%PDF-1.4 test resume")
     return p
 
@@ -138,7 +138,7 @@ def test_build_submission_fills_profile_fields(db, mk_app, monkeypatch):
     assert payload is not None, reason
     form = json.loads(payload["data"]["applicationForm"])
     by_path = {f["path"]: f["value"] for f in form["fieldSubmissions"]}
-    assert by_path["_systemfield_name"] == "Suren Hakobyan"
+    assert by_path["_systemfield_name"] == "Alexey Smirnov"
     assert "@" in by_path["_systemfield_email"]
     # Email — с plus-меткой заявки: ответ Ashby придёт на адрес из формы,
     # и только метка позволит почтовому циклу привязать его к заявке.

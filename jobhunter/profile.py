@@ -1,6 +1,7 @@
 """Загрузка profile.yaml и индексы для гейта/подгонки."""
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from datetime import date
 from functools import lru_cache
@@ -109,6 +110,14 @@ class Profile:
             self.forbidden_terms |= {a.lower() for a in n.get("aliases", [])}
         # forbidden побеждает allowed при коллизии
         self.allowed_terms -= self.forbidden_terms
+
+        # Слова своей локации — не технологии. «Moscow» в словаре есть (метод
+        # приоритизации MoSCoW), и «I'm based in Moscow» гейт резал как
+        # незнакомую технологию.
+        out = raw.get("outreach", {}) or {}
+        loc = " ".join(str(x or "") for x in (self.identity.get("location"), out.get("location_ru"),
+                                               out.get("location_en"), out.get("city_ru")))
+        self.location_terms = {w.lower() for w in re.findall(r"[^\W\d_]+", loc)}
 
         # названия компаний (для проверки сущностей)
         self.company_terms = set()
