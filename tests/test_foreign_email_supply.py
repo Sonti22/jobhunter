@@ -20,8 +20,8 @@ from jobhunter.match import workformat
     ("Ours Privacy | Senior Platform Engineer | Remote (US) | Full-time | https://oursprivacy.com/careers",
      "Ours Privacy", "Senior Platform Engineer"),
     ("Cider Consulting | NY, USA | REMOTE (US-based only)", "Cider Consulting", ""),
-    ("MWI Animal Health | Remote (US only) | Senior SWE, Senior DevOps",
-     "MWI Animal Health", "Senior SWE, Senior DevOps"),
+    ("Acme Animal Health | Remote (US only) | Senior SWE, Senior DevOps",
+     "Acme Animal Health", "Senior SWE, Senior DevOps"),
     ("Coder | https://coder.com/ | Multiple roles | Multiple locations | Full-time",
      "Coder", "Multiple roles"),
     ("Trax | https://www.traxtech.com/ | Onsite Cebu PH, Remote US are possible | Full-time | Architect",
@@ -32,8 +32,8 @@ from jobhunter.match import workformat
     ("Purple Candor LLC — AI Engineer — Remote / US (Sub-contractor- 6 month+)",
      "Purple Candor LLC", "AI Engineer"),
     ("Software Engineer — Remote (US Only)", "", "Software Engineer"),
-    ("Democrance | https://democrance.com | Python/Django/Pyramid/Pydantic AI hacker | REMOTE",
-     "Democrance", "Python/Django/Pyramid/Pydantic AI hacker"),
+    ("Insurely | https://insurely.io | Python/Django/Pyramid/Pydantic AI hacker | REMOTE",
+     "Insurely", "Python/Django/Pyramid/Pydantic AI hacker"),
     ("Turquoise|Senior Performance Engineer|FT| Remote USA | 172-195",
      "Turquoise", "Senior Performance Engineer"),
 ])
@@ -124,7 +124,7 @@ def test_onsite_only_header_is_not_remote():
 @pytest.mark.parametrize("raw", [
     "ON SITE TORONTO MUST BE ON SITE. REMOTE WILL BE IGNORED",
     "Remote-first with PST overlap", "Location: Florianopolis, Brazil (UTC-3)",
-    "https://cyberatlas.ai", "US-Based / Remote",
+    "https://cybernova.ai", "US-Based / Remote",
 ])
 def test_format_and_location_lines_are_not_letter_titles(raw):
     from jobhunter.tailor.roletitle import clean_title, display_role

@@ -98,7 +98,7 @@ def main() -> int:
 
     # 6. непрерывность таймлайна
     ordered = sorted(exp, key=lambda e: e["start"])
-    for prev, nxt in zip(ordered, ordered[1:]):
+    for prev, nxt in zip(ordered, ordered[1:], strict=False):
         if prev["end"] and prev["end"] > nxt["start"]:
             warnings.append("перекрытие: %s заканчивается %s, %s начинается %s"
                             % (prev["id"], prev["end"], nxt["id"], nxt["start"]))

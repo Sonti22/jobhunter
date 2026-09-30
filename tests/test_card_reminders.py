@@ -56,13 +56,13 @@ def _texts(db):
 def test_reminders_fire_once_per_stage_and_digest_once_a_day(db):
     from jobhunter import owner
     noon = datetime(2026, 9, 19, 9, 0)                       # 12:00 МСК
-    _card(db, "Astoria AI", noon - timedelta(hours=70), noon + timedelta(hours=2))    # скоро истечёт
-    _card(db, "Zapier", noon - timedelta(hours=10), noon + timedelta(hours=38))       # висит 10 часов
+    _card(db, "Nimbus AI", noon - timedelta(hours=70), noon + timedelta(hours=2))    # скоро истечёт
+    _card(db, "Flowbase", noon - timedelta(hours=10), noon + timedelta(hours=38))       # висит 10 часов
     _card(db, "Fresh Co", noon - timedelta(hours=1), noon + timedelta(hours=47))      # только пришла
     assert owner.remind_pending(now=noon) == 2
     texts = _texts(db)
-    assert any("Истекает через 2 ч" in t and "Astoria AI" in t for t in texts)
-    assert any("Zapier" in t and "уже 10 ч" in t for t in texts)
+    assert any("Истекает через 2 ч" in t and "Nimbus AI" in t for t in texts)
+    assert any("Flowbase" in t and "уже 10 ч" in t for t in texts)
     assert not any("Fresh Co" in t and "🔔" in t for t in texts)
     digest = [t for t in texts if t.startswith("📬")]
     assert len(digest) == 1 and "Ждут твоего ответа: 3" in digest[0] and "Fresh Co" in digest[0]
@@ -75,7 +75,7 @@ def test_no_reminders_at_night_and_none_for_decided_cards(db):
     from jobhunter import owner
     from jobhunter.models import OwnerRequest
     night = datetime(2026, 9, 19, 0, 30)                     # 03:30 МСК
-    rid = _card(db, "Astoria AI", night - timedelta(hours=70), night + timedelta(hours=2))
+    rid = _card(db, "Nimbus AI", night - timedelta(hours=70), night + timedelta(hours=2))
     assert owner.remind_pending(now=night) == 0 and _texts(db) == []
     with db.session_scope() as sess:
         sess.get(OwnerRequest, rid).decision = "send"
@@ -132,12 +132,12 @@ def test_send_decision_in_telegram_manual_mode_hands_the_text_to_the_owner(db):
 
 
 def test_reminders_do_not_repeat_after_delivery(db):
-    """19.09 вживую: сводка пришла трижды за час, напоминание про Zapier — дважды. Ключ dedup у
+    """19.09 вживую: сводка пришла трижды за час, напоминание про Flowbase — дважды. Ключ dedup у
     push() защищает только недоставленные копии; доставленное сообщение ключ освобождало."""
     from jobhunter import owner
     from jobhunter.models import BotOutbox, utcnow
     noon = datetime(2026, 9, 19, 9, 0)
-    _card(db, "Zapier", noon - timedelta(hours=10), noon + timedelta(hours=38))
+    _card(db, "Flowbase", noon - timedelta(hours=10), noon + timedelta(hours=38))
     assert owner.remind_pending(now=noon) == 1
     with db.session_scope() as sess:                      # бот всё доставил
         for o in sess.scalars(select(BotOutbox)):
@@ -153,7 +153,7 @@ def test_reminders_do_not_repeat_after_delivery(db):
 
 def _expired_card(db):
     now = datetime.now(timezone.utc).replace(tzinfo=None)
-    return _card(db, "YADRO", now - timedelta(hours=49), now - timedelta(minutes=5))
+    return _card(db, "Orbit", now - timedelta(hours=49), now - timedelta(minutes=5))
 
 
 def _stale_bot_beat(minutes):

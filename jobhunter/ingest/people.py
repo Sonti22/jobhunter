@@ -356,7 +356,7 @@ def _gh_headers() -> dict:
 RATE_LIMITED = "_rate_limited"
 
 # Кадровые агентства и HR-аккаунты заводят профили с «hiring» в био ради сбора
-# откликов. Сухой прогон 18.09: organichire, brovate — три адресата из трёх.
+# откликов. Сухой прогон 18.09: три адресата из трёх оказались агентствами.
 _RECRUITER = re.compile(
     r"recruit|staffing|talent\s+(?:acquisition|partner|sourc)|head\s?hunt|\bhr\b|"
     r"human\s+resources|outsourc|outstaff|agency|рекрут|кадров|подбор\s+персонал", re.I)

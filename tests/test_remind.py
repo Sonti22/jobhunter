@@ -18,7 +18,7 @@ import pytest
 def db(tmp_path_factory):
     os.environ["DB_PATH"] = str(tmp_path_factory.mktemp("db") / "rem.db")
     os.environ["TELEGRAM_BOT_TOKEN"] = "test:token"
-    os.environ["BOT_ALLOWED_USER_IDS"] = "5875908057"
+    os.environ["BOT_ALLOWED_USER_IDS"] = "111222333"
     os.environ["LLM_ENABLED"] = "false"
     from jobhunter.config import get_settings
     get_settings.cache_clear()

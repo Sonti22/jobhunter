@@ -21,7 +21,7 @@ import pytest
 def db(tmp_path_factory):
     os.environ["DB_PATH"] = str(tmp_path_factory.mktemp("db") / "manual.db")
     os.environ["TELEGRAM_BOT_TOKEN"] = "test:token"
-    os.environ["BOT_ALLOWED_USER_IDS"] = "5875908057"
+    os.environ["BOT_ALLOWED_USER_IDS"] = "111222333"
     os.environ["LLM_ENABLED"] = "false"
     from jobhunter.config import get_settings
     get_settings.cache_clear()
@@ -230,9 +230,9 @@ def test_bot_button_marks_and_dims_card(db):
     app_id = _job_app(db)
     upd = {"update_id": 1,
            "callback_query": {"id": "cb1", "data": "m:%d:applied" % app_id,
-                              "from": {"id": 5875908057},
+                              "from": {"id": 111222333},
                               "message": {"message_id": 77,
-                                          "chat": {"id": 5875908057}}}}
+                                          "chat": {"id": 111222333}}}}
     acts = handlers.handle(upd)
     assert any(a["do"] == "answer" for a in acts)
     edit = [a for a in acts if a["do"] == "edit"][0]

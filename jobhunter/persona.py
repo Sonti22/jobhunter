@@ -113,7 +113,7 @@ def subject(kind: str, lang: str, p: Profile | None = None, **fields: str) -> st
 
 
 def cv_file_prefix(p: Profile | None = None) -> str:
-    """Начало имени файла резюме: «Hakobyan_Python_ab12.pdf»."""
+    """Начало имени файла резюме: «Smirnov_Python_ab12.pdf»."""
     prof = p or get_profile()
     explicit = str(_section(prof).get("cv_file_prefix") or "").strip()
     if not explicit:

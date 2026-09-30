@@ -11,8 +11,8 @@ from pathlib import Path
 
 import pytest
 
-OWNER = 5875908057
-STRANGER = 111222333
+OWNER = 111222333
+STRANGER = 999888777
 
 
 @pytest.fixture(scope="module")

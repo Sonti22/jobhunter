@@ -1,7 +1,7 @@
 """Ответы работодателей в Gmail не теряются.
 
-Диагностика 16.09 на живой базе: Astoria AI 09.09 позвали на следующий этап
-(«Next Steps: пришлите work sample»), SearchAtlas попросили подать отклик по
+Диагностика 16.09 на живой базе: Nimbus AI 09.09 позвали на следующий этап
+(«Next Steps: пришлите work sample»), RankLab попросили подать отклик по
 ссылке — оба письма неделю лежали «в обработке» без ответа и без карточки.
 Причин было четыре: антиспам Telegram блокировал и почтовые ответы,
 классификатор принимал такие письма за «спасибо», заблокированный автоответ
@@ -18,28 +18,28 @@ from sqlalchemy import select
 from jobhunter.convo import mailmatch
 from jobhunter.convo.classify import classify
 
-ASTORIA = """Dear Alexey,
+NIMBUS = """Dear Alexey,
 
-Thank you for your interest in Astoria AI. We reviewed your application and we believe that there could be a potential fit.
+Thank you for your interest in Nimbus AI. We reviewed your application and we believe that there could be a potential fit.
 
 Next Steps
 
 To continue the process, we would like to get a better understanding of your practical experience. Please share the following:
 
 Work sample or project
-Present an existing work sample or a meaningful project that best represents your skills and experience (Full Stack and/or GenAI) relevant for Astoria AI. Please share the GitHub repository or your portfolio, with a short explanation or demo (video preferred).
+Present an existing work sample or a meaningful project that best represents your skills and experience (Full Stack and/or GenAI) relevant for Nimbus AI. Please share the GitHub repository or your portfolio, with a short explanation or demo (video preferred).
 
 After reviewing your submission, we will schedule a conversation with the CTO and the founders to discuss your experience and potential collaboration.
 
 Happy to answer any questions. Please feel free to reach out.
 
-Konstantin
-Astoria AI"""
+Daniel
+Nimbus AI"""
 
-SEARCH_ATLAS = """Hi!
+RANKLAB = """Hi!
 Thanks for reaching out!
 You can apply to the role directly here:
-https://searchatlas.na.teamtailor.com/jobs/595729-senior-full-stack-engineer-django-next-js
+https://ranklab.na.teamtailor.com/jobs/595729-senior-full-stack-engineer-django-next-js
 
 Wishing you all the very best,"""
 
@@ -47,8 +47,8 @@ Wishing you all the very best,"""
 # ── классификатор ──
 
 @pytest.mark.parametrize("text,expected", [
-    (ASTORIA, "task_request"),
-    (SEARCH_ATLAS, "apply_link"),
+    (NIMBUS, "task_request"),
+    (RANKLAB, "apply_link"),
     ("Алексей, добрый день!\nНа данный момент мы остановили поиск на данную вакансию, "
      "т.к. определились с финальными кандидатами.\nБольшое спасибо за ваш интерес!",
      "rejection"),
@@ -80,7 +80,7 @@ def test_task_and_apply_link_never_auto_even_in_bold():
     from jobhunter.models import Application, Status
 
     app = Application(id=1, status=Status.AWAITING_REPLY.value, cv_lang="en")
-    for text in (ASTORIA, SEARCH_ATLAS):
+    for text in (NIMBUS, RANKLAB):
         plan = plan_reply(app, text, bold=True)
         assert not plan.should_reply and plan.escalate
 
@@ -140,12 +140,12 @@ def db(tmp_path, monkeypatch):
     get_settings.cache_clear()
 
 
-def _email_app(db, addr="konstantin.mueller@astoria.ai", status="AWAITING_REPLY"):
+def _email_app(db, addr="daniel.weber@nimbus-ai.io", status="AWAITING_REPLY"):
     from jobhunter.models import Application, ContactKind, Job
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     with db.session_scope() as sess:
         job = Job(external_uuid=str(random.random()), source="hn", title="Full Stack Engineer",
-                  company_name="Astoria AI", description_raw="Python, GenAI",
+                  company_name="Nimbus AI", description_raw="Python, GenAI",
                   contact_kind=ContactKind.EMAIL.value, contact_url="mailto:" + addr)
         sess.add(job)
         sess.flush()
@@ -190,10 +190,10 @@ def test_stuck_emails_are_reprocessed_into_cards(db):
     from jobhunter.convo import inbox_email
     from jobhunter.models import Message, OwnerRequest, utcnow
 
-    astoria = _email_app(db)
-    atlas = _email_app(db, addr="joao.pedro@searchatlas.com")
+    nimbus = _email_app(db)
+    atlas = _email_app(db, addr="lucas.costa@ranklab.com")
     with db.session_scope() as sess:
-        for app_id, body in ((astoria, ASTORIA), (atlas, SEARCH_ATLAS)):
+        for app_id, body in ((nimbus, NIMBUS), (atlas, RANKLAB)):
             sess.add(Message(application_id=app_id, direction="in", body=body,
                              received_at=utcnow(), processing_pending=True,
                              processing_error="автоответ не ушёл: stop:ручной режим после двух PeerFlood"))
@@ -201,10 +201,10 @@ def test_stuck_emails_are_reprocessed_into_cards(db):
     with db.session_scope() as sess:
         assert not sess.scalars(select(Message).where(Message.processing_pending.is_(True))).all()
         cards = {c.application_id: c for c in sess.scalars(select(OwnerRequest))}
-        assert "следующий этап" in cards[astoria].payload_json["reason"]
-        assert cards[atlas].payload_json["apply_url"].startswith("https://searchatlas.")
-        assert "joao.pedro@searchatlas.com" in cards[atlas].question
-        ttl = cards[astoria].expires_at - cards[astoria].created_at
+        assert "следующий этап" in cards[nimbus].payload_json["reason"]
+        assert cards[atlas].payload_json["apply_url"].startswith("https://ranklab.")
+        assert "lucas.costa@ranklab.com" in cards[atlas].question
+        ttl = cards[nimbus].expires_at - cards[nimbus].created_at
         assert ttl >= timedelta(hours=71), "почтовая карточка живёт 72 часа"
     # повтор не зацикливается: зависших больше нет
     assert asyncio.run(inbox_email.retry_stuck()) == 0
@@ -265,15 +265,15 @@ def test_build_context_indexes_company_domain(db):
 
 # ── находки 18.09 ──
 
-ZAPIER = """Hi Alexey,
+FLOWBASE = """Hi Alexey,
 
-Thanks so much for reaching out and for your interest in Zapier! We really
+Thanks so much for reaching out and for your interest in Flowbase! We really
 appreciate the initiative.
 
-At Zapier, all candidate journeys start with an application through our
+At Flowbase, all candidate journeys start with an application through our
 jobs page. I'd encourage you to check out our current openings at
-zapier.com/jobs
-<https://www.google.com/url?q=https://zapier.com/jobs&source=gmail&ust=1789736726823000&sa=E>
+flowbase.com/jobs
+<https://www.google.com/url?q=https://flowbase.com/jobs&source=gmail&ust=1789736726823000&sa=E>
 and apply to any roles that match your background and interests.
 
 From there, the hiring team will review your application and reach out with
@@ -284,12 +284,12 @@ Raluca"""
 
 
 def test_apply_through_jobs_page_is_apply_link_not_a_task():
-    assert classify(ZAPIER).label == "apply_link"
+    assert classify(FLOWBASE).label == "apply_link"
 
 
 def test_apply_url_unwraps_google_redirect_and_bare_domain():
     from jobhunter.convo.engine import find_apply_url
-    assert find_apply_url(ZAPIER) == "https://zapier.com/jobs"
+    assert find_apply_url(FLOWBASE) == "https://flowbase.com/jobs"
     assert find_apply_url("Please apply at acme.io/careers/backend.") == "https://acme.io/careers/backend"
     assert find_apply_url("Apply here: https://jobs.acme.com/1.") == "https://jobs.acme.com/1"
     assert find_apply_url("Write to hr@acme.com (acme.com)") == ""

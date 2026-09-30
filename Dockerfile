@@ -39,7 +39,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Код и данные, нужные для работы. .env сюда НЕ попадает (см. .dockerignore):
 # секреты приходят переменными окружения в момент запуска.
 COPY --chown=app:app jobhunter/ ./jobhunter/
-COPY --chown=app:app profile.yaml ./
+# Личный profile.yaml в образ не кладём: слои образа читает любой, у кого он
+# есть. Настоящий профиль подключается томом (docker-compose.yml), а пример
+# нужен тестам внутри образа.
+COPY --chown=app:app profile.example.yaml ./
 COPY --chown=app:app lexicon/ ./lexicon/
 COPY --chown=app:app tests/ ./tests/
 # Реестр проверенных Telegram-каналов нужен автопилоту внутри образа.

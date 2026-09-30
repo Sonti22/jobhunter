@@ -113,7 +113,7 @@ def test_github_skips_recruiters_service_mailboxes_and_stops_on_rate_limit(monke
     """Сухой прогон 18.09: три адресата из трёх — кадровые агентства, один — support@."""
     monkeypatch.setattr(people.time, "sleep", lambda *a: None)
     users = {
-        "agency": {"login": "organichire", "email": "hello@organichire.co",
+        "agency": {"login": "hireagency", "email": "hello@hireagency.co",
                    "bio": "We're hiring! Recruiting agency for Python devs"},
         "support": {"login": "corp", "email": "support@corp.dev", "bio": "CTO. We're hiring"},
         "hr": {"login": "kate", "email": "kate@corp.dev", "bio": "HR at Corp, hiring backend"},
@@ -122,7 +122,7 @@ def test_github_skips_recruiters_service_mailboxes_and_stops_on_rate_limit(monke
         # площадки найма по названию компании и домену — тоже мимо
         "bighire": {"login": "vince", "email": "vince@bighire.io", "company": "Bighire.io LLC",
                     "bio": "Founder. We're hiring engineers"},
-        "talento": {"login": "emma", "email": "emma@talentoit.org", "company": "Talento IT",
+        "talento": {"login": "emma", "email": "emma@talentohub.org", "company": "Talento IT",
                     "bio": "CEO, hiring"},
     }
     found = people.github_people(limit=10, fetcher=_github(users), queries=("hiring in:bio",))
@@ -283,7 +283,7 @@ def test_provenance_recheck(monkeypatch):
     ("name.surname@corp.io", True), ("your.name@corp.io", True), ("username@corp.io", True),
     ("john.doe@corp.io", True), ("jobs@example.com", True), ("test@corp.io", True),
     # настоящие адреса, похожие на заглушки
-    ("me@charlesvien.com", False), ("mail@firma.de", False), ("marco@konghq.com", False),
+    ("me@janedoe.dev", False), ("mail@firma.de", False), ("cto@konghq.com", False),
     ("lastochkin@corp.ru", False), ("jobs@acme.io", False),
 ])
 def test_placeholder_addresses_are_never_contacts(addr, placeholder):
@@ -311,7 +311,7 @@ def test_github_member_with_placeholder_email_is_skipped(monkeypatch):
     ("Ищу работу, открыт к предложениям", False),
     ("CTO @Kong. We are hiring engineers: https://konghq.com/careers", True),
     ("Founder & CEO. We're hiring!", True),
-    ("PlusAI is hiring. Leader in self-driving trucks", True),
+    ("PlusML is hiring. Leader in self-driving trucks", True),
     ("Hiring (reach out on LinkedIn)", True),
     ("Мы нанимаем разработчиков", True),
     ("Backend dev, no hiring here", True),

@@ -309,7 +309,7 @@ def record_bounce(headers: dict, body: str, dry: bool = False) -> str:
 
 
 # Так помечались письма, чей автоответ заблокировала политика. Повтора у них
-# не было: Astoria AI (next steps) и SearchAtlas (подать по ссылке) неделю
+# не было: Nimbus AI (next steps) и RankLab (подать по ссылке) неделю
 # лежали «в обработке». Сбои-исключения сюда не входят — их разбирает владелец.
 STUCK_MARK = "автоответ не ушёл"
 

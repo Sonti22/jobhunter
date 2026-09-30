@@ -142,7 +142,7 @@ def test_general_reply_limit_still_caps_bold(db):
 def test_tech_question_draft_is_actually_written(monkeypatch):
     """План помечал техвопрос «черновиком по фактам», а черновик писать было
     нечем: в задачах draft_routine_reply не было tech_question, и 24.09 каждый
-    такой вопрос (вопросы GDL IT — месяц) уходил владельцу карточкой."""
+    такой вопрос (вопросы Acme IT — месяц) уходил владельцу карточкой."""
     from types import SimpleNamespace
 
     from jobhunter.config import get_settings

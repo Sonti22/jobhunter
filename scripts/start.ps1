@@ -7,7 +7,7 @@
 # Положить ярлык в автозагрузку:
 #   1. Win+R → shell:startup
 #   2. Создать ярлык на:
-#      powershell -WindowStyle Hidden -ExecutionPolicy Bypass -File C:\Users\User\Desktop\jobhunter\scripts\start.ps1
+#      powershell -WindowStyle Hidden -ExecutionPolicy Bypass -File <папка проекта>\scripts\start.ps1
 
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot

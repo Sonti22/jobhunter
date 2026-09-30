@@ -13,7 +13,7 @@ def db(tmp_path, monkeypatch):
     monkeypatch.setenv("DB_PATH", str(tmp_path / "resend.db"))
     monkeypatch.setenv("LLM_ENABLED", "false")
     monkeypatch.setenv("KILL_SWITCH_PATH", str(tmp_path / "STOP"))
-    monkeypatch.setenv("SMTP_USER", "suren@gmail.com")
+    monkeypatch.setenv("SMTP_USER", "alexey@gmail.com")
     monkeypatch.setenv("SMTP_APP_PASSWORD", "x")
     monkeypatch.setenv("CV_OUT", str(tmp_path / "cv"))
     import jobhunter.db as dbmod
@@ -32,12 +32,12 @@ def db(tmp_path, monkeypatch):
     get_settings.cache_clear()
 
 
-def _app(db, addr="enghiring@senzing.com", lang="ru", **kw):
+def _app(db, addr="enghiring@entigo.com", lang="ru", **kw):
     from jobhunter.models import Application, ContactKind, Job, utcnow
     with db.session_scope() as sess:
         job = Job(external_uuid=str(random.random()), source=kw.pop("source", "hn"),
-                  title="Platform Engineer", company_name="Senzing",
-                  description_raw=kw.pop("body", "Senzing | Platform Engineer | Remote (USA)\n"
+                  title="Platform Engineer", company_name="Entigo",
+                  description_raw=kw.pop("body", "Entigo | Platform Engineer | Remote (USA)\n"
                                                   "We're hiring. Python, PostgreSQL, Kubernetes."),
                   contact_kind=ContactKind.EMAIL.value, contact_url=addr)
         sess.add(job)

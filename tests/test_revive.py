@@ -20,7 +20,7 @@ def db(tmp_path_factory):
     os.environ["DB_PATH"] = str(tmp_path_factory.mktemp("db") / "revive.db")
     os.environ["LLM_ENABLED"] = "false"
     os.environ["TELEGRAM_BOT_TOKEN"] = "test:token"
-    os.environ["BOT_ALLOWED_USER_IDS"] = "5875908057"
+    os.environ["BOT_ALLOWED_USER_IDS"] = "111222333"
     from jobhunter.config import get_settings
     get_settings.cache_clear()
     import jobhunter.db as dbmod

@@ -17,7 +17,7 @@ import pytest
 def db(tmp_path_factory):
     os.environ["DB_PATH"] = str(tmp_path_factory.mktemp("db") / "auto.db")
     os.environ["TELEGRAM_BOT_TOKEN"] = "test:token"
-    os.environ["BOT_ALLOWED_USER_IDS"] = "5875908057"
+    os.environ["BOT_ALLOWED_USER_IDS"] = "111222333"
     os.environ["LLM_ENABLED"] = "false"
     os.environ["SMTP_USER"] = "owner@example.com"
     os.environ["SMTP_APP_PASSWORD"] = "x"

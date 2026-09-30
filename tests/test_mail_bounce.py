@@ -25,7 +25,7 @@ Final-Recipient: rfc822; jobs@deadco.com
 Action: failed
 Status: 5.1.1
 
-From: Alexey Smirnov <suren@gmail.com>
+From: Alexey Smirnov <alexey@gmail.com>
 To: jobs@deadco.com
 Subject: Application: Backend Engineer
 Message-ID: <jobhunter-%d-initial@gmail.com>

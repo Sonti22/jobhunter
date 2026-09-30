@@ -237,7 +237,7 @@ def _create(sess, contact, *, role: str = "", jd_text: str = "", linked: list | 
         sess.add(emp)
         sess.flush()
     kind = "referral" if contact.kind == people.REFERRAL else "exec"
-    # Название часто приходит логином GitHub («inato»): в теме письма строчная
+    # Название часто приходит логином GitHub («trialix»): в теме письма строчная
     # буква выглядит как рассылка. Бренд целиком не угадать, первую букву — можно.
     company = (contact.company or "").strip()
     if company and company == company.lower() and company[0].isalpha():

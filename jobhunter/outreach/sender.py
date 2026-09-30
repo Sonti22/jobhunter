@@ -411,7 +411,7 @@ async def send_one(client, item: dict, rng: random.Random, dry: bool) -> str:
                              error_class="PeerFloodError", peer_id=item["handle"]))
             # Peer-триггер уходит в карантин, а не обратно в очередь.
             # Возврат в APPROVED стоил кампании второго страйка: после
-            # первого PeerFlood на @angel_hrdigital заявка осталась в
+            # первого PeerFlood на рекрутёра заявка осталась в
             # очереди, через два дня сендер написал ТОМУ ЖЕ адресату,
             # снова словил PeerFlood — потолок 30→15→7 и ручной режим.
             app = sess.get(Application, item["app_id"])

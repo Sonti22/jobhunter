@@ -139,8 +139,8 @@ def test_notification_dedup_is_atomic_shape(db):
 
 def test_llm_prompt_redacts_contact_data():
     from jobhunter.llm import redact_pii
-    cleaned = redact_pii("Связь: suren@example.com, +7 (999) 123-45-67")
-    assert "suren@example.com" not in cleaned
+    cleaned = redact_pii("Связь: alexey@example.com, +7 (999) 123-45-67")
+    assert "alexey@example.com" not in cleaned
     assert "+7" not in cleaned
     assert "<EMAIL>" in cleaned and "<PHONE>" in cleaned
 

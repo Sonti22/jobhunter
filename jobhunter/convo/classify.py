@@ -37,7 +37,7 @@ AUTO_OK_BOLD = AUTO_OK | {TECH_QUESTION, WORK_FORMAT}
 # Деньги, оффер и предложенное время не автоматизируются НИКОГДА, при
 # любых настройках. Прямое решение владельца, закреплено тестом.
 # Задание от работодателя и «подайте через сайт» — тоже: ответ «спасибо» на
-# «пришлите work sample» хоронит лучший разговор (Astoria AI, 09.09).
+# «пришлите work sample» хоронит лучший разговор (Nimbus AI, 09.09).
 ESCALATE_ALWAYS = {MONEY, OFFER, SLOT_PROPOSED, TASK_REQUEST, APPLY_LINK}
 ESCALATE = {TECH_QUESTION, MONEY, OFFER, UNKNOWN, SLOT_PROPOSED, WORK_FORMAT,
             TASK_REQUEST, APPLY_LINK}
@@ -105,12 +105,12 @@ _PATTERNS = [
                      r"это\s+не\s+вакансия|это\s+мо[её]\s+резюме|"
                      r"я\s+(?:сам\w*\s+|тоже\s+)?(?:ищу\s+работу|работу\s+ищу)|"
                      r"(?:we\s+are|we're)\s+only\s+hiring\s+in\b)"),
-    # «You can apply to the role directly here: <ссылка>» (SearchAtlas) —
+    # «You can apply to the role directly here: <ссылка>» (RankLab) —
     # отклик надо подать на сайте, благодарность в ответ его не заменит.
     (APPLY_LINK, 0.9, r"(\bapply\b[^.!?\n]{0,40}\b(?:directly|here|via|through|using|"
                       r"on\s+our|at\s+our|on\s+the\s+(?:link|website|site|portal))\b|"
                       r"(?:application|careers?)\s+(?:link|portal|page|form)\b|"
-                      # Zapier 17.09: «all candidate journeys start with an application
+                      # Flowbase 17.09: «all candidate journeys start with an application
                       # through our jobs page… apply to any roles that match»
                       r"application\s+(?:through|via|on)\s+our\b|\b(?:jobs|careers?)\s+page\b|"
                       r"\bapply\s+(?:to|for)\s+any\s+(?:roles?|positions?|openings?)\b|"

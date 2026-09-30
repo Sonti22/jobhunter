@@ -2,7 +2,7 @@
 # Сессия Telethon монопольна, поэтому демон останавливается на время прогона
 # и ПОДНИМАЕТСЯ ОБРАТНО в конце — что бы ни случилось посередине (finally).
 $ErrorActionPreference = "Continue"
-Set-Location "C:\Users\User\Desktop\jobhunter"
+Set-Location (Split-Path -Parent $PSScriptRoot)
 $log = "out\logs\manual_run_$(Get-Date -Format 'yyyyMMdd_HHmm').log"
 function Log($m) { "$(Get-Date -Format 'HH:mm:ss') $m" | Tee-Object -FilePath $log -Append }
 

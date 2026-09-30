@@ -466,7 +466,7 @@ def find_apply_url(text: str) -> str:
     """Ссылка «подать отклик» из письма работодателя.
 
     Gmail заворачивает ссылки в google.com/url?q=…, а рекрутёры пишут адрес и
-    без схемы («check out our openings at zapier.com/jobs») — кнопка в
+    без схемы («check out our openings at flowbase.com/jobs») — кнопка в
     карточке должна вести на сам сайт, а не на редирект.
     """
     from urllib.parse import unquote

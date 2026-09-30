@@ -14,6 +14,7 @@ from pathlib import Path
 
 from sqlalchemy import select
 
+from jobhunter import persona
 from jobhunter.config import ROOT
 from jobhunter.db import session_scope
 from jobhunter.models import Application, ContactKind, Job, Status
@@ -130,7 +131,7 @@ def build() -> Path:
                         'Открыть чат @%s</a>'
                         % (html.escape(it["handle"]), html.escape(it["handle"])))
         else:
-            subj = "Отклик: %s — Акопян Сурен" % it["title"][:60]
+            subj = persona.subject("apply", "ru", role=it["title"][:60])
             open_btn = ('<a class="btn" href="mailto:%s?subject=%s">Написать %s</a>'
                         % (html.escape(it["email"]),
                            html.escape(subj.replace(" ", "%20")),

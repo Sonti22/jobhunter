@@ -9,7 +9,7 @@ import uuid
 
 import pytest
 
-OWNER = 5875908057
+OWNER = 111222333
 
 
 @pytest.fixture(scope="module")
@@ -45,8 +45,8 @@ def test_phones_with_dots_are_redacted():
     """«8.999.123.45.67» раньше уходил во внешний API нередактированным."""
     from jobhunter.llm import redact_pii
 
-    for txt in ("тел. 8.999.123.45.67", "звони +7 (999) 404-84-43",
-                "мой номер 89994048443"):
+    for txt in ("тел. 8.999.123.45.67", "звони +7 (999) 555-01-23",
+                "мой номер 89995550123"):
         assert "<PHONE>" in redact_pii(txt), txt
 
 
@@ -63,10 +63,10 @@ def test_redaction_is_wired_into_generate(monkeypatch):
 
     monkeypatch.setattr(llm, "PROVIDERS", [("fake", fake_provider)])
     monkeypatch.setattr(llm, "_key_for", lambda name, s: "k")
-    res = llm.generate("позвони мне: +7 999 404-84-43 и напиши a@b.com")
+    res = llm.generate("позвони мне: +7 999 555-01-23 и напиши a@b.com")
     assert res.ok
     assert "<PHONE>" in captured["prompt"] and "<EMAIL>" in captured["prompt"]
-    assert "404-84-43" not in captured["prompt"]
+    assert "555-01-23" not in captured["prompt"]
 
 
 # ── авто-ответ: плейсхолдер не уходит рекрутёру ──

@@ -36,7 +36,7 @@ def db(tmp_path, monkeypatch):
     monkeypatch.setenv("CV_OUT", str(tmp_path / "cv"))
     monkeypatch.setenv("BASE_CV_PATH", "")
     monkeypatch.setenv("DIRECT_ENABLED", "true")
-    monkeypatch.setenv("SMTP_USER", "suren@gmail.com")
+    monkeypatch.setenv("SMTP_USER", "alexey@gmail.com")
     import jobhunter.db as dbmod
     from jobhunter.config import get_settings
     get_settings.cache_clear()
@@ -140,7 +140,7 @@ def test_language_repair_leaves_direct_letters_alone(db):
     служебное, а письмо английское, и «исправление языка» считало это ошибкой."""
     from jobhunter.models import Application
     from jobhunter.repair_queue import reset_email_language
-    app_id = _direct_app(db, "marco@konghq.com", status="APPROVED", company="Kong")
+    app_id = _direct_app(db, "cto@konghq.com", status="APPROVED", company="Kong")
     assert reset_email_language(dry=False).get("сброшено", 0) == 0
     with db.session_scope() as sess:
         app = sess.get(Application, app_id)
@@ -152,13 +152,13 @@ def test_lowercase_company_from_github_login_is_capitalised(db):
     from jobhunter.models import Job
     from jobhunter.outreach import direct
     with db.session_scope() as sess:
-        for email, company in (("cto@inato.com", "inato"), ("cto@konghq.com", "Kong"),
-                               ("a@eye2gene.com", "eye2gene")):
+        for email, company in (("cto@trialix.com", "trialix"), ("cto@konghq.com", "Kong"),
+                               ("a@visiongene.com", "visiongene")):
             direct._create(sess, people.Contact(email=email, kind=people.EXEC, company=company,
                                                 source_url="https://api.github.com/users/x"))
     with db.session_scope() as sess:
         names = sorted(n for n, in sess.execute(select(Job.company_name).where(Job.source == "direct:exec")))
-        assert names == ["Eye2gene", "Inato", "Kong"]
+        assert names == ["Kong", "Trialix", "Visiongene"]
 
 
 def test_general_inbox_waits_for_owner(db):
@@ -352,7 +352,7 @@ def test_dead_approved_tail_is_closed_with_a_reason(db, monkeypatch):
             sess.add(app)
             sess.flush()
             ids[name] = app.id
-    direct_id = _direct_app(db, "marco@konghq.com", status="APPROVED", company="Kong")
+    direct_id = _direct_app(db, "cto@konghq.com", status="APPROVED", company="Kong")
     stats = sweep_dead_approved()
     assert sum(stats.values()) == 4
     with db.session_scope() as sess:

@@ -132,19 +132,19 @@ FAQ_FIXTURE = [
     {"id": "payments_experience", "answer_ru": "Есть опыт платёжных интеграций — Stripe, PayPal."},
     {"id": "start_date", "answer_ru": "Могу выйти сразу."},
 ]
-GDL_IT = ("Добрый день! Спасибо за отклик. Ответьте пожалуйста на вопросы: "
+ACME_IT = ("Добрый день! Спасибо за отклик. Ответьте пожалуйста на вопросы: "
           "1) Расскажите о вашем последнем проекте, какие технологии там использовались? "
           "2) Готовы ли к посещению офиса в Москве? 3) Есть ли опыт в финтехе? "
           "Я вернусь с обратной связью в течении недели.")
 
 
 def test_every_question_covered_by_faq_is_answered_verbatim_in_order(monkeypatch):
-    """24.09: LLM-пересказ на вопросы GDL IT написал «переезд в офис обсуждаем» —
+    """24.09: LLM-пересказ на вопросы Acme IT написал «переезд в офис обсуждаем» —
     а у владельца на все три вопроса есть выверенные ответы."""
     from jobhunter.convo.reply import faq_reply
     prof = _profile(faq=FAQ_FIXTURE)
     monkeypatch.setattr("jobhunter.profile.get_profile", lambda: prof)
-    text, topics = faq_reply(GDL_IT)
+    text, topics = faq_reply(ACME_IT)
     assert topics == ["last_project", "location_and_format", "payments_experience"]
     assert text == ("Последний проект — Integration Manager в Nordlane. Живу в Москве. "
                     "Работаю только удалённо. Есть опыт платёжных интеграций — Stripe, PayPal.")
@@ -162,7 +162,7 @@ def test_tech_question_plan_uses_faq_verbatim(db, monkeypatch):
     from jobhunter.convo.reply import plan_reply
     prof = _profile(faq=FAQ_FIXTURE)
     monkeypatch.setattr("jobhunter.profile.get_profile", lambda: prof)
-    plan = plan_reply(_app_row(db), GDL_IT, bold=True)
+    plan = plan_reply(_app_row(db), ACME_IT, bold=True)
     assert plan.should_reply and plan.verbatim and not plan.needs_draft
     assert "только удалённо" in plan.text
 
